@@ -1,0 +1,47 @@
+src/cli/index.ts
+  s_3d7f58f9094359::t_84e9bd737b6fd8 3-4,12-20,23,27-38
+package.json
+  s_3d7f58f9094359::t_ee1f171b4ea3e5 22-23
+  s_3d7f58f9094359::t_48a09342b9d7e9 21
+electron-builder.yml
+  s_3d7f58f9094359::t_1fe4fb34fc54d4 41-42
+  s_3d7f58f9094359::t_e6e1049943637f 43
+SKILL.md
+  s_3d7f58f9094359::t_591c1c8ff2d7f0 3,7,10,25
+  s_3d7f58f9094359::t_25275ab24c8fd2 9,11,14-22
+  s_3d7f58f9094359::t_b476b01bc9cdc6 8
+README.md
+  s_3d7f58f9094359::t_0872d7dd8bd520 7-17,24-25,30,32,42-57
+  s_3d7f58f9094359::t_b5dc42c0e8fbb7 58
+  s_3d7f58f9094359::t_73be9e37197dec 20-21,27
+scripts/build-cli.sh
+  s_3d7f58f9094359::t_0f82678eb0b2ab 1-2,10-11
+  s_3d7f58f9094359::t_408a8ae671cf54 3-9
+src/main/vault.ts
+  s_3d7f58f9094359::t_fef6893c394635 21
+src/main/skill-template.ts
+  s_3d7f58f9094359::t_b994cc7a44e16c 2,5-6,10,36-39,42,45-53,56-58
+  s_3d7f58f9094359::t_17b8012662193b 1
+  s_3d7f58f9094359::t_34803e54530a6c 41
+  s_3d7f58f9094359::t_3d27ee1fe46b84 40
+src/shared/capture-match.test.ts
+  s_3d7f58f9094359::t_6547e8e175ecc1 15,23,86,100,111,118,142,155,159
+src/shared/capture-match.ts
+  s_3d7f58f9094359::t_5c0d9a8e6dd620 101-102,156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "db6d0eee5a5a1870a32192d00eb225d65247c91f",
+  "prompts": {},
+  "sessions": {
+    "s_3d7f58f9094359": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c93a4bc5-05d9-4f4e-9128-6854ed9c6413",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
