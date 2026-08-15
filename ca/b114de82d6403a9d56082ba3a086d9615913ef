@@ -1,0 +1,117 @@
+.editorconfig
+  s_3d7f58f9094359::t_5175f2cde26df0 1-9
+.vscode/launch.json
+  s_3d7f58f9094359::t_d33a4f28f2e120 1-39
+build/entitlements.mac.plist
+  s_3d7f58f9094359::t_ab9510a8fe2faa 1-12
+bun.lock
+  s_3d7f58f9094359::t_b676495054fc44 1-2107
+components.json
+  s_3d7f58f9094359::t_312d1a955b412b 1-25
+oxfmt.config.ts
+  s_3d7f58f9094359::t_ad5c4bb49bf4d0 1-6
+oxlint.config.ts
+  s_096c0f12a3fc74::t_e9dd5d6ea85684 1-82
+package.json
+  s_664c037ed26848::t_ac4ba8946afdc4 1-72
+src/cli/index.ts
+  s_3d7f58f9094359::t_1e6bd51797955e 1-173
+src/main/capture.ts
+  s_3d7f58f9094359::t_3f3fd56d1d364f 1-383
+src/main/index.ts
+  s_3d7f58f9094359::t_4ea0118c7e6949 1-592
+src/main/skill-template.ts
+  s_3d7f58f9094359::t_0ad1a61440b5b8 1-54
+src/preload/index.d.ts
+  s_3d7f58f9094359::t_943ba71da661bf 1-7
+src/renderer/src/app.tsx
+  s_3d7f58f9094359::t_39f88d15a3cfe4 1-789
+src/renderer/src/components/bulk-bar.tsx
+  s_3d7f58f9094359::t_6c4f7bf2d68673 1-112
+src/renderer/src/components/chip.tsx
+  s_3d7f58f9094359::t_04e0bc2907f52c 1-26
+src/renderer/src/components/section-picker.tsx
+  s_3d7f58f9094359::t_3d758c1d6918cf 1-289
+src/renderer/src/components/settings-panel.tsx
+  s_3d7f58f9094359::t_06ac37b4d54285 1-324
+src/renderer/src/components/ui/badge.tsx
+  s_3d7f58f9094359::t_f814ffc5f00e30 1-53
+src/renderer/src/components/ui/button-group.tsx
+  s_3d7f58f9094359::t_95a5b128d20c84 1-59
+src/renderer/src/components/ui/button.tsx
+  s_3d7f58f9094359::t_72584cfd6b808b 1-59
+src/renderer/src/components/ui/combobox.tsx
+  s_3d7f58f9094359::t_cce86ff934f660 1-154
+src/renderer/src/components/ui/command.tsx
+  s_3d7f58f9094359::t_8b8bf4932d9a5b 1-191
+src/renderer/src/components/ui/dropdown-menu.tsx
+  s_3d7f58f9094359::t_9d314814329c86 1-272
+src/renderer/src/components/ui/input-group.tsx
+  s_3d7f58f9094359::t_fb160dc65e08dc 1-159
+src/renderer/src/components/ui/input.tsx
+  s_3d7f58f9094359::t_8c6a776ed487a3 1-20
+src/renderer/src/components/ui/kbd.tsx
+  s_3d7f58f9094359::t_36017595ce12e5 1-26
+src/renderer/src/components/ui/scroll-area.tsx
+  s_3d7f58f9094359::t_22baf8aef49603 1-52
+src/renderer/src/components/ui/separator.tsx
+  s_3d7f58f9094359::t_c436de903e90fb 1-23
+src/renderer/src/components/ui/switch.tsx
+  s_3d7f58f9094359::t_953fcfc9417496 1-32
+src/renderer/src/components/ui/tabs.tsx
+  s_3d7f58f9094359::t_1f421661f2e469 1-81
+src/renderer/src/components/ui/textarea.tsx
+  s_3d7f58f9094359::t_1da8d5f54a19de 1-18
+src/renderer/src/components/ui/tooltip.tsx
+  s_3d7f58f9094359::t_6dad5b9a3c527b 1-66
+src/renderer/src/env.d.ts
+  s_3d7f58f9094359::t_afe92b5d1bbaaf 1
+src/renderer/src/lib/section-menu.ts
+  s_3d7f58f9094359::t_f2befb554e5e7e 1-84
+src/renderer/src/lib/slip-menu.ts
+  s_3d7f58f9094359::t_654578c12c079a 1-153
+src/renderer/src/main.tsx
+  s_3d7f58f9094359::t_d6d4c6dfe35009 1-16
+src/shared/logic.ts
+  s_3d7f58f9094359::t_551374519ec698 1-110
+src/shared/short-id.ts
+  s_3d7f58f9094359::t_f83f9b51ddb6db 1-6
+tsconfig.json
+  s_3d7f58f9094359::t_6aa2f229f8e858 1-14
+tsconfig.node.json
+  s_096c0f12a3fc74::t_f872d24e2bb68a 1-23
+tsconfig.web.json
+  s_096c0f12a3fc74::t_4a785e079cb344 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "cab114de82d6403a9d56082ba3a086d9615913ef",
+  "prompts": {},
+  "sessions": {
+    "s_096c0f12a3fc74": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db894eb1-6f72-414b-b7bf-75431778321c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    },
+    "s_3d7f58f9094359": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c93a4bc5-05d9-4f4e-9128-6854ed9c6413",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    },
+    "s_664c037ed26848": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d79e68b4-d00e-4165-bbbd-cf2e6e927fe5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
