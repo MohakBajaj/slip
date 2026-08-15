@@ -18,10 +18,7 @@ import { SKILL_MD } from "./skill-template";
 
 export const ensureVault = (root: string): void => {
   mkdirSync(path.join(root, "attachments"), { recursive: true });
-  const skill = path.join(root, "SKILL.md");
-  if (!existsSync(skill)) {
-    writeFileSync(skill, SKILL_MD);
-  }
+  writeFileSync(path.join(root, "SKILL.md"), SKILL_MD);
   if (!existsSync(path.join(root, "INDEX.md"))) {
     writeFileSync(path.join(root, "INDEX.md"), "# Slip index\n");
   }
@@ -32,10 +29,10 @@ export const listSlips = (root: string): Slip[] => {
   return readdirSync(root)
     .filter(
       (name) =>
-        name.endsWith(".md") && name !== "INDEX.md" && name !== "SKILL.md"
+        name.endsWith(".md") && name !== "INDEX.md" && name !== "SKILL.md",
     )
     .map((name) =>
-      parseSlip(name, readFileSync(path.join(root, name), "utf-8"))
+      parseSlip(name, readFileSync(path.join(root, name), "utf-8")),
     )
     .filter((slip): slip is Slip => Boolean(slip));
 };
@@ -64,7 +61,7 @@ export const createSlip = (
     images?: string[];
     section?: string;
     source?: string;
-  }
+  },
 ): Slip => {
   const createdAt = new Date().toISOString();
   const id = shortId();
@@ -90,7 +87,7 @@ export const createSlip = (
 export const updateSlip = (
   root: string,
   id: string,
-  patch: Partial<Slip>
+  patch: Partial<Slip>,
 ): Slip | null => {
   const current = listSlips(root).find((slip) => slip.id === id);
   if (!current) {
@@ -124,7 +121,7 @@ export { importImage };
 
 export const watchVault = (
   root: string,
-  onChange: () => void
+  onChange: () => void,
 ): (() => void) => {
   ensureVault(root);
   let timer: NodeJS.Timeout | null = null;
@@ -150,7 +147,7 @@ export const watchVault = (
 
 export const resolveAttachment = (
   root: string,
-  filePath: string
+  filePath: string,
 ): string | null => {
   const attachments = path.join(root, "attachments");
   if (!filePath.startsWith(attachments)) {

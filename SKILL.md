@@ -1,23 +1,28 @@
 # Slip
 
-Local capture inbox. Vault is `~/Documents/Slip`. One `.md` file per slip. Never rename or move files.
+Local capture inbox. One markdown file per slip. Never rename or move files. Vault is `~/Documents/Slip` unless Slip settings or `SLIP_VAULT` say otherwise.
 
 ## CLI
 
-From this repo:
+The CLI ships inside Slip.app only. The app does not need to be running. Do not call `bun src/cli` — that path is not part of a release.
+
+`/Applications/Slip.app/Contents/Helpers/slip <command>`
+
+If Slip is not in Applications, use `Slip.app/Contents/Helpers/slip` from wherever the app lives.
 
 ```sh
-bun src/cli/index.ts list
-bun src/cli/index.ts search <query>
-bun src/cli/index.ts add "text"
-bun src/cli/index.ts done <id>
-bun src/cli/index.ts archive <id>
-bun src/cli/index.ts tag <id> <tag>
-bun src/cli/index.ts path <id>
-bun src/cli/index.ts prompt <id> [id...]
+/Applications/Slip.app/Contents/Helpers/slip list
+/Applications/Slip.app/Contents/Helpers/slip search <query>
+/Applications/Slip.app/Contents/Helpers/slip add "text"
+/Applications/Slip.app/Contents/Helpers/slip done <id>
+/Applications/Slip.app/Contents/Helpers/slip archive <id>
+/Applications/Slip.app/Contents/Helpers/slip tag <id> <tag>
+/Applications/Slip.app/Contents/Helpers/slip path <id>
+/Applications/Slip.app/Contents/Helpers/slip prompt <id> [id...]
+/Applications/Slip.app/Contents/Helpers/slip vault
 ```
 
-`SLIP_VAULT` overrides the folder.
+`--vault <dir>` or `SLIP_VAULT` overrides the folder.
 
 ## Files
 

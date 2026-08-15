@@ -38,6 +38,9 @@ mac:
   extendInfo:
     NSDocumentsFolderUsageDescription: Slip keeps your notes as markdown in Documents.
   notarize: false
+  extraFiles:
+    - from: dist/cli/slip
+      to: Helpers/slip
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:

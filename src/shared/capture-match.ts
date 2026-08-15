@@ -98,7 +98,8 @@ export const MOD_KEYCODES = new Set([
 ]);
 
 export type Compiled =
-  { code: number; flags: number; kind: "key" } | { kind: "mod"; mask: number };
+  | { code: number; flags: number; kind: "key" }
+  | { kind: "mod"; mask: number };
 
 export type MatchInput =
   | { flags: number; type: "flags" }
@@ -152,7 +153,7 @@ const fallback = (): Compiled[] => compileCapture(["Shift", "Shift"]);
 
 export const createCaptureMatcher = (
   seq: string[],
-  opts?: { now?: () => number; windowMs?: number },
+  opts?: { now?: () => number; windowMs?: number }
 ) => {
   let steps = compileCapture(seq);
   if (steps.length === 0) {

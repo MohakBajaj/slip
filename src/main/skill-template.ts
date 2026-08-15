@@ -1,10 +1,13 @@
+export const SLIP_CLI = "/Applications/Slip.app/Contents/Helpers/slip";
+
 export const SKILL_MD = `# Slip
 
-Local capture inbox. One markdown file per slip. Never rename or move files.
+Local capture inbox. One markdown file per slip. Never rename or move
+files.
 
 ## Layout
 
-\`~/Documents/Slip/\` (or the vault path in settings)
+\`~/Documents/Slip/\` (or the vault path in Slip settings)
 
 - \`YYYY-MM-DD-<6id>.md\` — a slip. State lives in frontmatter.
 - \`INDEX.md\` — generated list. Do not edit.
@@ -30,20 +33,29 @@ The body is the note. First line is the title.
 
 ## CLI
 
-From the Slip repo (files only — the app does not need to be running):
+The CLI is inside Slip.app. The app does not need to be running. There
+is no separate CLI install.
+
+\`${SLIP_CLI} <command>\`
+
+If Slip is not in Applications, use \`Slip.app/Contents/Helpers/slip\`
+from wherever the app lives.
 
 \`\`\`sh
-bun src/cli/slip.ts list
-bun src/cli/slip.ts search <query>
-bun src/cli/slip.ts add "text"
-bun src/cli/slip.ts done <id>
-bun src/cli/slip.ts archive <id>
-bun src/cli/slip.ts tag <id> <tag>
-bun src/cli/slip.ts path <id>
-bun src/cli/slip.ts prompt <id> [id...]
+${SLIP_CLI} list
+${SLIP_CLI} search <query>
+${SLIP_CLI} add "text"
+${SLIP_CLI} done <id>
+${SLIP_CLI} archive <id>
+${SLIP_CLI} tag <id> <tag>
+${SLIP_CLI} path <id>
+${SLIP_CLI} prompt <id> [id...]
+${SLIP_CLI} vault
 \`\`\`
 
-\`SLIP_VAULT\` overrides the folder. Default is \`~/Documents/Slip\`.
+\`--vault <dir>\` or \`SLIP_VAULT\` overrides the folder. Otherwise the
+CLI uses the vault path from Slip settings, then
+\`~/Documents/Slip\`.
 
 ## Rules
 

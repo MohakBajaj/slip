@@ -12,7 +12,7 @@ import {
 
 const tapMod = (
   matcher: ReturnType<typeof createCaptureMatcher>,
-  mask: number,
+  mask: number
 ): boolean[] => [
   matcher.push({ flags: mask, type: "flags" }),
   matcher.push({ flags: 0, type: "flags" }),
@@ -20,7 +20,7 @@ const tapMod = (
 
 const doubleTap = (
   matcher: ReturnType<typeof createCaptureMatcher>,
-  mask: number,
+  mask: number
 ): boolean => {
   tapMod(matcher, mask);
   const second = tapMod(matcher, mask);
@@ -83,7 +83,7 @@ describe("capture matcher", () => {
     const matcher = createCaptureMatcher(["Shift", "Shift"]);
     tapMod(matcher, FLAG_SHIFT);
     expect(matcher.push({ code: KEYCODES.A, flags: 0, type: "key" })).toBe(
-      false,
+      false
     );
     expect(tapMod(matcher, FLAG_SHIFT)).toEqual([false, false]);
   });
@@ -97,7 +97,7 @@ describe("capture matcher", () => {
         code: KEYCODES.C,
         flags: FLAG_COMMAND,
         type: "key",
-      }),
+      })
     ).toBe(true);
   });
 
@@ -108,14 +108,14 @@ describe("capture matcher", () => {
         code: KEYCODES.C,
         flags: FLAG_COMMAND,
         type: "key",
-      }),
+      })
     ).toBe(false);
     expect(
       matcher.push({
         code: KEYCODES.C,
         flags: FLAG_COMMAND | FLAG_SHIFT,
         type: "key",
-      }),
+      })
     ).toBe(true);
   });
 
@@ -139,7 +139,7 @@ describe("capture matcher", () => {
         code: KEYCODES["`"],
         flags: FLAG_SHIFT,
         type: "key",
-      }),
+      })
     ).toBe(true);
   });
 
@@ -152,11 +152,11 @@ describe("capture matcher", () => {
   test("device bits on flags are ignored", () => {
     const matcher = createCaptureMatcher(["Option", "Option"]);
     expect(matcher.push({ flags: FLAG_OPTION | 0x20, type: "flags" })).toBe(
-      false,
+      false
     );
     expect(matcher.push({ flags: 0, type: "flags" })).toBe(false);
     expect(matcher.push({ flags: FLAG_OPTION | 0x20, type: "flags" })).toBe(
-      false,
+      false
     );
     expect(matcher.push({ flags: 0, type: "flags" })).toBe(true);
   });

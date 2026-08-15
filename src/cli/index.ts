@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 
 import { createCLI, defineCommand, option } from "@bunli/core";
@@ -7,19 +9,39 @@ import { z } from "zod";
 
 import { createSlip, listSlips, updateSlip } from "../main/vault";
 import { promptFor, titleOf } from "../shared/format";
-import { defaultVaultPath } from "../shared/types";
+import { defaultVaultPath, sanitizeSettings } from "../shared/types";
+
+const SETTINGS_FILE = path.join(
+  homedir(),
+  "Library",
+  "Application Support",
+  "slip",
+  "settings.json",
+);
 
 const vaultOption = option(z.string().optional(), {
-  description: "Vault folder (or SLIP_VAULT)",
+  description: "Vault folder (or SLIP_VAULT, or Slip settings)",
   short: "v",
 });
 
+const settingsVault = (): string | undefined => {
+  if (!existsSync(SETTINGS_FILE)) {
+    return undefined;
+  }
+  try {
+    return sanitizeSettings(JSON.parse(readFileSync(SETTINGS_FILE, "utf-8")))
+      .vaultPath;
+  } catch {
+    return undefined;
+  }
+};
+
 const vaultOf = (flag?: string): string =>
-  flag ?? process.env.SLIP_VAULT ?? defaultVaultPath();
+  flag ?? process.env.SLIP_VAULT ?? settingsVault() ?? defaultVaultPath();
 
 const find = (root: string, id: string) => {
   const slip = listSlips(root).find(
-    (item) => item.id === id || item.filename.startsWith(id)
+    (item) => item.id === id || item.filename.startsWith(id),
   );
   if (!slip) {
     throw new Error(`no slip ${id}`);
@@ -33,7 +55,7 @@ const list = defineCommand({
     const root = vaultOf(flags.vault);
     for (const slip of listSlips(root).filter((item) => !item.archived)) {
       console.log(
-        `${slip.id}\t${slip.done ? "done" : "open"}\t${titleOf(slip.content)}`
+        `${slip.id}\t${slip.done ? "done" : "open"}\t${titleOf(slip.content)}`,
       );
     }
   },
@@ -50,7 +72,7 @@ const search = defineCommand({
       (item) =>
         !item.archived &&
         (item.content.toLowerCase().includes(query) ||
-          item.tags.join(" ").toLowerCase().includes(query))
+          item.tags.join(" ").toLowerCase().includes(query)),
     )) {
       console.log(`${slip.id}\t${titleOf(slip.content)}`);
     }

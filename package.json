@@ -4,15 +4,11 @@
   "description": "A local capture inbox. Shift Shift, and it is a markdown file.",
   "homepage": "https://github.com/MohakBajaj/slip",
   "author": "Mohak Bajaj",
-  "bin": {
-    "slip": "./src/cli/index.ts"
-  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "env -u ELECTRON_RUN_AS_NODE electron-vite dev",
     "start": "env -u ELECTRON_RUN_AS_NODE electron-vite preview",
     "build": "electron-vite build",
-    "slip": "bun src/cli/index.ts",
     "check": "ultracite check --type-aware",
     "fix": "ultracite fix --type-aware",
     "typecheck:node": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json",
@@ -22,7 +18,9 @@
     "postinstall": "electron-builder install-app-deps",
     "make:tray": "xcrun swift scripts/make-tray-icons.swift resources/tray",
     "make:dock": "xcrun swift scripts/mask-dock-icon.swift resources/dock/light.png resources/dock/dark.png",
-    "package:mac": "electron-vite build && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --publish never"
+    "build:cli": "sh scripts/build-cli.sh",
+    "package:mac": "electron-vite build && sh scripts/build-cli.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --publish never",
+    "release:mac": "electron-vite build && sh scripts/build-cli.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
