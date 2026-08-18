@@ -1,0 +1,38 @@
+src/renderer/src/components/settings-panel.tsx
+  s_c5eb463bec95b3::t_2244efef1db8f8 12
+  s_c5eb463bec95b3::t_6cd326fb45cc60 197-233
+src/renderer/src/lib/use-slip-hotkeys.ts
+  s_c5eb463bec95b3::t_f1ada54c2ccfcc 35-37
+src/renderer/src/index.css
+  s_c5eb463bec95b3::t_dad52f2993d343 153-159
+src/main/index.ts
+  s_c5eb463bec95b3::t_e81c68d857de9f 472-474
+  s_c5eb463bec95b3::t_edd186138e5423 643-661
+  s_c5eb463bec95b3::t_72da213d1d996c 351-361,363,367-369,380,382
+  s_c5eb463bec95b3::t_d84393f9955c71 642
+src/renderer/src/app.tsx
+  s_c5eb463bec95b3::t_ce1515f9568d1a 27
+  s_c5eb463bec95b3::t_91cdcbc983963f 513
+  s_c5eb463bec95b3::t_ea898fbb484868 429-437,441
+src/shared/types.ts
+  s_c5eb463bec95b3::t_35d9cc93b4c2c3 116-119,133
+  s_c5eb463bec95b3::t_58232bcef15d28 40
+  s_c5eb463bec95b3::t_3d765da752a04d 62,65-69
+  s_c5eb463bec95b3::t_4d2df4b11dc1ae 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3d900d5d1f43cf30bd89eb7ac629d5add3cc1e2f",
+  "prompts": {},
+  "sessions": {
+    "s_c5eb463bec95b3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b29695d9-00e1-4a3a-b37a-a02c62f9fc79",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
