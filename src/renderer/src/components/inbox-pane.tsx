@@ -2,7 +2,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef } from "react";
 
 import { BulkBar } from "@/components/bulk-bar";
-import { Chip } from "@/components/chip";
 import { DetailWell } from "@/components/detail-well";
 import { SectionPicker } from "@/components/section-picker";
 import { SlipMark } from "@/components/slip-mark";
@@ -166,17 +165,14 @@ export const InboxPane = ({
   onFile,
   onFocus,
   onHeaderMenu,
-  onInbox,
   onMenu,
   onPick,
   onPatch,
   onSection,
   onSubmit,
-  onToggleArchive,
   renaming,
   section,
   sections,
-  showArchived,
 }: {
   bulk: BulkActions | null;
   current: Slip | null;
@@ -192,17 +188,14 @@ export const InboxPane = ({
   onFile: (name: string) => void;
   onFocus: (id: string | null) => void;
   onHeaderMenu: (name: string) => void;
-  onInbox: () => void;
   onMenu: (slip: Slip) => void;
   onPick: (id: string, mods: { meta: boolean; shift: boolean }) => void;
   onPatch: (id: string, next: Partial<Slip>) => void;
   onSection: (name: string) => void;
   onSubmit: () => void;
-  onToggleArchive: () => void;
   renaming: string | null;
   section: string;
   sections: string[];
-  showArchived: boolean;
 }) => {
   const rows = useMemo(() => groupedRows(list), [list]);
   const marks = useMemo(() => new Set(marked), [marked]);
@@ -234,15 +227,6 @@ export const InboxPane = ({
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${hidden ? "hidden" : ""}`}>
-      <div className="flex flex-wrap gap-1 px-2.5 pb-1.5">
-        <Chip on={!showArchived} onClick={onInbox}>
-          Inbox
-        </Chip>
-        <Chip on={showArchived} onClick={onToggleArchive}>
-          Archive
-        </Chip>
-      </div>
-
       <div
         className="no-scrollbar scroll-fade min-h-0 flex-1 overflow-y-auto"
         ref={parentRef}

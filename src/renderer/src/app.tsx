@@ -6,6 +6,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Chip } from "@/components/chip";
 import { CommandPalette } from "@/components/command-palette";
 import { InboxPane } from "@/components/inbox-pane";
 import { SettingsPanel } from "@/components/settings-panel";
@@ -515,63 +516,92 @@ const App = () => {
       data-font={settings.font}
       data-theme={settings.theme}
     >
-      <header className="drag flex items-center gap-1.5 px-2.5 pt-10 pb-1.5">
-        {settingsOpen ? (
-          <p className="min-w-0 flex-1 text-[13px] font-medium text-pretty">
-            Settings
-          </p>
-        ) : (
-          <div className="no-drag relative min-w-0 flex-1">
-            <HugeiconsIcon
-              className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
-              icon={Search01Icon}
-            />
-            <Input
-              className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
-              data-search=""
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search slips"
-              value={query}
-            />
-            {query ? (
-              <Button
-                aria-label="Clear search"
-                className="press absolute top-1/2 right-0.5 -translate-y-1/2"
-                onClick={() => setQuery("")}
-                size="icon-xs"
-                type="button"
-                variant="ghost"
+      <header className="drag flex flex-col">
+        <div className="flex h-[38px] items-center justify-end px-2.5">
+          {settingsOpen ? null : (
+            <div className="no-drag flex gap-1">
+              <Chip
+                on={!showArchived}
+                onClick={() => {
+                  stopRename();
+                  setSection("");
+                  setShowArchived(false);
+                  setMarked([]);
+                }}
               >
-                <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
-              </Button>
-            ) : null}
-          </div>
-        )}
-        <Button
-          aria-label="Command palette"
-          className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
-          onClick={() => setPaletteOpen(true)}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <span className="text-[10px] font-medium">⌘K</span>
-        </Button>
-        <Button
-          aria-label={settingsOpen ? "Close settings" : "Settings"}
-          className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
-          onClick={() => {
-            stopRename();
-            setSettingsOpen((value) => !value);
-          }}
-          size={settingsOpen ? "sm" : "icon-sm"}
-          variant="ghost"
-        >
-          {settingsOpen ? (
-            <span className="text-[11px]">Done</span>
-          ) : (
-            <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
+                Inbox
+              </Chip>
+              <Chip
+                on={showArchived}
+                onClick={() => {
+                  stopRename();
+                  setShowArchived((value) => !value);
+                  setMarked([]);
+                }}
+              >
+                Archive
+              </Chip>
+            </div>
           )}
-        </Button>
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 pb-1.5">
+          {settingsOpen ? (
+            <p className="min-w-0 flex-1 text-[13px] font-medium text-pretty">
+              Settings
+            </p>
+          ) : (
+            <div className="no-drag relative min-w-0 flex-1">
+              <HugeiconsIcon
+                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
+                icon={Search01Icon}
+              />
+              <Input
+                className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
+                data-search=""
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search slips"
+                value={query}
+              />
+              {query ? (
+                <Button
+                  aria-label="Clear search"
+                  className="press absolute top-1/2 right-0.5 -translate-y-1/2"
+                  onClick={() => setQuery("")}
+                  size="icon-xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
+                </Button>
+              ) : null}
+            </div>
+          )}
+          <Button
+            aria-label="Command palette"
+            className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+            onClick={() => setPaletteOpen(true)}
+            size="icon-sm"
+            variant="ghost"
+          >
+            <span className="text-[10px] font-medium">⌘K</span>
+          </Button>
+          <Button
+            aria-label={settingsOpen ? "Close settings" : "Settings"}
+            className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+            onClick={() => {
+              stopRename();
+              setSettingsOpen((value) => !value);
+            }}
+            size={settingsOpen ? "sm" : "icon-sm"}
+            variant="ghost"
+          >
+            {settingsOpen ? (
+              <span className="text-[11px]">Done</span>
+            ) : (
+              <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
+            )}
+          </Button>
+        </div>
       </header>
 
       {capture === "denied" ? (
@@ -663,12 +693,6 @@ const App = () => {
         onHeaderMenu={(name) => {
           openHeaderMenu(name).catch(() => undefined);
         }}
-        onInbox={() => {
-          stopRename();
-          setSection("");
-          setShowArchived(false);
-          setMarked([]);
-        }}
         onMenu={(slip) => {
           openSlipMenu(slip).catch(() => undefined);
         }}
@@ -703,15 +727,9 @@ const App = () => {
             })
             .catch(() => undefined);
         }}
-        onToggleArchive={() => {
-          stopRename();
-          setShowArchived((value) => !value);
-          setMarked([]);
-        }}
         renaming={renaming}
         section={section}
         sections={sections}
-        showArchived={showArchived}
       />
 
       <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
