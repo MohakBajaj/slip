@@ -370,7 +370,7 @@ const createWindow = (): void => {
     show: false,
     title: "Slip",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 12, y: 10 },
+    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       backgroundThrottling: true,
       contextIsolation: true,

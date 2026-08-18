@@ -6,6 +6,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import darkIcon from "@/assets/dock-dark.png";
+import lightIcon from "@/assets/dock-light.png";
 import { Chip } from "@/components/chip";
 import { CommandPalette } from "@/components/command-palette";
 import { InboxPane } from "@/components/inbox-pane";
@@ -517,9 +519,18 @@ const App = () => {
       data-theme={settings.theme}
     >
       <header className="drag flex flex-col">
-        <div className="flex h-[38px] items-center justify-end px-2.5">
+        <div className="flex h-9.5 items-center gap-2 pr-2.5">
+          <div className="flex min-w-0 items-center gap-1.5 pl-20">
+            <img
+              alt=""
+              className={`pointer-events-none size-4 rounded-[4.5px] outline ${dark ? "outline-white/10" : "outline-black/10"}`}
+              draggable={false}
+              src={dark ? darkIcon : lightIcon}
+            />
+            <p className="truncate text-[13px] font-medium">Slip</p>
+          </div>
           {settingsOpen ? null : (
-            <div className="no-drag flex gap-1">
+            <div className="no-drag ml-auto flex shrink-0 gap-1">
               <Chip
                 on={!showArchived}
                 onClick={() => {

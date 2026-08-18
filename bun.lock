@@ -46,6 +46,7 @@
     },
   },
   "trustedDependencies": [
+    "electron",
     "koffi",
   ],
   "packages": {

@@ -40,11 +40,24 @@ export interface Settings {
   zoom: number;
 }
 
-export const defaultVaultPath = (): string =>
-  `${process.env.HOME}/Documents/Slip`;
+const homeDir = (): string | undefined => {
+  if (typeof process === "undefined") {
+    return undefined;
+  }
+  return process.env.HOME;
+};
 
-export const settingsFile = (): string =>
-  `${process.env.HOME}/Library/Application Support/slip/settings.json`;
+export const defaultVaultPath = (): string => {
+  const home = homeDir();
+  return home === undefined ? "~/Documents/Slip" : `${home}/Documents/Slip`;
+};
+
+export const settingsFile = (): string => {
+  const home = homeDir();
+  return home === undefined
+    ? ""
+    : `${home}/Library/Application Support/slip/settings.json`;
+};
 
 export const defaultSettings = (): Settings => ({
   accent: "amber",
