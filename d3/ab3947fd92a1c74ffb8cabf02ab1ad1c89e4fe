@@ -1,0 +1,14 @@
+src/renderer/src/app.tsx
+  h_465c0699bc2db3 516
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d3ab3947fd92a1c74ffb8cabf02ab1ad1c89e4fe",
+  "prompts": {},
+  "humans": {
+    "h_465c0699bc2db3": {
+      "author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
