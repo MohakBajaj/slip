@@ -1,0 +1,20 @@
+src/main/index.ts
+  s_c5eb463bec95b3::t_3c386448e5c5ce 180,184-186,188-191
+  s_c5eb463bec95b3::t_53fc4fbcd07320 439-441,443-458
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b5f5e1c5d63291c6eaf1220d4087aea5f0ca5a84",
+  "prompts": {},
+  "sessions": {
+    "s_c5eb463bec95b3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b29695d9-00e1-4a3a-b37a-a02c62f9fc79",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
