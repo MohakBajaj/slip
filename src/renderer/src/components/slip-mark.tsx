@@ -19,5 +19,7 @@ export const SlipMark = ({
   if (marked) {
     return <span className="bg-primary block size-3.5 rounded-full" />;
   }
-  return <span className="border-border block size-3.5 rounded-full border" />;
+  return (
+    <span className="border-border group-hover/mark:border-foreground/50 block size-3.5 rounded-full border transition-[border-color] duration-150 ease-[cubic-bezier(0.2,0,0,1)]" />
+  );
 };

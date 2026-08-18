@@ -36,6 +36,7 @@ mac:
   hardenedRuntime: false
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
+    NSAutoFillHeuristicControllerEnabled: false
     NSDocumentsFolderUsageDescription: Slip keeps your notes as markdown in Documents.
   notarize: false
   extraFiles:

@@ -63,10 +63,32 @@ const writeClipboard = (text: string, paths: string[]): void => {
 };
 
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("in-process-gpu");
+app.commandLine.appendSwitch("disable-software-rasterizer");
 app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess");
+app.commandLine.appendSwitch(
+  "disable-features",
+  [
+    "AutofillServerCommunication",
+    "CalculateNativeWinOcclusion",
+    "CertificateTransparencyComponentUpdater",
+    "DialMediaRouteProvider",
+    "HardwareMediaKeyHandling",
+    "InterestFeedContentSuggestions",
+    "MediaRouter",
+    "SpareRendererForSitePerProcess",
+    "Translate",
+  ].join(",")
+);
 app.commandLine.appendSwitch("disable-background-networking");
 app.commandLine.appendSwitch("disable-breakpad");
-app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
+app.commandLine.appendSwitch("disable-component-update");
+app.commandLine.appendSwitch("disable-domain-reliability");
+app.commandLine.appendSwitch("disable-sync");
+app.commandLine.appendSwitch(
+  "js-flags",
+  "--max-old-space-size=96 --max-semi-space-size=2 --optimize-for-size"
+);
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -81,12 +103,12 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let win: BrowserWindow | null = null;
+let winReady = false;
 let tray: Tray | null = null;
 let captureCtl: CaptureHandle | null = null;
 let stopWatch: (() => void) | null = null;
 let capture: CaptureState = "off";
 let currentSection = "";
-let quitting = false;
 
 const loadSettings = (): Settings => {
   mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
@@ -274,7 +296,6 @@ const rebuildTray = (): void => {
       {
         accelerator: "Command+Q",
         click: () => {
-          quitting = true;
           app.quit();
         },
         label: "Quit Slip",
@@ -283,12 +304,17 @@ const rebuildTray = (): void => {
   );
 };
 
-const showWindow = (): void => {
-  if (!win) {
+const showWindow = (whenReady?: () => void): void => {
+  if (!win || win.isDestroyed()) {
     createWindow();
+  }
+  if (!winReady) {
+    win?.once("ready-to-show", () => whenReady?.());
+    return;
   }
   win?.show();
   win?.focus();
+  whenReady?.();
 };
 
 const setCapture = (next: CaptureState): void => {
@@ -377,25 +403,20 @@ const createWindow = (): void => {
       preload: path.join(__dirname, "../preload/index.js"),
       sandbox: true,
       spellcheck: false,
+      webgl: false,
       zoomFactor: zoom,
     },
     width: Math.round(360 * zoom),
   });
+  winReady = false;
   win.on("ready-to-show", () => {
-    if (loginItem().wasOpenedAtLogin) {
-      return;
-    }
+    winReady = true;
     win?.show();
-  });
-  win.on("close", (event) => {
-    if (quitting) {
-      return;
-    }
-    event.preventDefault();
-    win?.hide();
+    win?.focus();
   });
   win.on("closed", () => {
     win = null;
+    winReady = false;
   });
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -628,8 +649,7 @@ const boot = async (): Promise<void> => {
           {
             accelerator: "Command+,",
             click: () => {
-              showWindow();
-              send("command", "settings");
+              showWindow(() => send("command", "settings"));
             },
             label: "Settings…",
           },
@@ -693,7 +713,9 @@ const boot = async (): Promise<void> => {
 
   bootWatch();
   bootCapture();
-  createWindow();
+  if (!loginItem().wasOpenedAtLogin) {
+    createWindow();
+  }
 
   app.on("activate", () => showWindow());
 };
@@ -705,7 +727,6 @@ boot().catch(() => {
 });
 
 app.on("before-quit", () => {
-  quitting = true;
   captureCtl?.stop();
   stopWatch?.();
 });

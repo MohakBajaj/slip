@@ -4,14 +4,19 @@ import {
   Settings02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import darkIcon from "@/assets/dock-dark.png";
 import lightIcon from "@/assets/dock-light.png";
 import { Chip } from "@/components/chip";
-import { CommandPalette } from "@/components/command-palette";
 import { InboxPane } from "@/components/inbox-pane";
-import { SettingsPanel } from "@/components/settings-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { copySlip } from "@/lib/copy-slip";
@@ -34,6 +39,16 @@ import type {
   Settings,
   Slip,
 } from "../../shared/types";
+
+const CommandPalette = lazy(async () => {
+  const mod = await import("@/components/command-palette");
+  return { default: mod.CommandPalette };
+});
+
+const SettingsPanel = lazy(async () => {
+  const mod = await import("@/components/settings-panel");
+  return { default: mod.SettingsPanel };
+});
 
 const snapshot = (slips: Slip[]): Slip[] =>
   slips.map((slip) => ({
@@ -461,6 +476,9 @@ const App = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "news") {
+      void import("@fontsource-variable/newsreader/wght.css");
+    }
   }, [dark, settings.accent, settings.font, settings.theme]);
 
   useSlipHotkeys({
@@ -567,10 +585,13 @@ const App = () => {
                 icon={Search01Icon}
               />
               <Input
+                autoComplete="off"
+                autoCorrect="off"
                 className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
                 data-search=""
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search slips"
+                spellCheck={false}
                 value={query}
               />
               {query ? (
@@ -632,116 +653,118 @@ const App = () => {
 
       {settingsOpen ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <SettingsPanel
-            dark={dark}
-            login={login}
-            onBind={setBinding}
-            onChange={writeSettings}
-            onLogin={setLogin}
-            settings={settings}
-          />
+          <Suspense fallback={null}>
+            <SettingsPanel
+              dark={dark}
+              login={login}
+              onBind={setBinding}
+              onChange={writeSettings}
+              onLogin={setLogin}
+              settings={settings}
+            />
+          </Suspense>
         </div>
-      ) : null}
-      <InboxPane
-        bulk={
-          marked.length > 0
-            ? {
-                archiveLabel: subject.every((slip) => slip.archived)
-                  ? "Restore"
-                  : "Archive",
-                canMerge: marked.length > 1,
-                doneLabel: subject.every((slip) => slip.done)
-                  ? "Reopen"
-                  : "Done",
-                fileValue: subject.every(
-                  (slip) => slip.section === subject[0]?.section
-                )
-                  ? (subject[0]?.section ?? "")
-                  : "",
-                onArchive: () => {
-                  toggle(marked, "archived");
-                },
-                onClear: () => setMarked([]),
-                onCopyList: () => {
-                  copyList().catch(() => undefined);
-                },
-                onCopyPrompt: () => {
-                  copyPrompt().catch(() => undefined);
-                },
-                onDone: () => {
-                  toggle(marked, "done");
-                },
-                onMerge: () => {
-                  merge().catch(() => undefined);
-                },
-              }
-            : null
-        }
-        current={marked.length > 1 ? null : current}
-        draft={draft}
-        emptyCopy={emptyCopy}
-        focused={focused}
-        hidden={settingsOpen}
-        list={list}
-        marked={marked}
-        onCancelRename={stopRename}
-        onCopy={(slip) => {
-          if (marked.length > 1 && marked.includes(slip.id)) {
-            copyList().catch(() => undefined);
-            return;
+      ) : (
+        <InboxPane
+          bulk={
+            marked.length > 0
+              ? {
+                  archiveLabel: subject.every((slip) => slip.archived)
+                    ? "Restore"
+                    : "Archive",
+                  canMerge: marked.length > 1,
+                  doneLabel: subject.every((slip) => slip.done)
+                    ? "Reopen"
+                    : "Done",
+                  fileValue: subject.every(
+                    (slip) => slip.section === subject[0]?.section
+                  )
+                    ? (subject[0]?.section ?? "")
+                    : "",
+                  onArchive: () => {
+                    toggle(marked, "archived");
+                  },
+                  onClear: () => setMarked([]),
+                  onCopyList: () => {
+                    copyList().catch(() => undefined);
+                  },
+                  onCopyPrompt: () => {
+                    copyPrompt().catch(() => undefined);
+                  },
+                  onDone: () => {
+                    toggle(marked, "done");
+                  },
+                  onMerge: () => {
+                    merge().catch(() => undefined);
+                  },
+                }
+              : null
           }
-          copyNamed("Copied", () => copySlip(slip));
-        }}
-        onDraft={setDraft}
-        onFile={(name) => {
-          remember("Filed");
-          apply(marked, { section: name }).catch(() => undefined);
-        }}
-        onFocus={(id) => {
-          setFocused(id);
-          setMarked([]);
-        }}
-        onHeaderMenu={(name) => {
-          openHeaderMenu(name).catch(() => undefined);
-        }}
-        onMenu={(slip) => {
-          openSlipMenu(slip).catch(() => undefined);
-        }}
-        onPick={pick}
-        onPatch={(id, next) => {
-          apply([id], next).catch(() => undefined);
-        }}
-        onSection={(name) => {
-          stopRename();
-          setSection(name);
-          setMarked([]);
-        }}
-        onSubmit={() => {
-          const text = draft.trim();
-          if (!text) {
-            return;
-          }
-          if (renaming !== null) {
-            renameSection(renaming, text).catch(() => undefined);
-            return;
-          }
-          remember("Added");
-          window.slip
-            .createSlip(text)
-            .then((slip) => {
-              if (slip === null) {
-                return;
-              }
-              setUndo((cur) => (cur ? { ...cur, drop: [slip.id] } : cur));
-              setDraft("");
-              setSlips((cur) => [...cur, slip]);
-            })
-            .catch(() => undefined);
-        }}
-        renaming={renaming}
-        section={section}
-        sections={sections}
-      />
+          current={marked.length > 1 ? null : current}
+          draft={draft}
+          emptyCopy={emptyCopy}
+          focused={focused}
+          list={list}
+          marked={marked}
+          onCancelRename={stopRename}
+          onCopy={(slip) => {
+            if (marked.length > 1 && marked.includes(slip.id)) {
+              copyList().catch(() => undefined);
+              return;
+            }
+            copyNamed("Copied", () => copySlip(slip));
+          }}
+          onDraft={setDraft}
+          onFile={(name) => {
+            remember("Filed");
+            apply(marked, { section: name }).catch(() => undefined);
+          }}
+          onFocus={(id) => {
+            setFocused(id);
+            setMarked([]);
+          }}
+          onHeaderMenu={(name) => {
+            openHeaderMenu(name).catch(() => undefined);
+          }}
+          onMenu={(slip) => {
+            openSlipMenu(slip).catch(() => undefined);
+          }}
+          onPick={pick}
+          onPatch={(id, next) => {
+            apply([id], next).catch(() => undefined);
+          }}
+          onSection={(name) => {
+            stopRename();
+            setSection(name);
+            setMarked([]);
+          }}
+          onSubmit={() => {
+            const text = draft.trim();
+            if (!text) {
+              return;
+            }
+            if (renaming !== null) {
+              renameSection(renaming, text).catch(() => undefined);
+              return;
+            }
+            remember("Added");
+            window.slip
+              .createSlip(text)
+              .then((slip) => {
+                if (slip === null) {
+                  return;
+                }
+                setUndo((cur) => (cur ? { ...cur, drop: [slip.id] } : cur));
+                setDraft("");
+                setSlips((cur) => [...cur, slip]);
+              })
+              .catch(() => undefined);
+          }}
+          renaming={renaming}
+          section={section}
+          sections={sections}
+        />
+      )}
 
       <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
         <span>
@@ -754,47 +777,51 @@ const App = () => {
         <span>{capture === "live" ? "listening" : capture}</span>
       </footer>
 
-      <CommandPalette
-        onCopyList={() => {
-          setSettingsOpen(false);
-          copyList().catch(() => undefined);
-          setPaletteOpen(false);
-        }}
-        onCopyPrompt={() => {
-          setSettingsOpen(false);
-          copyPrompt().catch(() => undefined);
-          setPaletteOpen(false);
-        }}
-        onInbox={() => {
-          setSettingsOpen(false);
-          setPaletteOpen(false);
-        }}
-        onMerge={() => {
-          setSettingsOpen(false);
-          merge().catch(() => undefined);
-          setPaletteOpen(false);
-        }}
-        onOpen={goToSlip}
-        onOpenChange={setPaletteOpen}
-        onOpenVault={() => {
-          window.slip.openVault().catch(() => undefined);
-          setPaletteOpen(false);
-        }}
-        onSettings={() => {
-          setSettingsOpen(true);
-          setPaletteOpen(false);
-        }}
-        onUndo={() => {
-          runUndo().catch(() => undefined);
-          setPaletteOpen(false);
-        }}
-        open={paletteOpen}
-        settingsOpen={settingsOpen}
-        shortcuts={settings.shortcuts}
-        slips={slips}
-        subjectCount={subject.length}
-        undoLabel={undo?.label ?? null}
-      />
+      {paletteOpen ? (
+        <Suspense fallback={null}>
+          <CommandPalette
+            onCopyList={() => {
+              setSettingsOpen(false);
+              copyList().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onCopyPrompt={() => {
+              setSettingsOpen(false);
+              copyPrompt().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onInbox={() => {
+              setSettingsOpen(false);
+              setPaletteOpen(false);
+            }}
+            onMerge={() => {
+              setSettingsOpen(false);
+              merge().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onOpen={goToSlip}
+            onOpenChange={setPaletteOpen}
+            onOpenVault={() => {
+              window.slip.openVault().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onSettings={() => {
+              setSettingsOpen(true);
+              setPaletteOpen(false);
+            }}
+            onUndo={() => {
+              runUndo().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            open
+            settingsOpen={settingsOpen}
+            shortcuts={settings.shortcuts}
+            slips={slips}
+            subjectCount={subject.length}
+            undoLabel={undo?.label ?? null}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 };

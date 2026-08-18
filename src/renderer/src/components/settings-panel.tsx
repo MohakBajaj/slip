@@ -1,3 +1,4 @@
+import "@fontsource-variable/newsreader/wght.css";
 import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";

@@ -68,6 +68,7 @@ const SlipRow = ({
   focused,
   marked,
   onCopy,
+  onDone,
   onMenu,
   onPick,
   slip,
@@ -75,6 +76,7 @@ const SlipRow = ({
   focused: boolean;
   marked: boolean;
   onCopy: () => void;
+  onDone: () => void;
   onMenu: () => void;
   onPick: (mods: { meta: boolean; shift: boolean }) => void;
   slip: Slip;
@@ -89,6 +91,16 @@ const SlipRow = ({
     data-slip-row=""
     onClick={(event) => {
       if (Date.now() - menuAt < 250) {
+        return;
+      }
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-slip-mark]")
+      ) {
+        if (event.detail > 1) {
+          return;
+        }
+        onDone();
         return;
       }
       if (event.detail > 1) {
@@ -108,7 +120,10 @@ const SlipRow = ({
     }}
     type="button"
   >
-    <span className="text-muted-foreground mt-0.5">
+    <span
+      className="text-muted-foreground group/mark relative mt-0.5 after:absolute after:-inset-2 after:content-['']"
+      data-slip-mark=""
+    >
       <SlipMark marked={marked} slip={slip} />
     </span>
     <span className="min-w-0 flex-1">
@@ -156,7 +171,6 @@ export const InboxPane = ({
   draft,
   emptyCopy,
   focused,
-  hidden,
   list,
   marked,
   onCancelRename,
@@ -179,7 +193,6 @@ export const InboxPane = ({
   draft: string;
   emptyCopy: string;
   focused: string | null;
-  hidden: boolean;
   list: Slip[];
   marked: string[];
   onCancelRename: () => void;
@@ -202,18 +215,17 @@ export const InboxPane = ({
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
-    enabled: !hidden,
     estimateSize: (index) => (rows[index]?.kind === "header" ? 26 : 40),
     getItemKey: (index) => rows[index]?.key ?? index,
     getScrollElement: () => parentRef.current,
-    overscan: 10,
+    overscan: 4,
     paddingEnd: 2,
     paddingStart: 2,
   });
   const isRename = renaming !== null;
 
   useEffect(() => {
-    if (focused === null || hidden) {
+    if (focused === null) {
       return;
     }
     const index = rows.findIndex(
@@ -223,10 +235,10 @@ export const InboxPane = ({
       return;
     }
     virtualizer.scrollToIndex(index, { align: "auto" });
-  }, [focused, hidden, rows, virtualizer]);
+  }, [focused, rows, virtualizer]);
 
   return (
-    <div className={`flex min-h-0 flex-1 flex-col ${hidden ? "hidden" : ""}`}>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         className="no-scrollbar scroll-fade min-h-0 flex-1 overflow-y-auto"
         ref={parentRef}
@@ -270,6 +282,9 @@ export const InboxPane = ({
                       marked={marks.has(row.slip.id)}
                       onCopy={() => {
                         onCopy(row.slip);
+                      }}
+                      onDone={() => {
+                        onPatch(row.slip.id, { done: !row.slip.done });
                       }}
                       onMenu={() => {
                         onMenu(row.slip);
@@ -318,9 +333,12 @@ export const InboxPane = ({
             <MarkedActions actions={bulk} />
           ) : (
             <textarea
+              autoComplete="off"
+              autoCorrect="off"
               autoFocus={isRename}
               className="placeholder:text-muted-foreground min-h-11 w-full resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none"
               key={renaming ?? "compose"}
+              spellCheck={false}
               onChange={(event) => {
                 onDraft(event.target.value);
               }}
