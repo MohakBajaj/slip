@@ -513,7 +513,7 @@ const App = () => {
 
   return (
     <div
-      className={`bg-background text-foreground flex h-screen flex-col ${dark ? "dark" : ""} ${settingsOpen ? "no-pick" : ""}`}
+      className={`bg-background text-foreground flex h-screen flex-col scroll-smooth antialiased ${dark ? "dark" : ""} ${settingsOpen ? "no-pick" : ""}`}
       data-accent={settings.accent}
       data-font={settings.font}
       data-theme={settings.theme}
