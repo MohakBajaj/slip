@@ -37,6 +37,7 @@ export interface Settings {
   theme: ThemeId;
   trayIcon: TrayIconId;
   vaultPath: string;
+  zoom: number;
 }
 
 export const defaultVaultPath = (): string =>
@@ -58,7 +59,14 @@ export const defaultSettings = (): Settings => ({
   theme: "paper",
   trayIcon: "slip",
   vaultPath: defaultVaultPath(),
+  zoom: 1,
 });
+
+export const ZOOM_MIN = 0.8;
+export const ZOOM_MAX = 1.5;
+
+export const clampZoom = (value: number): number =>
+  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value * 10) / 10));
 
 const isAccent = (value: unknown): value is Accent =>
   value === "amber" ||
@@ -105,6 +113,10 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (typeof next.vaultPath !== "string" || next.vaultPath.length === 0) {
     next.vaultPath = defaultVaultPath();
   }
+  next.zoom =
+    typeof next.zoom === "number" && Number.isFinite(next.zoom)
+      ? clampZoom(next.zoom)
+      : 1;
   return {
     accent: next.accent,
     alwaysOnTop: next.alwaysOnTop,
@@ -118,6 +130,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     theme: next.theme,
     trayIcon: next.trayIcon,
     vaultPath: next.vaultPath,
+    zoom: next.zoom,
   };
 };
 

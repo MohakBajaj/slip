@@ -348,13 +348,25 @@ const bootWatch = (): void => {
   });
 };
 
+const applyZoom = (next: number, prev: number): void => {
+  if (!win) {
+    return;
+  }
+  const scale = next / prev;
+  win.setMinimumSize(Math.round(340 * next), Math.round(520 * next));
+  const [width, height] = win.getSize();
+  win.setSize(Math.round(width * scale), Math.round(height * scale));
+  win.webContents.setZoomFactor(next);
+};
+
 const createWindow = (): void => {
+  const { zoom } = settings;
   win = new BrowserWindow({
     alwaysOnTop: settings.alwaysOnTop,
     backgroundColor: windowHex(),
-    height: 600,
-    minHeight: 520,
-    minWidth: 340,
+    height: Math.round(600 * zoom),
+    minHeight: Math.round(520 * zoom),
+    minWidth: Math.round(340 * zoom),
     show: false,
     title: "Slip",
     titleBarStyle: "hiddenInset",
@@ -365,8 +377,9 @@ const createWindow = (): void => {
       preload: path.join(__dirname, "../preload/index.js"),
       sandbox: true,
       spellcheck: false,
+      zoomFactor: zoom,
     },
-    width: 360,
+    width: Math.round(360 * zoom),
   });
   win.on("ready-to-show", () => {
     if (loginItem().wasOpenedAtLogin) {
@@ -455,6 +468,9 @@ const boot = async (): Promise<void> => {
     }
     if (windowHex() !== prevBg) {
       win?.setBackgroundColor(windowHex());
+    }
+    if (settings.zoom !== prev.zoom) {
+      applyZoom(settings.zoom, prev.zoom);
     }
     if (vaultChanged) {
       ensureVault(settings.vaultPath);
@@ -623,6 +639,26 @@ const boot = async (): Promise<void> => {
         ],
       },
       { role: "editMenu" },
+      {
+        label: "View",
+        submenu: [
+          {
+            accelerator: "CommandOrControl+=",
+            click: () => send("command", "zoom_in"),
+            label: "Zoom In",
+          },
+          {
+            accelerator: "CommandOrControl+-",
+            click: () => send("command", "zoom_out"),
+            label: "Zoom Out",
+          },
+          {
+            accelerator: "CommandOrControl+0",
+            click: () => send("command", "zoom_reset"),
+            label: "Actual Size",
+          },
+        ],
+      },
       {
         label: "Slip",
         submenu: [

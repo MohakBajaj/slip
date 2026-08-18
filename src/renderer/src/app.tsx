@@ -24,7 +24,7 @@ import {
   slipIdsOf,
   visibleSlips,
 } from "../../shared/logic";
-import { defaultSettings } from "../../shared/types";
+import { clampZoom, defaultSettings } from "../../shared/types";
 import type {
   CaptureState,
   LoginState,
@@ -426,10 +426,19 @@ const App = () => {
         undo: () => {
           runUndo().catch(() => undefined);
         },
+        zoom_in: () => {
+          writeSettings({ ...settings, zoom: clampZoom(settings.zoom + 0.1) });
+        },
+        zoom_out: () => {
+          writeSettings({ ...settings, zoom: clampZoom(settings.zoom - 0.1) });
+        },
+        zoom_reset: () => {
+          writeSettings({ ...settings, zoom: 1 });
+        },
       });
     });
     return off;
-  }, [copyList, copyPrompt, merge, runUndo]);
+  }, [copyList, copyPrompt, merge, runUndo, settings]);
 
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -501,7 +510,7 @@ const App = () => {
 
   return (
     <div
-      className={`bg-background text-foreground flex h-screen flex-col ${dark ? "dark" : ""}`}
+      className={`bg-background text-foreground flex h-screen flex-col ${dark ? "dark" : ""} ${settingsOpen ? "no-pick" : ""}`}
       data-accent={settings.accent}
       data-font={settings.font}
       data-theme={settings.theme}

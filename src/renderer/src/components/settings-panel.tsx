@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 import { FONTS, THEMES, TRAY_ICONS } from "../../../shared/appearance";
 import type { FontId, ThemeId, TrayIconId } from "../../../shared/appearance";
-import { ACCENTS } from "../../../shared/types";
+import { ACCENTS, clampZoom, ZOOM_MAX, ZOOM_MIN } from "../../../shared/types";
 import type { Accent, LoginState, Settings } from "../../../shared/types";
 import { CaptureBind } from "./capture-bind";
 import { DockLook } from "./dock-look";
@@ -194,6 +194,43 @@ export const SettingsPanel = ({
                 ))}
               </div>
             </div>
+            <SettingsRow label="Zoom">
+              <div className="flex items-center gap-0.5">
+                <Button
+                  aria-label="Zoom out"
+                  className="press"
+                  disabled={settings.zoom <= ZOOM_MIN}
+                  onClick={() =>
+                    onChange({
+                      ...settings,
+                      zoom: clampZoom(settings.zoom - 0.1),
+                    })
+                  }
+                  size="xs"
+                  variant="ghost"
+                >
+                  −
+                </Button>
+                <span className="w-9 text-center text-[12px] tabular-nums">
+                  {Math.round(settings.zoom * 100)}%
+                </span>
+                <Button
+                  aria-label="Zoom in"
+                  className="press"
+                  disabled={settings.zoom >= ZOOM_MAX}
+                  onClick={() =>
+                    onChange({
+                      ...settings,
+                      zoom: clampZoom(settings.zoom + 0.1),
+                    })
+                  }
+                  size="xs"
+                  variant="ghost"
+                >
+                  +
+                </Button>
+              </div>
+            </SettingsRow>
           </Card>
           <Card>
             {FONTS.map((font) => (

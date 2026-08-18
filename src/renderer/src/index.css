@@ -150,6 +150,13 @@
   -webkit-app-region: no-drag;
 }
 
+.no-pick,
+.no-pick * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .md p,
 .md li {
   font-size: 0.8125rem;

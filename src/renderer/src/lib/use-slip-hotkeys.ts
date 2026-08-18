@@ -32,6 +32,9 @@ export const runMenuCommand = (
     palette: () => void;
     settings: () => void;
     undo: () => void;
+    zoom_in: () => void;
+    zoom_out: () => void;
+    zoom_reset: () => void;
   }
 ): void => {
   const run: Record<string, () => void> = actions;
