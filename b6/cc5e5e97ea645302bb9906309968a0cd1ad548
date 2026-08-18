@@ -1,0 +1,27 @@
+src/renderer/src/app.tsx
+  s_c5eb463bec95b3::t_d5c114d53e3623 579,588
+  s_c5eb463bec95b3::t_52b4a8158a17d7 519-530,532-547,573,602,604
+  s_c5eb463bec95b3::t_b565459893a32e 9
+  s_c5eb463bec95b3::t_739d1285ae1ccd 570-572
+  s_c5eb463bec95b3::t_8e504f45c68c33 574-576
+  s_c5eb463bec95b3::t_af248b317dcf35 580-582,585-587
+  s_c5eb463bec95b3::t_e07d3cad1f5281 589-591,599-601
+  s_c5eb463bec95b3::t_6e5f9794848b50 603
+  s_c5eb463bec95b3::t_085e57a251a8a2 549-551,553-569,577,583-584,592-598
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b6cc5e5e97ea645302bb9906309968a0cd1ad548",
+  "prompts": {},
+  "sessions": {
+    "s_c5eb463bec95b3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b29695d9-00e1-4a3a-b37a-a02c62f9fc79",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
