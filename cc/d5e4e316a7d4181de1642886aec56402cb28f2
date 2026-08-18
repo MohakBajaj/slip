@@ -1,0 +1,68 @@
+src/renderer/src/index.css
+  s_39651731189ef6::t_9e09bf376e0a88 4
+src/main/index.ts
+  s_cab2b3d7689e44::t_a7ce00f1c14e4f 106
+  s_39651731189ef6::t_4f385ddaa8b1b5 66-67,69-82,85-91
+  s_cab2b3d7689e44::t_76dc574e905812 307,317
+  s_39651731189ef6::t_4e1f872f953f58 406
+  s_cab2b3d7689e44::t_437b68fbd9d983 652
+  s_39651731189ef6::t_9e85de872b38de 308
+  s_39651731189ef6::t_003b706cb3e202 415
+  s_cab2b3d7689e44::t_21d8225e477a14 311-312
+  s_39651731189ef6::t_c7810d20551502 314,716-718
+  s_39651731189ef6::t_59d7761d58752b 313
+  s_cab2b3d7689e44::t_18c1181c201f46 411,413,419
+electron-builder.yml
+  s_39651731189ef6::t_d8f77fb3dc2856 39
+src/renderer/src/components/slip-mark.tsx
+  s_1dccf521a436f8::t_e917068ff2c828 22,24
+  s_1dccf521a436f8::t_c3bfd2113febff 23
+src/renderer/src/app.tsx
+  s_39651731189ef6::t_b1e98d1cba9ec0 656-665,667-701,703-767
+  s_39651731189ef6::t_ab660b33102e7f 43-52
+  s_39651731189ef6::t_6a680673bcb008 588-589,594
+  s_39651731189ef6::t_4d042a3a18d903 780-824
+  s_39651731189ef6::t_155d14cb5160fc 7-14
+  s_39651731189ef6::t_59895588fc4049 479-481
+src/renderer/src/components/inbox-pane.tsx
+  s_39651731189ef6::t_03741643bef03e 221
+  s_1dccf521a436f8::t_084f9dc42fce92 286-288
+  s_1dccf521a436f8::t_9e520afed78672 71,79
+  s_39651731189ef6::t_e0c95379fbade5 228,238,241
+  s_39651731189ef6::t_fb8097507c70ef 336-337,341
+  s_1dccf521a436f8::t_1ff745005f478c 96-105,123-126
+src/renderer/src/components/settings-panel.tsx
+  s_39651731189ef6::t_ba2bfb9f20a989 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ccd5e4e316a7d4181de1642886aec56402cb28f2",
+  "prompts": {},
+  "sessions": {
+    "s_1dccf521a436f8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8888cf18-4d11-487a-8a8d-f2e2e0bad35b",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    },
+    "s_39651731189ef6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eee5541c-21ca-4cd3-aa73-be8655db5c00",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    },
+    "s_cab2b3d7689e44": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc048f8e-8fb3-4bdd-91ff-ed0e28fe5a7a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
