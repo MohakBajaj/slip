@@ -280,6 +280,16 @@ export const SettingsPanel = ({
           <Heading>Mac</Heading>
           <DockLook dark={dark} />
           <Card>
+            <SettingsRow label="Always on top">
+              <Switch
+                aria-label="Always on top"
+                checked={settings.alwaysOnTop}
+                onCheckedChange={(alwaysOnTop) =>
+                  onChange({ ...settings, alwaysOnTop })
+                }
+                size="sm"
+              />
+            </SettingsRow>
             <SettingsRow label="Show in Dock">
               <Switch
                 aria-label="Show in Dock"
@@ -304,17 +314,36 @@ export const SettingsPanel = ({
               />
             </SettingsRow>
             <SettingsRow detail={vaultLabel(settings.vaultPath)} label="Vault">
-              <Button
-                className="press"
-                onClick={() => {
-                  window.slip.openVault().catch(() => undefined);
-                }}
-                size="xs"
-                variant="ghost"
-              >
-                <HugeiconsIcon className="size-3" icon={Folder02Icon} />
-                Open
-              </Button>
+              <div className="flex gap-0.5">
+                <Button
+                  className="press"
+                  onClick={() => {
+                    window.slip
+                      .pickVault()
+                      .then((folder) => {
+                        if (folder !== null && folder !== settings.vaultPath) {
+                          onChange({ ...settings, vaultPath: folder });
+                        }
+                      })
+                      .catch(() => undefined);
+                  }}
+                  size="xs"
+                  variant="ghost"
+                >
+                  Change
+                </Button>
+                <Button
+                  className="press"
+                  onClick={() => {
+                    window.slip.openVault().catch(() => undefined);
+                  }}
+                  size="xs"
+                  variant="ghost"
+                >
+                  <HugeiconsIcon className="size-3" icon={Folder02Icon} />
+                  Open
+                </Button>
+              </div>
             </SettingsRow>
           </Card>
         </section>

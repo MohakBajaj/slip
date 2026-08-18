@@ -1,8 +1,17 @@
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import {
+  Archive02Icon,
+  ArchiveRestoreIcon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  Copy01Icon,
+  PinIcon,
+  PinOffIcon,
+  ReloadIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
-import type { MouseEvent } from "react";
+import type { ComponentProps, MouseEvent } from "react";
 
 import { SectionPicker } from "@/components/section-picker";
 import { Button } from "@/components/ui/button";
@@ -18,14 +27,17 @@ import { copySlip } from "@/lib/copy-slip";
 
 import { whenLabel } from "../../../shared/logic";
 import type { Slip } from "../../../shared/types";
-import { imgSrc } from "../lib/img-src";
 import { Markdown } from "../markdown";
 
+const imgSrc = (filePath: string): string => `slip-img://img${filePath}`;
+
 const Action = ({
+  icon,
   label,
   on,
   onClick,
 }: {
+  icon: ComponentProps<typeof HugeiconsIcon>["icon"];
   label: string;
   on?: boolean;
   onClick: () => void;
@@ -37,6 +49,7 @@ const Action = ({
     type="button"
     variant={on === true ? "default" : "ghost"}
   >
+    <HugeiconsIcon className="size-3" icon={icon} />
     {label}
   </Button>
 );
@@ -52,6 +65,7 @@ const CopyGroup = ({ slip }: { slip: Slip }) => (
       type="button"
       variant="outline"
     >
+      <HugeiconsIcon className="size-3" icon={Copy01Icon} />
       Copy
     </Button>
     <DropdownMenu>
@@ -211,16 +225,19 @@ export const DetailWell = ({
       <footer className="flex flex-wrap items-center gap-1 px-2.5 pt-1 pb-1.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)]">
         <ButtonGroup className="flex-wrap">
           <Action
+            icon={slip.done ? ReloadIcon : CheckmarkCircle02Icon}
             label={slip.done ? "Reopen" : "Done"}
             on={slip.done}
             onClick={() => onPatch({ done: !slip.done })}
           />
           <Action
+            icon={slip.pin ? PinOffIcon : PinIcon}
             label={slip.pin ? "Unpin" : "Pin"}
             on={slip.pin}
             onClick={() => onPatch({ pin: !slip.pin })}
           />
           <Action
+            icon={slip.archived ? ArchiveRestoreIcon : Archive02Icon}
             label={slip.archived ? "Restore" : "Archive"}
             onClick={() => onPatch({ archived: !slip.archived })}
           />

@@ -1,23 +1,20 @@
 #!/usr/bin/env bun
 
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 
 import { createCLI, defineCommand, option } from "@bunli/core";
 import { z } from "zod";
 
-import { createSlip, listSlips, updateSlip } from "../main/vault";
 import { promptFor, titleOf } from "../shared/format";
-import { defaultVaultPath, sanitizeSettings } from "../shared/types";
+import {
+  defaultVaultPath,
+  sanitizeSettings,
+  settingsFile,
+} from "../shared/types";
+import { createSlip, listSlips, updateSlip } from "../vault";
 
-const SETTINGS_FILE = path.join(
-  homedir(),
-  "Library",
-  "Application Support",
-  "slip",
-  "settings.json",
-);
+const SETTINGS_FILE = settingsFile();
 
 const vaultOption = option(z.string().optional(), {
   description: "Vault folder (or SLIP_VAULT, or Slip settings)",
@@ -40,13 +37,21 @@ const vaultOf = (flag?: string): string =>
   flag ?? process.env.SLIP_VAULT ?? settingsVault() ?? defaultVaultPath();
 
 const find = (root: string, id: string) => {
-  const slip = listSlips(root).find(
-    (item) => item.id === id || item.filename.startsWith(id),
+  const slips = listSlips(root);
+  const exact = slips.find(
+    (item) =>
+      item.id === id || item.filename === id || item.filename === `${id}.md`
   );
-  if (!slip) {
-    throw new Error(`no slip ${id}`);
+  if (exact) {
+    return exact;
   }
-  return slip;
+  if (/^[0-9a-z]{1,5}$/u.test(id)) {
+    const hits = slips.filter((item) => item.id.startsWith(id));
+    if (hits.length === 1) {
+      return hits[0];
+    }
+  }
+  throw new Error(`no slip ${id}`);
 };
 
 const list = defineCommand({
@@ -55,7 +60,7 @@ const list = defineCommand({
     const root = vaultOf(flags.vault);
     for (const slip of listSlips(root).filter((item) => !item.archived)) {
       console.log(
-        `${slip.id}\t${slip.done ? "done" : "open"}\t${titleOf(slip.content)}`,
+        `${slip.id}\t${slip.done ? "done" : "open"}\t${titleOf(slip.content)}`
       );
     }
   },
@@ -72,7 +77,7 @@ const search = defineCommand({
       (item) =>
         !item.archived &&
         (item.content.toLowerCase().includes(query) ||
-          item.tags.join(" ").toLowerCase().includes(query)),
+          item.tags.join(" ").toLowerCase().includes(query))
     )) {
       console.log(`${slip.id}\t${titleOf(slip.content)}`);
     }

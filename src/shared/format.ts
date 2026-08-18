@@ -10,18 +10,6 @@ export const titleOf = (content: string): string => {
   return (line ?? "Untitled").replace(headingPrefix, "").trim() || "Untitled";
 };
 
-export const bodyOf = (content: string): string => {
-  const lines = content.split("\n");
-  const first = lines.findIndex((row) => row.trim().length > 0);
-  if (first === -1) {
-    return "";
-  }
-  return lines
-    .slice(first + 1)
-    .join("\n")
-    .trim();
-};
-
 export const renderIndex = (slips: Slip[]): string => {
   const open = slips.filter((slip) => !slip.archived);
   const lines = [

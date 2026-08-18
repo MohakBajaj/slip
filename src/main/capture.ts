@@ -142,14 +142,15 @@ const install = (opts: {
   let lastTrusted: boolean | null = null;
   let grabbing = false;
 
-  const synthesizeCopy = (): void => {
+  const synthesizeCopy = (): boolean => {
     const src = CGEventSourceCreate(kCGEventSourceStateCombinedSessionState);
     if (!src) {
-      return;
+      return false;
     }
     const down = CGEventCreateKeyboardEvent(src, kVK_ANSI_C, 1);
     const up = CGEventCreateKeyboardEvent(src, kVK_ANSI_C, 0);
-    if (down && up) {
+    const posted = Boolean(down && up);
+    if (posted) {
       CGEventSetFlags(down, kCGEventFlagMaskCommand);
       CGEventSetFlags(up, kCGEventFlagMaskCommand);
       CGEventPost(kCGAnnotatedSessionEventTap, down);
@@ -162,6 +163,7 @@ const install = (opts: {
       CFRelease(up);
     }
     CFRelease(src);
+    return posted;
   };
 
   const whitespace = /\s+/u;
@@ -200,26 +202,65 @@ const install = (opts: {
     return null;
   };
 
-  const grab = (): void => {
+  interface ClipSnap {
+    file: string | null;
+    imagePng: Buffer | null;
+    text: string;
+  }
+
+  const snapClip = (): ClipSnap => {
     const image = clipboard.readImage();
-    if (!image.isEmpty()) {
+    return {
+      file: clipboardFile(),
+      imagePng: image.isEmpty() ? null : image.toPNG(),
+      text: clipboard.readText(),
+    };
+  };
+
+  const samePng = (left: Buffer | null, right: Buffer | null): boolean => {
+    if (left === null || right === null) {
+      return left === right;
+    }
+    return left.equals(right);
+  };
+
+  const restoreClip = (snap: ClipSnap): void => {
+    if (snap.imagePng) {
+      clipboard.write({
+        image: nativeImage.createFromBuffer(snap.imagePng),
+        text: snap.text,
+      });
+      return;
+    }
+    clipboard.writeText(snap.text);
+  };
+
+  const grab = (before: ClipSnap): void => {
+    const after = snapClip();
+    const imageChanged =
+      after.imagePng !== null && !samePng(after.imagePng, before.imagePng);
+    const fileChanged = after.file !== null && after.file !== before.file;
+    const textChanged = after.text.trim() !== before.text.trim();
+    if (!(imageChanged || fileChanged || textChanged)) {
+      return;
+    }
+    if (imageChanged && after.imagePng) {
       const imagePath = path.join(opts.imageDir, `capture-${Date.now()}.png`);
-      writeFileSync(imagePath, image.toPNG());
+      writeFileSync(imagePath, after.imagePng);
       opts.onEvent({ kind: "image", path: imagePath });
       return;
     }
-    const file = clipboardFile();
-    if (file) {
+    if (fileChanged && after.file) {
       const dest = path.join(
         opts.imageDir,
-        `capture-${Date.now()}${path.extname(file) || ".png"}`
+        `capture-${Date.now()}${path.extname(after.file) || ".png"}`
       );
-      copyFileSync(file, dest);
+      copyFileSync(after.file, dest);
       opts.onEvent({ kind: "image", path: dest });
       return;
     }
-    const text = clipboard.readText().trim();
-    if (text) {
+    const text = after.text.trim();
+    if (textChanged && text) {
       opts.onEvent({ kind: "text", text });
     }
   };
@@ -229,16 +270,21 @@ const install = (opts: {
       return;
     }
     grabbing = true;
+    const before = snapClip();
     try {
-      synthesizeCopy();
+      if (!synthesizeCopy()) {
+        grabbing = false;
+        return;
+      }
     } catch {
       grabbing = false;
       return;
     }
     setTimeout(() => {
       try {
-        grab();
+        grab(before);
       } finally {
+        restoreClip(before);
         grabbing = false;
       }
     }, COPY_SETTLE_MS);
@@ -369,15 +415,4 @@ const install = (opts: {
       dropTap();
     },
   };
-};
-
-export const writeClipboard = (text: string, paths: string[]): void => {
-  if (paths.length === 0) {
-    clipboard.writeText(text);
-    return;
-  }
-  clipboard.write({
-    image: nativeImage.createFromPath(paths[0]),
-    text,
-  });
 };

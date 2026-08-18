@@ -1,7 +1,9 @@
 import matter from "gray-matter";
 
-import { asString } from "./as-string";
 import type { Slip } from "./types";
+
+const asString = (value: unknown, fallback: string): string =>
+  typeof value === "string" && value.length > 0 ? value : fallback;
 
 const leadingNewlines = /^\n+/u;
 const markdownExt = /\.md$/u;

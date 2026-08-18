@@ -11,7 +11,6 @@ import { InboxPane } from "@/components/inbox-pane";
 import { SettingsPanel } from "@/components/settings-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { copySlip } from "@/lib/copy-slip";
 import { applyPick } from "@/lib/range-ids";
 import { handleSectionMenu, sectionMenuEntries } from "@/lib/section-menu";
@@ -82,9 +81,11 @@ const App = () => {
   const [binding, setBinding] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [flash, setFlash] = useState("");
-  const [undo, setUndo] = useState<{ label: string; slips: Slip[] } | null>(
-    null
-  );
+  const [undo, setUndo] = useState<{
+    drop: string[];
+    label: string;
+    slips: Slip[];
+  } | null>(null);
 
   const reload = useCallback(async () => {
     const data = await window.slip.load();
@@ -117,14 +118,13 @@ const App = () => {
     window.setTimeout(() => setFlash((cur) => (cur === line ? "" : cur)), 2200);
   };
 
-  const remember = (label: string): void => {
-    setUndo({ label, slips: snapshot(slips) });
-    say(`${label} — ⌘Z`);
-  };
-
-  const leaveSettings = (): void => {
-    setSettingsOpen(false);
-  };
+  const remember = useCallback(
+    (label: string, drop: string[] = []): void => {
+      setUndo({ drop, label, slips: snapshot(slips) });
+      say(`${label} — ⌘Z`);
+    },
+    [slips]
+  );
 
   const goToSlip = (id: string): void => {
     const slip = slips.find((item) => item.id === id);
@@ -140,7 +140,7 @@ const App = () => {
     if (!undo) {
       return;
     }
-    await window.slip.restoreSlips(undo.slips);
+    await window.slip.restoreSlips(undo.slips, undo.drop);
     setUndo(null);
     say("Undone");
     await reload();
@@ -163,19 +163,7 @@ const App = () => {
     window.slip.saveSettings(next).catch(() => undefined);
   };
 
-  const patch = async (id: string, next: Partial<Slip>): Promise<void> => {
-    const label = patchLabel(next);
-    if (label !== null) {
-      remember(label);
-    }
-    await window.slip.updateSlip(id, next);
-    await reload();
-  };
-
-  const patchMany = async (
-    ids: string[],
-    next: Partial<Slip>
-  ): Promise<void> => {
+  const apply = async (ids: string[], next: Partial<Slip>): Promise<void> => {
     if (ids.length === 0) {
       return;
     }
@@ -183,9 +171,20 @@ const App = () => {
     if (label !== null) {
       remember(label);
     }
-    await Promise.all(ids.map((id) => window.slip.updateSlip(id, next)));
-    setMarked([]);
-    await reload();
+    setSlips(await window.slip.updateSlips(ids, next));
+    if (ids.length > 1) {
+      setMarked([]);
+    }
+  };
+
+  const toggle = (ids: string[], key: "archived" | "done"): void => {
+    const items = slips.filter((slip) => ids.includes(slip.id));
+    if (items.length === 0) {
+      return;
+    }
+    apply(ids, { [key]: !items.every((item) => item[key]) }).catch(
+      () => undefined
+    );
   };
 
   const pick = (id: string, mods: { meta: boolean; shift: boolean }): void => {
@@ -236,22 +235,25 @@ const App = () => {
       if (items.length < 2) {
         return;
       }
-      setUndo({ label: "Merged", slips: snapshot(slips) });
-      say("Merged — ⌘Z");
+      remember("Merged");
       if (intoSection !== undefined) {
         setSection(intoSection);
         await window.slip.setSection(intoSection);
       }
       const content = items.map((slip) => slip.content.trim()).join("\n\n");
-      await window.slip.createSlip(content);
-      await Promise.all(
-        items.map((slip) => window.slip.updateSlip(slip.id, { archived: true }))
+      const created = await window.slip.createSlip(content);
+      if (created !== null) {
+        setUndo((cur) => (cur ? { ...cur, drop: [created.id] } : cur));
+      }
+      setSlips(
+        await window.slip.updateSlips(
+          items.map((slip) => slip.id),
+          { archived: true }
+        )
       );
       setMarked([]);
-      say("Merged");
-      await reload();
     },
-    [reload, slips]
+    [remember]
   );
 
   const merge = useCallback(async () => {
@@ -280,12 +282,9 @@ const App = () => {
       .filter((slip) => slip.section === from)
       .map((slip) => slip.id);
     remember("Renamed section");
-    await Promise.all(
-      ids.map((id) => window.slip.updateSlip(id, { section: named }))
-    );
+    setSlips(await window.slip.updateSlips(ids, { section: named }));
     setSection(named);
     stopRename();
-    await reload();
   };
 
   const membersOf = (name: string): Slip[] =>
@@ -330,15 +329,7 @@ const App = () => {
         merge().catch(() => undefined);
       },
       patch: (ids, next) => {
-        if (ids.length > 1) {
-          patchMany(ids, next).catch(() => undefined);
-          return;
-        }
-        const [only] = ids;
-        if (only === undefined) {
-          return;
-        }
-        patch(only, next).catch(() => undefined);
+        apply(ids, next).catch(() => undefined);
       },
       pick,
       scope,
@@ -362,7 +353,7 @@ const App = () => {
     );
     handleSectionMenu(id, {
       archive: () => {
-        patchMany(ids, { archived: !allArchived }).catch(() => undefined);
+        apply(ids, { archived: !allArchived }).catch(() => undefined);
       },
       copyList: () => {
         if (ids.length === 0) {
@@ -381,19 +372,16 @@ const App = () => {
           .filter((slip) => slip.section === name)
           .map((slip) => slip.id);
         remember("Removed section");
-        Promise.all(
-          every.map((itemId) => window.slip.updateSlip(itemId, { section: "" }))
-        )
+        apply(every, { section: "" })
           .then(() => {
             if (section === name) {
               setSection("");
             }
-            return reload();
           })
           .catch(() => undefined);
       },
       done: () => {
-        patchMany(ids, { done: !allDone }).catch(() => undefined);
+        apply(ids, { done: !allDone }).catch(() => undefined);
       },
       merge: () => {
         mergeItems(members, name).catch(() => undefined);
@@ -475,15 +463,13 @@ const App = () => {
     marked,
     onArchive: () => {
       if (marked.length > 0) {
-        const archived = !subject.every((item) => item.archived);
-        patchMany(marked, { archived }).catch(() => undefined);
+        toggle(marked, "archived");
         return;
       }
       const slip = current ?? slips.find((item) => item.id === focused);
-      if (!slip) {
-        return;
+      if (slip) {
+        toggle([slip.id], "archived");
       }
-      patch(slip.id, { archived: !slip.archived }).catch(() => undefined);
     },
     onCopy: () => {
       copyFocused().catch(() => undefined);
@@ -493,14 +479,12 @@ const App = () => {
     },
     onToggleDone: () => {
       if (marked.length > 0) {
-        const done = !subject.every((item) => item.done);
-        patchMany(marked, { done }).catch(() => undefined);
+        toggle(marked, "done");
         return;
       }
-      if (!current) {
-        return;
+      if (current) {
+        toggle([current.id], "done");
       }
-      patch(current.id, { done: !current.done }).catch(() => undefined);
     },
     onUndo: () => {
       runUndo().catch(() => undefined);
@@ -522,267 +506,264 @@ const App = () => {
   }
 
   return (
-    <TooltipProvider>
-      <div
-        className={`bg-background text-foreground flex h-screen flex-col ${dark ? "dark" : ""}`}
-        data-accent={settings.accent}
-        data-font={settings.font}
-        data-theme={settings.theme}
-      >
-        <header className="drag flex items-center gap-1.5 px-2.5 pt-10 pb-1.5">
-          {settingsOpen ? (
-            <p className="min-w-0 flex-1 text-[13px] font-medium text-pretty">
-              Settings
-            </p>
-          ) : (
-            <div className="no-drag relative min-w-0 flex-1">
-              <HugeiconsIcon
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
-                icon={Search01Icon}
-              />
-              <Input
-                className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
-                data-search=""
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search slips"
-                value={query}
-              />
-              {query ? (
-                <Button
-                  aria-label="Clear search"
-                  className="press absolute top-1/2 right-0.5 -translate-y-1/2"
-                  onClick={() => setQuery("")}
-                  size="icon-xs"
-                  type="button"
-                  variant="ghost"
-                >
-                  <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
-                </Button>
-              ) : null}
-            </div>
-          )}
-          <Button
-            aria-label="Command palette"
-            className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
-            onClick={() => setPaletteOpen(true)}
-            size="icon-sm"
-            variant="ghost"
-          >
-            <span className="text-[10px] font-medium">⌘K</span>
-          </Button>
-          <Button
-            aria-label={settingsOpen ? "Close settings" : "Settings"}
-            className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
-            onClick={() => {
-              stopRename();
-              setSettingsOpen((value) => !value);
-            }}
-            size={settingsOpen ? "sm" : "icon-sm"}
-            variant="ghost"
-          >
-            {settingsOpen ? (
-              <span className="text-[11px]">Done</span>
-            ) : (
-              <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
-            )}
-          </Button>
-        </header>
-
-        {capture === "denied" ? (
-          <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
-            <p>{chordName} needs Accessibility.</p>
-            <Button
-              onClick={() => {
-                window.slip.openAccess().catch(() => undefined);
-              }}
-              className="press"
-              size="xs"
-            >
-              Open Settings
-            </Button>
-          </div>
-        ) : null}
-
+    <div
+      className={`bg-background text-foreground flex h-screen flex-col ${dark ? "dark" : ""}`}
+      data-accent={settings.accent}
+      data-font={settings.font}
+      data-theme={settings.theme}
+    >
+      <header className="drag flex items-center gap-1.5 px-2.5 pt-10 pb-1.5">
         {settingsOpen ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <SettingsPanel
-              dark={dark}
-              login={login}
-              onBind={setBinding}
-              onChange={writeSettings}
-              onLogin={setLogin}
-              settings={settings}
+          <p className="min-w-0 flex-1 text-[13px] font-medium text-pretty">
+            Settings
+          </p>
+        ) : (
+          <div className="no-drag relative min-w-0 flex-1">
+            <HugeiconsIcon
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
+              icon={Search01Icon}
             />
+            <Input
+              className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
+              data-search=""
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search slips"
+              value={query}
+            />
+            {query ? (
+              <Button
+                aria-label="Clear search"
+                className="press absolute top-1/2 right-0.5 -translate-y-1/2"
+                onClick={() => setQuery("")}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
+                <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
+              </Button>
+            ) : null}
           </div>
-        ) : null}
-        <InboxPane
-          bulk={
-            marked.length > 0
-              ? {
-                  archiveLabel: subject.every((slip) => slip.archived)
-                    ? "Restore"
-                    : "Archive",
-                  canMerge: marked.length > 1,
-                  doneLabel: subject.every((slip) => slip.done)
-                    ? "Reopen"
-                    : "Done",
-                  fileValue: subject.every(
-                    (slip) => slip.section === subject[0]?.section
-                  )
-                    ? (subject[0]?.section ?? "")
-                    : "",
-                  onArchive: () => {
-                    const archived = !subject.every((slip) => slip.archived);
-                    patchMany(marked, { archived }).catch(() => undefined);
-                  },
-                  onClear: () => setMarked([]),
-                  onCopyList: () => {
-                    copyList().catch(() => undefined);
-                  },
-                  onCopyPrompt: () => {
-                    copyPrompt().catch(() => undefined);
-                  },
-                  onDone: () => {
-                    const done = !subject.every((slip) => slip.done);
-                    patchMany(marked, { done }).catch(() => undefined);
-                  },
-                  onMerge: () => {
-                    merge().catch(() => undefined);
-                  },
-                }
-              : null
-          }
-          current={marked.length > 1 ? null : current}
-          draft={draft}
-          emptyCopy={emptyCopy}
-          focused={focused}
-          hidden={settingsOpen}
-          list={list}
-          marked={marked}
-          onCancelRename={stopRename}
-          onCopy={(slip) => {
-            if (marked.length > 1 && marked.includes(slip.id)) {
-              copyList().catch(() => undefined);
-              return;
-            }
-            copyNamed("Copied", () => copySlip(slip));
-          }}
-          onDraft={setDraft}
-          onFile={(name) => {
-            remember("Filed");
-            Promise.all(
-              marked.map((id) => window.slip.updateSlip(id, { section: name }))
-            )
-              .then(() => reload())
-              .catch(() => undefined);
-          }}
-          onFocus={(id) => {
-            setFocused(id);
-            setMarked([]);
-          }}
-          onHeaderMenu={(name) => {
-            openHeaderMenu(name).catch(() => undefined);
-          }}
-          onInbox={() => {
+        )}
+        <Button
+          aria-label="Command palette"
+          className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+          onClick={() => setPaletteOpen(true)}
+          size="icon-sm"
+          variant="ghost"
+        >
+          <span className="text-[10px] font-medium">⌘K</span>
+        </Button>
+        <Button
+          aria-label={settingsOpen ? "Close settings" : "Settings"}
+          className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+          onClick={() => {
             stopRename();
-            setSection("");
-            setShowArchived(false);
-            setMarked([]);
+            setSettingsOpen((value) => !value);
           }}
-          onMenu={(slip) => {
-            openSlipMenu(slip).catch(() => undefined);
-          }}
-          onPick={pick}
-          onPatch={(id, next) => {
-            patch(id, next).catch(() => undefined);
-          }}
-          onSection={(name) => {
-            stopRename();
-            setSection(name);
-            setMarked([]);
-          }}
-          onSubmit={() => {
-            const text = draft.trim();
-            if (!text) {
-              return;
-            }
-            if (renaming !== null) {
-              renameSection(renaming, text).catch(() => undefined);
-              return;
-            }
-            const submit = async (): Promise<void> => {
-              await window.slip.createSlip(text);
-              setDraft("");
-              await reload();
-            };
-            remember("Added");
-            submit().catch(() => undefined);
-          }}
-          onToggleArchive={() => {
-            stopRename();
-            setShowArchived((value) => !value);
-            setMarked([]);
-          }}
-          renaming={renaming}
-          section={section}
-          sections={sections}
-          showArchived={showArchived}
-        />
+          size={settingsOpen ? "sm" : "icon-sm"}
+          variant="ghost"
+        >
+          {settingsOpen ? (
+            <span className="text-[11px]">Done</span>
+          ) : (
+            <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
+          )}
+        </Button>
+      </header>
 
-        <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
-          <span>
-            {statusLine(
-              flash,
-              marked.length,
-              list.filter((slip) => !slip.done).length
-            )}
-          </span>
-          <span>{capture === "live" ? "listening" : capture}</span>
-        </footer>
+      {capture === "denied" ? (
+        <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+          <p>{chordName} needs Accessibility.</p>
+          <Button
+            onClick={() => {
+              window.slip.openAccess().catch(() => undefined);
+            }}
+            className="press"
+            size="xs"
+          >
+            Open Settings
+          </Button>
+        </div>
+      ) : null}
 
-        <CommandPalette
-          onCopyList={() => {
-            leaveSettings();
+      {settingsOpen ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <SettingsPanel
+            dark={dark}
+            login={login}
+            onBind={setBinding}
+            onChange={writeSettings}
+            onLogin={setLogin}
+            settings={settings}
+          />
+        </div>
+      ) : null}
+      <InboxPane
+        bulk={
+          marked.length > 0
+            ? {
+                archiveLabel: subject.every((slip) => slip.archived)
+                  ? "Restore"
+                  : "Archive",
+                canMerge: marked.length > 1,
+                doneLabel: subject.every((slip) => slip.done)
+                  ? "Reopen"
+                  : "Done",
+                fileValue: subject.every(
+                  (slip) => slip.section === subject[0]?.section
+                )
+                  ? (subject[0]?.section ?? "")
+                  : "",
+                onArchive: () => {
+                  toggle(marked, "archived");
+                },
+                onClear: () => setMarked([]),
+                onCopyList: () => {
+                  copyList().catch(() => undefined);
+                },
+                onCopyPrompt: () => {
+                  copyPrompt().catch(() => undefined);
+                },
+                onDone: () => {
+                  toggle(marked, "done");
+                },
+                onMerge: () => {
+                  merge().catch(() => undefined);
+                },
+              }
+            : null
+        }
+        current={marked.length > 1 ? null : current}
+        draft={draft}
+        emptyCopy={emptyCopy}
+        focused={focused}
+        hidden={settingsOpen}
+        list={list}
+        marked={marked}
+        onCancelRename={stopRename}
+        onCopy={(slip) => {
+          if (marked.length > 1 && marked.includes(slip.id)) {
             copyList().catch(() => undefined);
-            setPaletteOpen(false);
-          }}
-          onCopyPrompt={() => {
-            leaveSettings();
-            copyPrompt().catch(() => undefined);
-            setPaletteOpen(false);
-          }}
-          onInbox={() => {
-            leaveSettings();
-            setPaletteOpen(false);
-          }}
-          onMerge={() => {
-            leaveSettings();
-            merge().catch(() => undefined);
-            setPaletteOpen(false);
-          }}
-          onOpen={goToSlip}
-          onOpenChange={setPaletteOpen}
-          onOpenVault={() => {
-            window.slip.openVault().catch(() => undefined);
-            setPaletteOpen(false);
-          }}
-          onSettings={() => {
-            setSettingsOpen(true);
-            setPaletteOpen(false);
-          }}
-          onUndo={() => {
-            runUndo().catch(() => undefined);
-            setPaletteOpen(false);
-          }}
-          open={paletteOpen}
-          settingsOpen={settingsOpen}
-          shortcuts={settings.shortcuts}
-          slips={slips}
-          subjectCount={subject.length}
-          undoLabel={undo?.label ?? null}
-        />
-      </div>
-    </TooltipProvider>
+            return;
+          }
+          copyNamed("Copied", () => copySlip(slip));
+        }}
+        onDraft={setDraft}
+        onFile={(name) => {
+          remember("Filed");
+          apply(marked, { section: name }).catch(() => undefined);
+        }}
+        onFocus={(id) => {
+          setFocused(id);
+          setMarked([]);
+        }}
+        onHeaderMenu={(name) => {
+          openHeaderMenu(name).catch(() => undefined);
+        }}
+        onInbox={() => {
+          stopRename();
+          setSection("");
+          setShowArchived(false);
+          setMarked([]);
+        }}
+        onMenu={(slip) => {
+          openSlipMenu(slip).catch(() => undefined);
+        }}
+        onPick={pick}
+        onPatch={(id, next) => {
+          apply([id], next).catch(() => undefined);
+        }}
+        onSection={(name) => {
+          stopRename();
+          setSection(name);
+          setMarked([]);
+        }}
+        onSubmit={() => {
+          const text = draft.trim();
+          if (!text) {
+            return;
+          }
+          if (renaming !== null) {
+            renameSection(renaming, text).catch(() => undefined);
+            return;
+          }
+          remember("Added");
+          window.slip
+            .createSlip(text)
+            .then((slip) => {
+              if (slip === null) {
+                return;
+              }
+              setUndo((cur) => (cur ? { ...cur, drop: [slip.id] } : cur));
+              setDraft("");
+              setSlips((cur) => [...cur, slip]);
+            })
+            .catch(() => undefined);
+        }}
+        onToggleArchive={() => {
+          stopRename();
+          setShowArchived((value) => !value);
+          setMarked([]);
+        }}
+        renaming={renaming}
+        section={section}
+        sections={sections}
+        showArchived={showArchived}
+      />
+
+      <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
+        <span>
+          {statusLine(
+            flash,
+            marked.length,
+            list.filter((slip) => !slip.done).length
+          )}
+        </span>
+        <span>{capture === "live" ? "listening" : capture}</span>
+      </footer>
+
+      <CommandPalette
+        onCopyList={() => {
+          setSettingsOpen(false);
+          copyList().catch(() => undefined);
+          setPaletteOpen(false);
+        }}
+        onCopyPrompt={() => {
+          setSettingsOpen(false);
+          copyPrompt().catch(() => undefined);
+          setPaletteOpen(false);
+        }}
+        onInbox={() => {
+          setSettingsOpen(false);
+          setPaletteOpen(false);
+        }}
+        onMerge={() => {
+          setSettingsOpen(false);
+          merge().catch(() => undefined);
+          setPaletteOpen(false);
+        }}
+        onOpen={goToSlip}
+        onOpenChange={setPaletteOpen}
+        onOpenVault={() => {
+          window.slip.openVault().catch(() => undefined);
+          setPaletteOpen(false);
+        }}
+        onSettings={() => {
+          setSettingsOpen(true);
+          setPaletteOpen(false);
+        }}
+        onUndo={() => {
+          runUndo().catch(() => undefined);
+          setPaletteOpen(false);
+        }}
+        open={paletteOpen}
+        settingsOpen={settingsOpen}
+        shortcuts={settings.shortcuts}
+        slips={slips}
+        subjectCount={subject.length}
+        undoLabel={undo?.label ?? null}
+      />
+    </div>
   );
 };
 

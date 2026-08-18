@@ -66,7 +66,6 @@ export default defineConfig({
         "src/renderer/src/lib/slip-menu.ts",
         "src/renderer/src/components/section-picker.tsx",
         "src/renderer/src/components/inbox-pane.tsx",
-        "src/renderer/src/components/ui/combobox.tsx",
       ],
       rules: {
         "eslint/complexity": "off",

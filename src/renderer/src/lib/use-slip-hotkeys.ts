@@ -34,24 +34,8 @@ export const runMenuCommand = (
     undo: () => void;
   }
 ): void => {
-  if (name === "settings") {
-    actions.settings();
-  }
-  if (name === "palette") {
-    actions.palette();
-  }
-  if (name === "copy_as_list") {
-    actions.copy_as_list();
-  }
-  if (name === "copy_as_prompt") {
-    actions.copy_as_prompt();
-  }
-  if (name === "merge") {
-    actions.merge();
-  }
-  if (name === "undo") {
-    actions.undo();
-  }
+  const run: Record<string, () => void> = actions;
+  run[name]?.();
 };
 
 export const useSlipHotkeys = ({

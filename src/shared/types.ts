@@ -26,6 +26,7 @@ export interface Slip {
 
 export interface Settings {
   accent: Accent;
+  alwaysOnTop: boolean;
   capture: string[];
   dock: boolean;
   font: FontId;
@@ -41,8 +42,12 @@ export interface Settings {
 export const defaultVaultPath = (): string =>
   `${process.env.HOME}/Documents/Slip`;
 
+export const settingsFile = (): string =>
+  `${process.env.HOME}/Library/Application Support/slip/settings.json`;
+
 export const defaultSettings = (): Settings => ({
   accent: "amber",
+  alwaysOnTop: true,
   capture: defaultCapture(),
   dock: true,
   font: "geist",
@@ -84,6 +89,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
   }
+  if (typeof next.alwaysOnTop !== "boolean") {
+    next.alwaysOnTop = true;
+  }
   if (typeof next.dock !== "boolean") {
     next.dock = true;
   }
@@ -99,6 +107,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   }
   return {
     accent: next.accent,
+    alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
     dock: next.dock,
     font: next.font,

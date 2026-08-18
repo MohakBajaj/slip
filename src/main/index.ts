@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -8,6 +7,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   ipcMain,
   Menu,
   nativeImage,
@@ -26,22 +26,41 @@ import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, sameCapture } from "../shared/capture-bind";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import type { MenuEntry } from "../shared/menu";
-import { defaultSettings, sanitizeSettings } from "../shared/types";
+import {
+  defaultSettings,
+  sanitizeSettings,
+  settingsFile,
+} from "../shared/types";
 import type { CaptureState, LoginState, Settings, Slip } from "../shared/types";
-import type { CaptureEvent, CaptureHandle } from "./capture";
-import { startCapture, writeClipboard } from "./capture";
-import { applyDockIcon } from "./dock-icon";
 import {
   atRef,
   createSlip,
   ensureVault,
-  importImage,
   listSlips,
   resolveAttachment,
   restoreSlips,
   updateSlip,
+  updateSlips,
   watchVault,
-} from "./vault";
+} from "../vault";
+import type { CaptureEvent, CaptureHandle } from "./capture";
+import { startCapture } from "./capture";
+import { applyDockIcon } from "./dock-icon";
+
+const ACCESS =
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
+const SETTINGS_FILE = settingsFile();
+
+const writeClipboard = (text: string, paths: string[]): void => {
+  if (paths.length === 0) {
+    clipboard.writeText(text);
+    return;
+  }
+  clipboard.write({
+    image: nativeImage.createFromPath(paths[0]),
+    text,
+  });
+};
 
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess");
@@ -61,9 +80,6 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-const SUPPORT = path.join(homedir(), "Library", "Application Support", "slip");
-const SETTINGS_FILE = path.join(SUPPORT, "settings.json");
-
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let captureCtl: CaptureHandle | null = null;
@@ -73,7 +89,7 @@ let currentSection = "";
 let quitting = false;
 
 const loadSettings = (): Settings => {
-  mkdirSync(SUPPORT, { recursive: true });
+  mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   if (!existsSync(SETTINGS_FILE)) {
     return defaultSettings();
   }
@@ -84,11 +100,16 @@ const loadSettings = (): Settings => {
   }
 };
 
-let settings = loadSettings();
+const resolveVault = (next: Settings): Settings => ({
+  ...next,
+  vaultPath: path.resolve(next.vaultPath),
+});
+
+let settings = resolveVault(loadSettings());
 
 const saveSettings = (next: Settings): void => {
-  settings = sanitizeSettings(next);
-  mkdirSync(SUPPORT, { recursive: true });
+  settings = resolveVault(sanitizeSettings(next));
+  mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 };
 
@@ -132,11 +153,10 @@ const loginState = (): LoginState => {
     return "unavailable";
   }
   const item = loginItem();
-  if (
-    item.openAtLogin ||
-    item.status === "enabled" ||
-    item.status === "requires-approval"
-  ) {
+  if (item.status === "requires-approval") {
+    return "off";
+  }
+  if (item.openAtLogin || item.status === "enabled") {
     return "on";
   }
   return "off";
@@ -150,7 +170,7 @@ const applyLogin = (on: boolean): LoginState => {
     return loginKnown;
   }
   app.setLoginItemSettings({ openAtLogin: on, type: "mainAppService" });
-  loginKnown = on ? "on" : "off";
+  loginKnown = loginState();
   send("login-state", loginKnown);
   rebuildTray();
   return loginKnown;
@@ -234,11 +254,7 @@ const rebuildTray = (): void => {
       { click: () => showWindow(), label: "Open Slip" },
       {
         click: () => {
-          shell
-            .openExternal(
-              "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-            )
-            .catch(() => undefined);
+          shell.openExternal(ACCESS).catch(() => undefined);
         },
         enabled: capture === "denied",
         label: "Grant Accessibility…",
@@ -330,6 +346,7 @@ const bootWatch = (): void => {
 
 const createWindow = (): void => {
   win = new BrowserWindow({
+    alwaysOnTop: settings.alwaysOnTop,
     backgroundColor: windowHex(),
     height: 600,
     minHeight: 520,
@@ -345,9 +362,14 @@ const createWindow = (): void => {
       sandbox: true,
       spellcheck: false,
     },
-    width: 400,
+    width: 360,
   });
-  win.on("ready-to-show", () => win?.show());
+  win.on("ready-to-show", () => {
+    if (loginItem().wasOpenedAtLogin) {
+      return;
+    }
+    win?.show();
+  });
   win.on("close", (event) => {
     if (quitting) {
       return;
@@ -417,11 +439,13 @@ const boot = async (): Promise<void> => {
     const vaultChanged = settings.vaultPath !== prevVault;
     applyDock(settings.dock);
     applyTrayIcon();
+    win?.setAlwaysOnTop(settings.alwaysOnTop);
     win?.setBackgroundColor(windowHex());
     if (vaultChanged) {
       ensureVault(settings.vaultPath);
       bootWatch();
       bootCapture();
+      send("slips-changed");
     } else if (captureChanged) {
       if (captureCtl) {
         captureCtl.setSequence(settings.capture);
@@ -432,69 +456,115 @@ const boot = async (): Promise<void> => {
     rebuildTray();
   });
   ipcMain.handle("createSlip", (_e, content: string, images: string[] = []) => {
+    if (typeof content !== "string") {
+      return null;
+    }
+    const files = Array.isArray(images)
+      ? images.filter((item) => typeof item === "string")
+      : [];
     const slip = createSlip(vaultRoot(), {
       content,
-      images,
+      images: files,
       section: currentSection,
     });
     rebuildTray();
     return slip;
   });
   ipcMain.handle("updateSlip", (_e, id: string, patch: Partial<Slip>) => {
+    if (typeof id !== "string" || patch === null || typeof patch !== "object") {
+      return null;
+    }
     const slip = updateSlip(vaultRoot(), id, patch);
     rebuildTray();
     return slip;
   });
-  ipcMain.handle("restoreSlips", (_e, previous: Slip[]) => {
-    restoreSlips(vaultRoot(), previous);
-    rebuildTray();
-  });
-  ipcMain.handle("setSection", (_e, section: string) => {
-    currentSection = section;
-  });
-  ipcMain.handle("importImages", (_e, id: string, paths: string[]) =>
-    paths.map((src) => importImage(vaultRoot(), id, src))
-  );
-  ipcMain.handle("copyText", (_e, text: string) => clipboard.writeText(text));
-  ipcMain.handle("copyBundle", (_e, text: string, paths: string[]) =>
-    writeClipboard(text, paths)
-  );
-  ipcMain.handle("copyList", (_e, ids: string[]) => {
-    const slips = listSlips(vaultRoot()).filter((slip) =>
-      ids.includes(slip.id)
+  ipcMain.handle("updateSlips", (_e, ids: string[], patch: Partial<Slip>) => {
+    if (!Array.isArray(ids) || patch === null || typeof patch !== "object") {
+      return listSlips(vaultRoot());
+    }
+    const slips = updateSlips(
+      vaultRoot(),
+      ids.filter((id) => typeof id === "string"),
+      patch
     );
-    clipboard.writeText(listMarkdown(slips));
+    rebuildTray();
+    return slips;
+  });
+  ipcMain.handle(
+    "restoreSlips",
+    (_e, previous: Slip[], drop: string[] = []) => {
+      if (!Array.isArray(previous)) {
+        return;
+      }
+      const ids = Array.isArray(drop)
+        ? drop.filter((id) => typeof id === "string")
+        : [];
+      restoreSlips(vaultRoot(), previous, ids);
+      rebuildTray();
+    }
+  );
+  ipcMain.handle("setSection", (_e, section: string) => {
+    if (typeof section === "string") {
+      currentSection = section;
+    }
+  });
+  ipcMain.handle("copyText", (_e, text: string) => {
+    if (typeof text === "string") {
+      clipboard.writeText(text);
+    }
+  });
+  ipcMain.handle("copyBundle", (_e, text: string, paths: string[]) => {
+    if (typeof text !== "string" || !Array.isArray(paths)) {
+      return;
+    }
+    writeClipboard(
+      text,
+      paths.filter((item) => typeof item === "string")
+    );
+  });
+  const slipsOf = (ids: string[]): Slip[] => {
+    const want = new Set(ids.filter((id) => typeof id === "string"));
+    return listSlips(vaultRoot()).filter((slip) => want.has(slip.id));
+  };
+  ipcMain.handle("copyList", (_e, ids: string[]) => {
+    if (Array.isArray(ids)) {
+      clipboard.writeText(listMarkdown(slipsOf(ids)));
+    }
   });
   ipcMain.handle("copyPrompt", (_e, ids: string[]) => {
-    const slips = listSlips(vaultRoot()).filter((slip) =>
-      ids.includes(slip.id)
-    );
-    clipboard.writeText(promptFor(slips));
+    if (Array.isArray(ids)) {
+      clipboard.writeText(promptFor(slipsOf(ids)));
+    }
   });
   ipcMain.handle("copyPath", (_e, id: string) => {
-    const slip = listSlips(vaultRoot()).find((item) => item.id === id);
+    const [slip] = typeof id === "string" ? slipsOf([id]) : [];
     if (slip) {
       clipboard.writeText(path.join(vaultRoot(), slip.filename));
     }
   });
   ipcMain.handle("copyAtRef", (_e, id: string) => {
-    const slip = listSlips(vaultRoot()).find((item) => item.id === id);
+    const [slip] = typeof id === "string" ? slipsOf([id]) : [];
     if (slip) {
       clipboard.writeText(atRef(slip));
     }
   });
   ipcMain.handle("openVault", () => shell.openPath(vaultRoot()));
-  ipcMain.handle("openAccess", () =>
-    shell.openExternal(
-      "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-    )
-  );
-  ipcMain.handle("setLogin", (_e, on: boolean) => applyLogin(on));
-  ipcMain.handle("quit", () => {
-    quitting = true;
-    app.quit();
+  ipcMain.handle("pickVault", async () => {
+    const opts: Electron.OpenDialogOptions = {
+      defaultPath: vaultRoot(),
+      properties: ["createDirectory", "openDirectory"],
+    };
+    const picked = win
+      ? await dialog.showOpenDialog(win, opts)
+      : await dialog.showOpenDialog(opts);
+    const [folder] = picked.filePaths;
+    if (picked.canceled || folder === undefined) {
+      return null;
+    }
+    return folder;
   });
-  ipcMain.handle("showWindow", () => showWindow());
+  ipcMain.handle("openAccess", () => shell.openExternal(ACCESS));
+  ipcMain.handle("setLogin", (_e, on: boolean) => applyLogin(on));
   ipcMain.handle(
     "popupMenu",
     (_e, entries: MenuEntry[]) =>

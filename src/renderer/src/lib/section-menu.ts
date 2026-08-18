@@ -43,42 +43,18 @@ export const handleSectionMenu = (
     use: () => void;
   }
 ): void => {
-  if (id === null) {
-    return;
-  }
-  if (id === "use") {
-    act.use();
-    return;
-  }
-  if (id === "rename") {
-    act.rename();
-    return;
-  }
-  if (id === "select") {
-    act.select();
-    return;
-  }
-  if (id === "copy-list") {
-    act.copyList();
-    return;
-  }
-  if (id === "copy-prompt") {
-    act.copyPrompt();
-    return;
-  }
-  if (id === "done") {
-    act.done();
-    return;
-  }
-  if (id === "archive") {
-    act.archive();
-    return;
-  }
-  if (id === "merge") {
-    act.merge();
-    return;
-  }
-  if (id === "dissolve") {
-    act.dissolve();
+  const run: Record<string, () => void> = {
+    archive: act.archive,
+    "copy-list": act.copyList,
+    "copy-prompt": act.copyPrompt,
+    dissolve: act.dissolve,
+    done: act.done,
+    merge: act.merge,
+    rename: act.rename,
+    select: act.select,
+    use: act.use,
+  };
+  if (id !== null) {
+    run[id]?.();
   }
 };

@@ -7,7 +7,9 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
-    "src/cli/**/*"
+    "src/cli/**/*",
+    "src/vault.ts",
+    "src/skill-template.ts"
   ],
   "exclude": ["src/**/*.test.ts"],
   "compilerOptions": {

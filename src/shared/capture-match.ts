@@ -137,7 +137,7 @@ const compileStep = (step: CaptureStep): Compiled | null => {
   return { code, flags, kind: "key" };
 };
 
-export const compileCapture = (seq: string[]): Compiled[] => {
+const compileCapture = (seq: string[]): Compiled[] => {
   const steps: Compiled[] = [];
   for (const step of parseCapture(seq)) {
     const next = compileStep(step);

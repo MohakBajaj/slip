@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 import type { MenuEntry } from "../shared/menu";
 import type { CaptureState, LoginState, Settings, Slip } from "../shared/types";
@@ -12,9 +12,7 @@ const api = {
   copyPrompt: (ids: string[]) => ipcRenderer.invoke("copyPrompt", ids),
   copyText: (text: string) => ipcRenderer.invoke("copyText", text),
   createSlip: (content: string, images?: string[]) =>
-    ipcRenderer.invoke("createSlip", content, images) as Promise<Slip>,
-  importImages: (id: string, paths: string[]) =>
-    ipcRenderer.invoke("importImages", id, paths) as Promise<string[]>,
+    ipcRenderer.invoke("createSlip", content, images) as Promise<Slip | null>,
   load: () =>
     ipcRenderer.invoke("load") as Promise<{
       slips: Slip[];
@@ -53,11 +51,11 @@ const api = {
   },
   openAccess: () => ipcRenderer.invoke("openAccess"),
   openVault: () => ipcRenderer.invoke("openVault"),
-  pathForFile: (file: File) => webUtils.getPathForFile(file),
+  pickVault: () => ipcRenderer.invoke("pickVault") as Promise<string | null>,
   popupMenu: (items: MenuEntry[]) =>
     ipcRenderer.invoke("popupMenu", items) as Promise<string | null>,
-  quit: () => ipcRenderer.invoke("quit"),
-  restoreSlips: (slips: Slip[]) => ipcRenderer.invoke("restoreSlips", slips),
+  restoreSlips: (slips: Slip[], drop: string[] = []) =>
+    ipcRenderer.invoke("restoreSlips", slips, drop),
   saveSettings: (settings: Settings) =>
     ipcRenderer.invoke("saveSettings", settings),
   setLogin: (on: boolean) =>
@@ -65,6 +63,8 @@ const api = {
   setSection: (section: string) => ipcRenderer.invoke("setSection", section),
   updateSlip: (id: string, patch: Partial<Slip>) =>
     ipcRenderer.invoke("updateSlip", id, patch) as Promise<Slip | null>,
+  updateSlips: (ids: string[], patch: Partial<Slip>) =>
+    ipcRenderer.invoke("updateSlips", ids, patch) as Promise<Slip[]>,
 };
 
 contextBridge.exposeInMainWorld("slip", api);

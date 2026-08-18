@@ -40,41 +40,34 @@ export const sectionsOf = (slips: Slip[]): string[] =>
 
 export const groupedRows = (slips: Slip[]): InboxRow[] => {
   const rows: InboxRow[] = [];
+  const bySection = new Map<string, Slip[]>();
   for (const slip of slips) {
-    if (slip.section.length > 0 || slip.done) {
-      continue;
+    const bucket = bySection.get(slip.section);
+    if (bucket) {
+      bucket.push(slip);
+    } else {
+      bySection.set(slip.section, [slip]);
     }
-    rows.push({ key: slip.id, kind: "slip", slip });
   }
-  for (const slip of slips) {
-    if (slip.section.length > 0 || !slip.done) {
+  const emit = (members: Slip[]): void => {
+    for (const slip of members) {
+      if (!slip.done) {
+        rows.push({ key: slip.id, kind: "slip", slip });
+      }
+    }
+    for (const slip of members) {
+      if (slip.done) {
+        rows.push({ key: slip.id, kind: "slip", slip });
+      }
+    }
+  };
+  emit(bySection.get("") ?? []);
+  for (const [name, members] of bySection) {
+    if (name.length === 0) {
       continue;
     }
-    rows.push({ key: slip.id, kind: "slip", slip });
-  }
-  const seen: string[] = [];
-  for (const slip of slips) {
-    if (slip.section.length === 0 || seen.includes(slip.section)) {
-      continue;
-    }
-    seen.push(slip.section);
-    rows.push({
-      key: `h:${slip.section}`,
-      kind: "header",
-      name: slip.section,
-    });
-    for (const member of slips) {
-      if (member.section !== slip.section || member.done) {
-        continue;
-      }
-      rows.push({ key: member.id, kind: "slip", slip: member });
-    }
-    for (const member of slips) {
-      if (member.section !== slip.section || !member.done) {
-        continue;
-      }
-      rows.push({ key: member.id, kind: "slip", slip: member });
-    }
+    rows.push({ key: `h:${name}`, kind: "header", name });
+    emit(members);
   }
   return rows;
 };
