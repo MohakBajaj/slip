@@ -449,12 +449,6 @@ const App = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
-    return () => {
-      root.classList.remove("dark");
-      delete root.dataset.accent;
-      delete root.dataset.theme;
-      delete root.dataset.font;
-    };
   }, [dark, settings.accent, settings.font, settings.theme]);
 
   useSlipHotkeys({

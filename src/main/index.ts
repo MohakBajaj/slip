@@ -177,14 +177,18 @@ const applyLogin = (on: boolean): LoginState => {
 };
 
 const applyDock = (show: boolean): void => {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" || !app.dock) {
     return;
   }
   if (show) {
-    app.dock?.show();
+    if (!app.dock.isVisible()) {
+      app.dock.show();
+    }
     applyDockIcon(isDark());
-  } else {
-    app.dock?.hide();
+    return;
+  }
+  if (app.dock.isVisible()) {
+    app.dock.hide();
   }
 };
 
@@ -432,15 +436,26 @@ const boot = async (): Promise<void> => {
     vaultPath: vaultRoot(),
   }));
   ipcMain.handle("saveSettings", (_e, next: Settings) => {
-    const prevCapture = settings.capture;
-    const prevVault = settings.vaultPath;
+    const prev = settings;
+    const prevBg = windowHex();
+    const prevDark = isDark();
     saveSettings(next);
-    const captureChanged = !sameCapture(settings.capture, prevCapture);
-    const vaultChanged = settings.vaultPath !== prevVault;
-    applyDock(settings.dock);
-    applyTrayIcon();
-    win?.setAlwaysOnTop(settings.alwaysOnTop);
-    win?.setBackgroundColor(windowHex());
+    const captureChanged = !sameCapture(settings.capture, prev.capture);
+    const vaultChanged = settings.vaultPath !== prev.vaultPath;
+    if (settings.dock !== prev.dock) {
+      applyDock(settings.dock);
+    } else if (settings.dock && isDark() !== prevDark) {
+      applyDockIcon(isDark());
+    }
+    if (settings.trayIcon !== prev.trayIcon) {
+      applyTrayIcon();
+    }
+    if (settings.alwaysOnTop !== prev.alwaysOnTop) {
+      win?.setAlwaysOnTop(settings.alwaysOnTop);
+    }
+    if (windowHex() !== prevBg) {
+      win?.setBackgroundColor(windowHex());
+    }
     if (vaultChanged) {
       ensureVault(settings.vaultPath);
       bootWatch();
