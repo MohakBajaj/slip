@@ -18,6 +18,8 @@ export const serializeSlip = (slip: Slip): string =>
     pin: slip.pin,
     section: slip.section,
     source: slip.source,
+    ...(slip.url ? { url: slip.url } : {}),
+    ...(slip.page ? { page: slip.page } : {}),
     tags: slip.tags,
     updated: slip.updatedAt,
   });
@@ -38,6 +40,7 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
       images: Array.isArray(data.images)
         ? data.images.map((item) => asString(item, ""))
         : [],
+      page: asString(data.page, ""),
       pin: Boolean(data.pin),
       section: asString(data.section, ""),
       source: asString(data.source, ""),
@@ -45,6 +48,7 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
         ? data.tags.map((item) => asString(item, ""))
         : [],
       updatedAt: asString(data.updated, created),
+      url: asString(data.url, ""),
     };
   } catch {
     return null;

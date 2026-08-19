@@ -24,12 +24,17 @@ pin: false
 done: false
 archived: false
 source: ""
+url: ""
+page: ""
 images: []
 created: 2026-08-15T00:00:00.000Z
 updated: 2026-08-15T00:00:00.000Z
 \`\`\`
 
 The body is the note. First line is the title.
+
+\`source\` is the app (or \`cli\`). Captures from a browser also set \`url\`
+and \`page\`.
 
 ## CLI
 

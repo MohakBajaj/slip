@@ -17,11 +17,13 @@ export interface Slip {
   filename: string;
   id: string;
   images: string[];
+  page: string;
   pin: boolean;
   section: string;
   source: string;
   tags: string[];
   updatedAt: string;
+  url: string;
 }
 
 export interface Settings {

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { titleOf } from "../../../shared/format";
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { groupedRows, whenLabel } from "../../../shared/logic";
+import { sourceWhere } from "../../../shared/source";
 import type { Slip } from "../../../shared/types";
 
 interface BulkActions {
@@ -129,6 +130,7 @@ const SlipRow = ({
   slip: Slip;
 }) => {
   const drop = useFileDrop(onDropImages);
+  const from = sourceWhere(slip);
   return (
     <button
       className={cn(
@@ -193,8 +195,9 @@ const SlipRow = ({
         >
           {titleOf(slip.content)}
         </span>
-        <span className="text-muted-foreground text-[10px] tabular-nums">
+        <span className="text-muted-foreground block truncate text-[10px] tabular-nums">
           {whenLabel(slip.createdAt)}
+          {from ? ` · ${from}` : ""}
           {slip.tags.length ? ` · ${slip.tags.join(" ")}` : ""}
         </span>
       </span>

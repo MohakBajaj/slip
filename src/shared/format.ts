@@ -1,3 +1,4 @@
+import { sourcePrompt } from "./source";
 import type { Slip } from "./types";
 
 export const filenameFor = (createdAt: string, id: string): string =>
@@ -31,7 +32,13 @@ export const renderIndex = (slips: Slip[]): string => {
 
 export const promptFor = (slips: Slip[]): string =>
   slips
-    .map((slip) => `## ${titleOf(slip.content)}\n\n${slip.content.trim()}`)
+    .map((slip) => {
+      const from = sourcePrompt(slip);
+      const body = from
+        ? `${from}\n\n${slip.content.trim()}`
+        : slip.content.trim();
+      return `## ${titleOf(slip.content)}\n\n${body}`;
+    })
     .join("\n\n---\n\n");
 
 export const listMarkdown = (slips: Slip[]): string =>

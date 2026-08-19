@@ -8,6 +8,7 @@ import koffi from "koffi";
 import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
 import { IMAGE_EXT } from "../shared/images";
 import type { CaptureState } from "../shared/types";
+import { startFrontContext } from "./front-context";
 
 const COPY_SETTLE_MS = 120;
 const TRUST_POLL_MS = 2000;
@@ -28,8 +29,16 @@ const FLAGS_MASK = 1 << kCGEventFlagsChanged;
 const KEY_MASK = (1 << kCGEventKeyDown) | FLAGS_MASK;
 
 export type CaptureEvent =
-  | { kind: "text"; text: string }
-  | { kind: "image"; path: string };
+  | {
+      context: ReturnType<typeof startFrontContext>;
+      kind: "text";
+      text: string;
+    }
+  | {
+      context: ReturnType<typeof startFrontContext>;
+      kind: "image";
+      path: string;
+    };
 
 export interface CaptureHandle {
   setSequence: (seq: string[]) => void;
@@ -49,6 +58,7 @@ export const startCapture = (opts: {
   onEvent: (event: CaptureEvent) => void;
   onState: (state: CaptureState) => void;
   sequence?: string[];
+  skip?: string[];
 }): CaptureHandle => {
   if (process.platform !== "darwin") {
     opts.onState("failed");
@@ -68,6 +78,7 @@ const install = (opts: {
   onEvent: (event: CaptureEvent) => void;
   onState: (state: CaptureState) => void;
   sequence?: string[];
+  skip?: string[];
 }): CaptureHandle => {
   const matcher = createCaptureMatcher(opts.sequence ?? ["Shift", "Shift"]);
   let listenKeys = matcher.needsKeys();
@@ -225,7 +236,10 @@ const install = (opts: {
     clipboard.writeText(snap.text);
   };
 
-  const grab = (before: ClipSnap): void => {
+  const grab = (
+    before: ClipSnap,
+    context: ReturnType<typeof startFrontContext>
+  ): void => {
     const after = snapClip();
     const imageChanged =
       after.imagePng !== null && !samePng(after.imagePng, before.imagePng);
@@ -237,7 +251,7 @@ const install = (opts: {
     if (imageChanged && after.imagePng) {
       const imagePath = path.join(opts.imageDir, `capture-${Date.now()}.png`);
       writeFileSync(imagePath, after.imagePng);
-      opts.onEvent({ kind: "image", path: imagePath });
+      opts.onEvent({ context, kind: "image", path: imagePath });
       return;
     }
     if (fileChanged && after.file) {
@@ -246,12 +260,12 @@ const install = (opts: {
         `capture-${Date.now()}${path.extname(after.file) || ".png"}`
       );
       copyFileSync(after.file, dest);
-      opts.onEvent({ kind: "image", path: dest });
+      opts.onEvent({ context, kind: "image", path: dest });
       return;
     }
     const text = after.text.trim();
     if (textChanged && text) {
-      opts.onEvent({ kind: "text", text });
+      opts.onEvent({ context, kind: "text", text });
     }
   };
 
@@ -261,6 +275,7 @@ const install = (opts: {
     }
     grabbing = true;
     const before = snapClip();
+    const context = startFrontContext(opts.skip ?? ["Electron", "Slip"]);
     try {
       if (!synthesizeCopy()) {
         grabbing = false;
@@ -272,7 +287,7 @@ const install = (opts: {
     }
     setTimeout(() => {
       try {
-        grab(before);
+        grab(before, context);
       } finally {
         restoreClip(before);
         grabbing = false;

@@ -1,4 +1,5 @@
 import { titleOf } from "./format";
+import { sourceSearchText } from "./source";
 import type { Slip } from "./types";
 
 export type InboxRow =
@@ -24,7 +25,7 @@ export const visibleSlips = (
         slip.content.toLowerCase().includes(q) ||
         slip.tags.some((tag) => tag.toLowerCase().includes(q)) ||
         slip.section.toLowerCase().includes(q) ||
-        slip.source.toLowerCase().includes(q)
+        sourceSearchText(slip).includes(q)
       );
     })
     .toSorted((a, b) => {

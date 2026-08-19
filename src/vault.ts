@@ -166,8 +166,10 @@ export const createSlip = (
   input: {
     content: string;
     images?: (string | ImagePayload)[];
+    page?: string;
     section?: string;
     source?: string;
+    url?: string;
   }
 ): Slip => {
   const createdAt = new Date().toISOString();
@@ -181,11 +183,13 @@ export const createSlip = (
     filename: filenameFor(createdAt, id),
     id,
     images,
+    page: input.page ?? "",
     pin: false,
     section: input.section ?? "",
     source: input.source ?? "",
     tags: [],
     updatedAt: createdAt,
+    url: input.url ?? "",
   };
   writeSlip(root, slip);
   return slip;

@@ -45,7 +45,9 @@ export default defineConfig({
     },
     {
       files: [
+        "src/main/ax-context.ts",
         "src/main/capture.ts",
+        "src/main/front-context.ts",
         "src/shared/capture-match.ts",
         "src/main/dock-icon.ts",
         "src/main/index.ts",

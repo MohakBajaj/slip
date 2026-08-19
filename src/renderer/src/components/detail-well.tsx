@@ -1,3 +1,4 @@
+import { PreviewCard } from "@base-ui/react/preview-card";
 import {
   Archive02Icon,
   ArchiveRestoreIcon,
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { whenLabel } from "../../../shared/logic";
+import { isWebUrl, sourceApp, urlLabel } from "../../../shared/source";
 import type { Slip } from "../../../shared/types";
 import { Markdown } from "../markdown";
 
@@ -120,6 +122,72 @@ const CopyGroup = ({ slip }: { slip: Slip }) => (
   </ButtonGroup>
 );
 
+const OriginUrl = ({ page, url }: { page: string; url: string }) => {
+  const label = urlLabel(url);
+  const className = cn(
+    "text-muted-foreground truncate text-[10px]",
+    page ? "mt-1" : ""
+  );
+  if (!isWebUrl(url)) {
+    return <p className={className}>{label}</p>;
+  }
+  return (
+    <a
+      className={cn(
+        className,
+        "hover:text-foreground block underline-offset-2 hover:underline"
+      )}
+      href={url}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {label}
+    </a>
+  );
+};
+
+const OriginCard = ({ slip }: { slip: Slip }) => {
+  const app = sourceApp(slip.source);
+  if (!app) {
+    return null;
+  }
+  if (!slip.page && !slip.url) {
+    return <span>{app}</span>;
+  }
+  return (
+    <PreviewCard.Root>
+      <PreviewCard.Trigger
+        className="hover:text-foreground cursor-default underline-offset-2 hover:underline"
+        closeDelay={80}
+        delay={160}
+        render={<span />}
+      >
+        {app}
+      </PreviewCard.Trigger>
+      <PreviewCard.Portal>
+        <PreviewCard.Positioner
+          align="start"
+          className="z-50 outline-none"
+          side="top"
+          sideOffset={6}
+        >
+          <PreviewCard.Popup className="bg-popover text-popover-foreground data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 w-64 origin-(--transform-origin) rounded-lg border border-foreground/20 p-2.5 shadow-lg duration-100">
+            {slip.page ? (
+              <p className="text-[12px] leading-snug text-pretty">
+                {slip.page}
+              </p>
+            ) : null}
+            {slip.url ? <OriginUrl page={slip.page} url={slip.url} /> : null}
+          </PreviewCard.Popup>
+        </PreviewCard.Positioner>
+      </PreviewCard.Portal>
+    </PreviewCard.Root>
+  );
+};
+
 const onWellMenu = (event: MouseEvent, onMenu: () => void): void => {
   if (
     event.target instanceof HTMLElement &&
@@ -164,8 +232,7 @@ export const DetailWell = ({
   noteRef.current = note;
   onPatchRef.current = onPatch;
   onEditingRef.current = onEditing;
-  const source =
-    slip.source === "capture" || slip.source.length === 0 ? "" : slip.source;
+  const app = sourceApp(slip.source);
 
   const startEdit = (): void => {
     setNote(slip.content);
@@ -315,9 +382,14 @@ export const DetailWell = ({
             setTag("");
           }}
         >
-          <span className="text-muted-foreground text-[10px] tabular-nums">
-            {whenLabel(slip.createdAt)}
-            {source ? ` · ${source}` : ""}
+          <span className="text-muted-foreground flex h-6 items-center gap-1 text-[10px] leading-none">
+            <span className="tabular-nums">{whenLabel(slip.createdAt)}</span>
+            {app ? (
+              <>
+                <span>·</span>
+                <OriginCard slip={slip} />
+              </>
+            ) : null}
           </span>
           <SectionPicker
             onChange={(name) => onPatch(slip.id, { section: name })}
@@ -328,7 +400,7 @@ export const DetailWell = ({
           />
           {slip.tags.map((name) => (
             <button
-              className="press bg-muted text-muted-foreground hover:text-foreground relative rounded-full px-2 py-0.5 text-[10px] after:absolute after:-inset-1.5 after:content-['']"
+              className="press bg-muted text-muted-foreground hover:text-foreground relative flex h-6 items-center rounded-full px-2 text-[10px] leading-none after:absolute after:-inset-1.5 after:content-['']"
               key={name}
               onClick={() =>
                 onPatch(slip.id, {
@@ -343,7 +415,7 @@ export const DetailWell = ({
           ))}
           <Input
             aria-label="Add tag"
-            className="h-6 w-16 min-w-12 flex-1 border-0 bg-transparent px-1 text-xs shadow-none"
+            className="h-6 min-h-6 w-16 min-w-12 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] leading-none shadow-none dark:bg-transparent"
             onChange={(event) => setTag(event.target.value)}
             placeholder={slip.tags.length === 0 ? "Add a tag" : "Tag"}
             value={tag}

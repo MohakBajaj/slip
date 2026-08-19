@@ -7,6 +7,7 @@ import { createCLI, defineCommand, option } from "@bunli/core";
 import { z } from "zod";
 
 import { promptFor, titleOf } from "../shared/format";
+import { sourceSearchText } from "../shared/source";
 import {
   defaultVaultPath,
   sanitizeSettings,
@@ -77,7 +78,8 @@ const search = defineCommand({
       (item) =>
         !item.archived &&
         (item.content.toLowerCase().includes(query) ||
-          item.tags.join(" ").toLowerCase().includes(query))
+          item.tags.join(" ").toLowerCase().includes(query) ||
+          sourceSearchText(item).includes(query))
     )) {
       console.log(`${slip.id}\t${titleOf(slip.content)}`);
     }

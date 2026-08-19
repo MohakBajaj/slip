@@ -27,6 +27,8 @@ import { formatCapture, sameCapture } from "../shared/capture-bind";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
+import { emptyContext } from "../shared/source";
+import type { FrontContext } from "../shared/source";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
@@ -439,25 +441,50 @@ const parseImageInputs = (raw: unknown): ImagePayload[] => {
   return inputs;
 };
 
-const ingest = (event: CaptureEvent): void => {
-  ensureVault(vaultRoot());
+const writeCapture = (event: CaptureEvent, ctx: FrontContext): Slip | null => {
   const images = event.kind === "image" ? [event.path] : [];
   const content =
     event.kind === "image" ? basenameImage(event.path) : event.text.trim();
   if (!content) {
-    return;
+    return null;
   }
   const slip = createSlip(vaultRoot(), {
     content,
     images,
+    page: ctx.page,
     section: currentSection,
-    source: "capture",
+    source: ctx.source,
+    url: ctx.url,
   });
   if (settings.notify && Notification.isSupported()) {
     new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
   }
   send("slips-changed");
   rebuildTray();
+  return slip;
+};
+
+const ingest = (event: CaptureEvent): void => {
+  ensureVault(vaultRoot());
+  void (async () => {
+    const ctx = await event.context.ready.catch(() => emptyContext());
+    const slip = writeCapture(event, ctx);
+    if (!slip) {
+      return;
+    }
+    const rich = await event.context.rich.catch(() => emptyContext());
+    if (!rich.page && !rich.url) {
+      return;
+    }
+    if (rich.page === slip.page && rich.url === slip.url) {
+      return;
+    }
+    updateSlip(vaultRoot(), slip.id, {
+      page: rich.page,
+      url: rich.url,
+    });
+    send("slips-changed");
+  })();
 };
 
 const bootCapture = (): void => {
@@ -468,6 +495,7 @@ const bootCapture = (): void => {
       onEvent: ingest,
       onState: setCapture,
       sequence: settings.capture,
+      skip: [app.getName(), "Electron"],
     });
   } catch {
     captureCtl = null;

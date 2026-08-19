@@ -235,10 +235,10 @@ export const SectionPicker = ({
 
   if (tone === "chip") {
     return (
-      <div className="relative" ref={root}>
+      <div className="relative flex h-6 items-center" ref={root}>
         <button
           className={cn(
-            "press relative rounded-full px-2 py-0.5 text-[10px] after:absolute after:-inset-1.5 after:content-['']",
+            "press relative flex h-6 items-center rounded-full px-2 text-[10px] leading-none after:absolute after:-inset-1.5 after:content-['']",
             value.length > 0
               ? "bg-muted text-foreground"
               : "text-muted-foreground hover:text-foreground"

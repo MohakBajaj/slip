@@ -1,5 +1,6 @@
 import { titleOf } from "./format";
 import { visibleSlips, whenLabel } from "./logic";
+import { sourceWhere } from "./source";
 import type { Slip } from "./types";
 
 export const TRAY_PREVIEW = 8;
@@ -35,7 +36,8 @@ export const trayLabel = (slip: Slip): string => {
 
 export const trayTip = (slip: Slip, now = Date.now()): string => {
   const when = whenLabel(slip.createdAt, now);
-  const where = slip.section || "Inbox";
+  const from = sourceWhere(slip);
+  const where = [slip.section || "Inbox", from].filter(Boolean).join(" · ");
   const preview = slip.content.replaceAll(/\s+/gu, " ").trim().slice(0, 160);
   if (!preview) {
     return `${where} · ${when}`;
