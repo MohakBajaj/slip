@@ -1,0 +1,19 @@
+src/renderer/src/components/ui/button.tsx
+  s_b008b1ecc10fe0::t_5f8728df90d981 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "18ec062d94155391e2e4cd5945f280354e7e23d4",
+  "prompts": {},
+  "sessions": {
+    "s_b008b1ecc10fe0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "72c5b1bc-fb4f-4c0f-913a-88ab64e8463b",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
