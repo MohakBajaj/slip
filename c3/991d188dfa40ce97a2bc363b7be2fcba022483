@@ -1,0 +1,38 @@
+src/renderer/src/components/settings-panel.tsx
+  s_067804434fe1f8::t_deb020a376f107 156-162
+  s_067804434fe1f8::t_374003e5158810 132-135
+  s_067804434fe1f8::t_a205a428ab2a02 5
+  s_067804434fe1f8::t_5b31860c1f21de 129-131,136-137
+  s_067804434fe1f8::t_4cd0d49fb94ae0 459,471
+  s_067804434fe1f8::t_dc4fbb1a938cad 460-470,472-473
+  s_067804434fe1f8::t_1d7ea9c8a41d2a 16-21
+src/main/index.ts
+  s_067804434fe1f8::t_90eb2e6578d4f2 1293-1294
+  s_067804434fe1f8::t_c13de66139b8ab 65
+src/preload/index.ts
+  s_067804434fe1f8::t_ae494b8c1453b2 5-11
+  s_067804434fe1f8::t_0c910572137401 40-41
+  s_067804434fe1f8::t_b1cdbb89036c49 144
+src/shared/types.ts
+  s_067804434fe1f8::t_2fcc8d99e9f57e 55-60
+src/skill-template.ts
+  s_067804434fe1f8::t_44a7649579dcba 74-83
+src/main/agent-skill.ts
+  s_067804434fe1f8::t_67e369ad6a6193 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c3991d188dfa40ce97a2bc363b7be2fcba022483",
+  "prompts": {},
+  "sessions": {
+    "s_067804434fe1f8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a4bf0112-996f-45dd-adf6-1018cf15ec07",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
