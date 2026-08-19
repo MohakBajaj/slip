@@ -149,6 +149,37 @@ describe("capture matcher", () => {
     expect(doubleTap(matcher, FLAG_SHIFT)).toBe(true);
   });
 
+  test("Mod+Shift twice is command held and shift tapped twice", () => {
+    const matcher = createCaptureMatcher(["Mod+Shift", "Mod+Shift"]);
+    expect(matcher.needsKeys()).toBe(false);
+    expect(matcher.push({ flags: FLAG_COMMAND, type: "flags" })).toBe(false);
+    expect(
+      matcher.push({ flags: FLAG_COMMAND | FLAG_SHIFT, type: "flags" })
+    ).toBe(false);
+    expect(matcher.push({ flags: FLAG_COMMAND, type: "flags" })).toBe(false);
+    expect(
+      matcher.push({ flags: FLAG_COMMAND | FLAG_SHIFT, type: "flags" })
+    ).toBe(false);
+    expect(matcher.push({ flags: FLAG_COMMAND, type: "flags" })).toBe(true);
+  });
+
+  test("Mod+Shift does not fire on a bare Shift Shift", () => {
+    const matcher = createCaptureMatcher(["Mod+Shift", "Mod+Shift"]);
+    expect(doubleTap(matcher, FLAG_SHIFT)).toBe(false);
+    expect(doubleTap(matcher, FLAG_SHIFT)).toBe(false);
+  });
+
+  test("releasing command after the first Mod+Shift resets", () => {
+    const matcher = createCaptureMatcher(["Mod+Shift", "Mod+Shift"]);
+    matcher.push({ flags: FLAG_COMMAND, type: "flags" });
+    matcher.push({ flags: FLAG_COMMAND | FLAG_SHIFT, type: "flags" });
+    matcher.push({ flags: FLAG_COMMAND, type: "flags" });
+    expect(matcher.push({ flags: 0, type: "flags" })).toBe(false);
+    matcher.push({ flags: FLAG_COMMAND, type: "flags" });
+    matcher.push({ flags: FLAG_COMMAND | FLAG_SHIFT, type: "flags" });
+    expect(matcher.push({ flags: FLAG_COMMAND, type: "flags" })).toBe(false);
+  });
+
   test("device bits on flags are ignored", () => {
     const matcher = createCaptureMatcher(["Option", "Option"]);
     expect(matcher.push({ flags: FLAG_OPTION | 0x20, type: "flags" })).toBe(

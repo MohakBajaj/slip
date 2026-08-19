@@ -1,6 +1,6 @@
 # Slip
 
-A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`.
+A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`. Hold **Option** to speak a note, or double-tap it to latch.
 
 No account, no sync, no telemetry. Agents read the folder.
 
@@ -8,7 +8,7 @@ No account, no sync, no telemetry. Agents read the folder.
 
 Download the latest macOS archive from [Releases](https://github.com/MohakBajaj/slip/releases). Open the `.dmg` or unzip the `.zip`, then drag **Slip** into Applications.
 
-Grant **Accessibility** the first time you capture. Closing the window hides it. The menu-bar item keeps capturing.
+Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing.
 
 Do not run Slip and Copper at the same time — both listen for the capture sequence.
 
@@ -38,7 +38,7 @@ See [SKILL.md](SKILL.md) for the full command list.
 - `YYYY-MM-DD-<id>.md` — one slip. Never renamed or moved.
 - `INDEX.md` — generated
 - `SKILL.md` — how agents should use the vault
-- `attachments/<id>/` — images
+- `attachments/<id>/` — images and voice notes
 
 ## Develop
 

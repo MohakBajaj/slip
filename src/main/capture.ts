@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { clipboard, nativeImage, systemPreferences } from "electron";
 import koffi from "koffi";
 
+import { createVoiceHold, HOLD_MS } from "../shared/capture-hold";
 import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
 import { IMAGE_EXT } from "../shared/images";
 import type { CaptureState } from "../shared/types";
@@ -41,7 +42,9 @@ export type CaptureEvent =
     };
 
 export interface CaptureHandle {
+  setDrawSequence: (seq: string[]) => void;
   setSequence: (seq: string[]) => void;
+  setVoiceSequence: (seq: string[]) => void;
   stop: () => void;
 }
 
@@ -49,16 +52,25 @@ const trusted = (): boolean =>
   systemPreferences.isTrustedAccessibilityClient(false);
 
 const idle: CaptureHandle = {
+  setDrawSequence: () => undefined,
   setSequence: () => undefined,
+  setVoiceSequence: () => undefined,
   stop: () => undefined,
 };
 
 export const startCapture = (opts: {
+  drawSequence?: string[];
   imageDir: string;
+  onDraw: () => void;
   onEvent: (event: CaptureEvent) => void;
   onState: (state: CaptureState) => void;
+  onVoice: () => void;
+  onVoiceCancel: () => void;
+  onVoiceHold: () => void;
+  onVoiceRelease: () => void;
   sequence?: string[];
   skip?: string[];
+  voiceSequence?: string[];
 }): CaptureHandle => {
   if (process.platform !== "darwin") {
     opts.onState("failed");
@@ -76,12 +88,32 @@ export const startCapture = (opts: {
 const install = (opts: {
   imageDir: string;
   onEvent: (event: CaptureEvent) => void;
+  drawSequence?: string[];
+  onDraw: () => void;
   onState: (state: CaptureState) => void;
+  onVoice: () => void;
+  onVoiceCancel: () => void;
+  onVoiceHold: () => void;
+  onVoiceRelease: () => void;
   sequence?: string[];
   skip?: string[];
+  voiceSequence?: string[];
 }): CaptureHandle => {
   const matcher = createCaptureMatcher(opts.sequence ?? ["Shift", "Shift"]);
-  let listenKeys = matcher.needsKeys();
+  const voiceMatcher = createCaptureMatcher(
+    opts.voiceSequence ?? ["Option", "Option"]
+  );
+  const drawMatcher = createCaptureMatcher(
+    opts.drawSequence ?? ["Mod+Shift", "Mod+Shift"]
+  );
+  const voiceHold = createVoiceHold(opts.voiceSequence ?? ["Option", "Option"]);
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  let holdLive = false;
+  let listenKeys =
+    matcher.needsKeys() ||
+    voiceMatcher.needsKeys() ||
+    drawMatcher.needsKeys() ||
+    voiceHold.needsKeys();
   mkdirSync(opts.imageDir, { recursive: true });
   const cg = koffi.load(
     "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
@@ -142,6 +174,55 @@ const install = (opts: {
   let callback: bigint | null = null;
   let lastTrusted: boolean | null = null;
   let grabbing = false;
+
+  const clearHoldTimer = (): void => {
+    if (holdTimer === null) {
+      return;
+    }
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  };
+
+  const applyHold = (action: ReturnType<typeof voiceHold.push>): void => {
+    if (action === "arm") {
+      clearHoldTimer();
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        holdLive = true;
+        voiceHold.markStarted();
+        voiceMatcher.reset();
+        try {
+          opts.onVoiceHold();
+        } catch {
+          // Overlay must not kill the tap.
+        }
+      }, HOLD_MS);
+      return;
+    }
+    if (action === "disarm") {
+      clearHoldTimer();
+      return;
+    }
+    if (action === "end") {
+      clearHoldTimer();
+      holdLive = false;
+      try {
+        opts.onVoiceRelease();
+      } catch {
+        // Overlay must not kill the tap.
+      }
+      return;
+    }
+    if (action === "cancel") {
+      clearHoldTimer();
+      holdLive = false;
+      try {
+        opts.onVoiceCancel();
+      } catch {
+        // Overlay must not kill the tap.
+      }
+    }
+  };
 
   const synthesizeCopy = (): boolean => {
     const src = CGEventSourceCreate(kCGEventSourceStateCombinedSessionState);
@@ -335,18 +416,50 @@ const install = (opts: {
           return event;
         }
         const flags = Number(CGEventGetFlags(event)) & MOD_FLAGS;
-        if (
-          type === kCGEventFlagsChanged &&
-          matcher.push({ flags, type: "flags" })
-        ) {
-          fire();
+        let input:
+          | { flags: number; type: "flags" }
+          | {
+              code: number;
+              flags: number;
+              type: "key";
+            }
+          | null = null;
+        if (type === kCGEventFlagsChanged) {
+          input = { flags, type: "flags" };
+        } else if (type === kCGEventKeyDown) {
+          input = {
+            code: Number(
+              CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
+            ),
+            flags,
+            type: "key",
+          };
         }
-        if (type === kCGEventKeyDown) {
-          const code = Number(
-            CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
-          );
-          if (matcher.push({ code, flags, type: "key" })) {
+        if (input) {
+          applyHold(voiceHold.push(input));
+          const textHit = matcher.push(input);
+          const voiceHit = holdLive ? false : voiceMatcher.push(input);
+          const drawHit = drawMatcher.push(input);
+          if (textHit) {
+            voiceMatcher.reset();
+            drawMatcher.reset();
             fire();
+          } else if (voiceHit) {
+            matcher.reset();
+            drawMatcher.reset();
+            try {
+              opts.onVoice();
+            } catch {
+              // Overlay must not kill the tap.
+            }
+          } else if (drawHit) {
+            matcher.reset();
+            voiceMatcher.reset();
+            try {
+              opts.onDraw();
+            } catch {
+              // Overlay must not kill the tap.
+            }
           }
         }
         return event;
@@ -397,10 +510,13 @@ const install = (opts: {
     }
   };
 
-  const setSequence = (seq: string[]): void => {
+  const syncListenKeys = (): void => {
     const prevKeys = listenKeys;
-    matcher.setSequence(seq);
-    listenKeys = matcher.needsKeys();
+    listenKeys =
+      matcher.needsKeys() ||
+      voiceMatcher.needsKeys() ||
+      drawMatcher.needsKeys() ||
+      voiceHold.needsKeys();
     if (listenKeys === prevKeys) {
       return;
     }
@@ -409,13 +525,32 @@ const install = (opts: {
     syncTrust();
   };
 
+  const setSequence = (seq: string[]): void => {
+    matcher.setSequence(seq);
+    syncListenKeys();
+  };
+
+  const setVoiceSequence = (seq: string[]): void => {
+    voiceMatcher.setSequence(seq);
+    voiceHold.setSequence(seq);
+    syncListenKeys();
+  };
+
+  const setDrawSequence = (seq: string[]): void => {
+    drawMatcher.setSequence(seq);
+    syncListenKeys();
+  };
+
   systemPreferences.isTrustedAccessibilityClient(true);
   syncTrust();
   const poll = setInterval(syncTrust, TRUST_POLL_MS);
 
   return {
+    setDrawSequence,
     setSequence,
+    setVoiceSequence,
     stop: () => {
+      clearHoldTimer();
       clearInterval(poll);
       dropTap();
     },

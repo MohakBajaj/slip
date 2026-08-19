@@ -1,6 +1,7 @@
 import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Mic } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BulkBar } from "@/components/bulk-bar";
@@ -9,6 +10,12 @@ import { ImagePicker, ImageStrip } from "@/components/image-strip";
 import { SectionPicker } from "@/components/section-picker";
 import { SlipMark } from "@/components/slip-mark";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   filesFromClipboard,
   forgetPending,
@@ -85,24 +92,34 @@ let menuAt = 0;
 
 const SlipThumb = ({ slip }: { slip: Slip }) => {
   const [first] = slip.images;
-  if (first === undefined) {
+  if (first !== undefined) {
+    return (
+      <span
+        className="relative mt-0.5 shrink-0 after:absolute after:-inset-1.5 after:content-['']"
+        data-slip-preview=""
+      >
+        <img
+          alt=""
+          className={`pointer-events-none size-7 rounded-[5px] object-cover outline outline-black/10 dark:outline-white/10 ${slip.done ? "opacity-50" : ""}`}
+          draggable={false}
+          src={slipImgSrc(first)}
+        />
+        {slip.images.length > 1 ? (
+          <span className="bg-background/90 text-foreground absolute -right-1 -bottom-1 rounded-full px-1 text-[8px] leading-3 tabular-nums outline outline-black/10 dark:outline-white/10">
+            {slip.images.length}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+  if (slip.audio.length === 0) {
     return null;
   }
   return (
-    <span
-      className="relative mt-0.5 shrink-0 after:absolute after:-inset-1.5 after:content-['']"
-      data-slip-preview=""
-    >
-      <img
-        alt=""
-        className={`pointer-events-none size-7 rounded-[5px] object-cover outline outline-black/10 dark:outline-white/10 ${slip.done ? "opacity-50" : ""}`}
-        draggable={false}
-        src={slipImgSrc(first)}
-      />
-      {slip.images.length > 1 ? (
-        <span className="bg-background/90 text-foreground absolute -right-1 -bottom-1 rounded-full px-1 text-[8px] leading-3 tabular-nums outline outline-black/10 dark:outline-white/10">
-          {slip.images.length}
-        </span>
+    <span className="text-muted-foreground mt-0.5 flex shrink-0 items-center gap-0.5">
+      <Mic className="size-3.5" />
+      {slip.audio.length > 1 ? (
+        <span className="text-[8px] tabular-nums">{slip.audio.length}</span>
       ) : null}
     </span>
   );
@@ -255,6 +272,7 @@ export const InboxPane = ({
   onPatch,
   onSection,
   onSubmit,
+  onVoice,
   renaming,
   section,
   sections,
@@ -282,6 +300,7 @@ export const InboxPane = ({
   onPatch: (id: string, next: Partial<Slip>) => void;
   onSection: (name: string) => void;
   onSubmit: (files: File[]) => void;
+  onVoice: () => void;
   renaming: string | null;
   section: string;
   sections: string[];
@@ -296,6 +315,17 @@ export const InboxPane = ({
   const dragging = useDraggingFiles();
   const composing = renaming === null && !bulk;
   const listDrop = useFileDrop(onCreateImages, composing);
+
+  useEffect(
+    () =>
+      window.slip.onDrawAttach((bytes) => {
+        const file = new File([Uint8Array.from(bytes)], "drawing.png", {
+          type: "image/png",
+        });
+        setPending((cur) => [...cur, ...pendingFromFiles([file])]);
+      }),
+    []
+  );
   const composeDrop = useFileDrop((files) => {
     setPending((cur) => [...cur, ...pendingFromFiles(files)]);
   }, composing);
@@ -576,18 +606,49 @@ export const InboxPane = ({
               </Button>
             ) : null}
             {composing ? (
-              <Button
-                aria-label="Attach images"
-                className="press"
-                onClick={() => {
-                  picker.current?.click();
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon className="size-3.5" icon={ImageAdd01Icon} />
-              </Button>
+              <>
+                <Button
+                  aria-label="Voice"
+                  className="press"
+                  onClick={onVoice}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Mic className="size-3.5" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        aria-label="Attach"
+                        className="press"
+                        size="icon-sm"
+                        type="button"
+                        variant="ghost"
+                      />
+                    }
+                  >
+                    <HugeiconsIcon className="size-3.5" icon={ImageAdd01Icon} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-28">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        picker.current?.click();
+                      }}
+                    >
+                      Photo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        window.slip.openDraw("attach").catch(() => undefined);
+                      }}
+                    >
+                      Draw
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             ) : null}
             {bulk && !isRename ? null : (
               <Button

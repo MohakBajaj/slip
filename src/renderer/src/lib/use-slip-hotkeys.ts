@@ -33,6 +33,7 @@ export const runMenuCommand = (
     palette: () => void;
     settings: () => void;
     undo: () => void;
+    voice: () => void;
     zoom_in: () => void;
     zoom_out: () => void;
     zoom_reset: () => void;

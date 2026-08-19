@@ -1,17 +1,38 @@
 import "./index.css";
 import { StrictMode } from "react";
+import type { ReactElement } from "react";
 import { createRoot } from "react-dom/client";
-
-import App from "./app";
-import { PreviewApp } from "./preview";
 
 const root = document.querySelector("#root");
 if (!root) {
   throw new Error("missing #root");
 }
 
-const preview = window.location.hash === "#preview";
+const page = async (): Promise<ReactElement> => {
+  const { hash } = window.location;
+  if (hash === "#preview") {
+    const { PreviewApp } = await import("./preview");
+    return <PreviewApp />;
+  }
+  if (hash === "#draw") {
+    const { DrawApp } = await import("./draw");
+    return <DrawApp />;
+  }
+  if (hash === "#voice") {
+    const { VoiceApp } = await import("./voice");
+    return <VoiceApp />;
+  }
+  const { default: App } = await import("./app");
+  return <App />;
+};
 
-createRoot(root).render(
-  <StrictMode>{preview ? <PreviewApp /> : <App />}</StrictMode>
-);
+const boot = async (): Promise<void> => {
+  try {
+    const node = await page();
+    createRoot(root).render(<StrictMode>{node}</StrictMode>);
+  } catch {
+    // keep the page blank
+  }
+};
+
+void boot();

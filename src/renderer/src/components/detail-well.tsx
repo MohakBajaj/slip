@@ -12,7 +12,7 @@ import {
   ReloadIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ComponentProps, MouseEvent } from "react";
 
@@ -36,6 +36,123 @@ import { whenLabel } from "../../../shared/logic";
 import { isWebUrl, sourceApp, urlLabel } from "../../../shared/source";
 import type { Slip } from "../../../shared/types";
 import { Markdown } from "../markdown";
+
+const blankMemo = (text: string): boolean => {
+  const next = text.trim();
+  return next.length === 0 || next === "Voice note";
+};
+
+const storedMemo = (text: string, hasAudio: boolean): string => {
+  const next = text.trim();
+  if (next.length > 0) {
+    return text;
+  }
+  return hasAudio ? "Voice note" : "";
+};
+
+const clock = (secs: number): string => {
+  const n = Number.isFinite(secs) && secs > 0 ? secs : 0;
+  const m = Math.floor(n / 60);
+  const s = Math.floor(n % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+const AudioClip = ({ file }: { file: string }) => {
+  const ref = useRef<HTMLAudioElement>(null);
+  const [on, setOn] = useState(false);
+  const [now, setNow] = useState(0);
+  const [len, setLen] = useState(0);
+  const src = slipImgSrc(file);
+
+  useEffect(() => {
+    const node = ref.current;
+    setOn(false);
+    setNow(0);
+    setLen(0);
+    if (node) {
+      node.pause();
+      node.src = src;
+      node.load();
+    }
+    return () => {
+      node?.pause();
+      node?.removeAttribute("src");
+      node?.load();
+    };
+  }, [src]);
+
+  const stamp = (): void => {
+    const node = ref.current;
+    if (!node) {
+      return;
+    }
+    const next = node.duration;
+    setLen(Number.isFinite(next) && next > 0 ? next : 0);
+  };
+
+  let bar = 8;
+  if (len > 0) {
+    bar = Math.min(100, (now / len) * 100);
+  } else if (on) {
+    bar = 36;
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-2.5 pb-1">
+      {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- transcript is the slip body */}
+      <audio
+        className="hidden"
+        onDurationChange={stamp}
+        onEnded={() => {
+          setOn(false);
+        }}
+        onLoadedMetadata={stamp}
+        onPause={() => {
+          setOn(false);
+        }}
+        onPlay={() => {
+          setOn(true);
+        }}
+        onTimeUpdate={() => {
+          setNow(ref.current?.currentTime ?? 0);
+        }}
+        preload="metadata"
+        ref={ref}
+        src={src}
+      />
+      <Button
+        aria-label={on ? "Pause" : "Play"}
+        className="press"
+        onClick={() => {
+          const node = ref.current;
+          if (!node) {
+            return;
+          }
+          if (node.paused) {
+            void node.play();
+            return;
+          }
+          node.pause();
+        }}
+        size="icon-xs"
+        type="button"
+        variant="outline"
+      >
+        {on ? <Pause className="size-3" /> : <Play className="size-3" />}
+      </Button>
+      <span className="text-muted-foreground w-16 shrink-0 text-[11px] tabular-nums">
+        {clock(now)}
+        {len > 0 ? `/${clock(len)}` : ""}
+      </span>
+      <div className="bg-muted h-0.5 min-w-0 flex-1 overflow-hidden rounded-full">
+        <div
+          className="bg-primary h-full rounded-full"
+          style={{ width: `${bar}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 const Action = ({
   icon,
@@ -174,7 +291,7 @@ const OriginCard = ({ slip }: { slip: Slip }) => {
           side="top"
           sideOffset={6}
         >
-          <PreviewCard.Popup className="bg-popover text-popover-foreground data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 w-64 origin-(--transform-origin) rounded-lg border border-foreground/20 p-2.5 shadow-lg duration-100">
+          <PreviewCard.Popup className="bg-popover text-popover-foreground data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 border-foreground/20 w-64 origin-(--transform-origin) rounded-lg border p-2.5 shadow-lg duration-100">
             {slip.page ? (
               <p className="text-[12px] leading-snug text-pretty">
                 {slip.page}
@@ -227,6 +344,7 @@ export const DetailWell = ({
   const noteRef = useRef(note);
   const prevId = useRef(slip.id);
   const prevContent = useRef(slip.content);
+  const prevHasAudio = useRef(slip.audio.length > 0);
   const onPatchRef = useRef(onPatch);
   const onEditingRef = useRef(onEditing);
   noteRef.current = note;
@@ -235,36 +353,48 @@ export const DetailWell = ({
   const app = sourceApp(slip.source);
 
   const startEdit = (): void => {
-    setNote(slip.content);
+    setNote(blankMemo(slip.content) ? "" : slip.content);
     onEditing(true);
   };
 
   const stopEdit = (save: boolean): void => {
     onEditing(false);
-    if (save && note !== slip.content) {
-      onPatch(slip.id, { content: note });
-    } else {
+    if (!save) {
       setNote(slip.content);
+      return;
     }
+    const stored = storedMemo(note, slip.audio.length > 0);
+    if (stored !== slip.content) {
+      onPatch(slip.id, { content: stored });
+    }
+    setNote(stored);
   };
 
   useEffect(() => {
     if (prevId.current === slip.id) {
       prevContent.current = slip.content;
+      prevHasAudio.current = slip.audio.length > 0;
       return;
     }
     if (noteRef.current !== prevContent.current) {
-      onPatchRef.current(prevId.current, { content: noteRef.current });
+      const stored = storedMemo(noteRef.current, prevHasAudio.current);
+      if (stored !== prevContent.current) {
+        onPatchRef.current(prevId.current, { content: stored });
+      }
     }
     setNote(slip.content);
     prevId.current = slip.id;
     prevContent.current = slip.content;
-  }, [slip.content, slip.id]);
+    prevHasAudio.current = slip.audio.length > 0;
+  }, [slip.audio.length, slip.content, slip.id]);
 
   useEffect(
     () => () => {
       if (noteRef.current !== prevContent.current) {
-        onPatchRef.current(prevId.current, { content: noteRef.current });
+        const stored = storedMemo(noteRef.current, prevHasAudio.current);
+        if (stored !== prevContent.current) {
+          onPatchRef.current(prevId.current, { content: stored });
+        }
       }
       onEditingRef.current(false);
     },
@@ -277,7 +407,7 @@ export const DetailWell = ({
       onClick={startEdit}
       type="button"
     >
-      Write a note
+      Add a memo
     </button>
   );
   if (editing) {
@@ -299,11 +429,11 @@ export const DetailWell = ({
             stopEdit(true);
           }
         }}
-        placeholder="Write a note"
+        placeholder="Add a memo"
         value={note}
       />
     );
-  } else if (slip.content.trim().length > 0) {
+  } else if (!blankMemo(slip.content)) {
     noteView = (
       <button
         className="no-scrollbar scroll-fade max-h-40 w-full overflow-auto px-2.5 pt-2 pb-1.5 text-left text-pretty"
@@ -337,13 +467,11 @@ export const DetailWell = ({
     >
       <ImagePicker inputRef={picker} onFiles={onAddImages} />
       {noteView}
+      {slip.audio.map((file) => (
+        <AudioClip file={file} key={file} />
+      ))}
 
-      <div
-        className={cn(
-          "px-2.5 pb-1.5",
-          slip.content.trim().length === 0 && "pt-2"
-        )}
-      >
+      <div className={cn("px-2.5 pb-1.5", blankMemo(slip.content) && "pt-2")}>
         <ImageStrip
           items={slip.images.map((filePath) => ({
             key: filePath,
@@ -462,8 +590,8 @@ export const DetailWell = ({
           ) : null}
           <Action
             icon={PencilEdit01Icon}
-            label={editing ? "Save" : "Edit"}
-            named={editing}
+            label={editing ? "Save" : "Memo"}
+            named
             on={editing}
             onClick={() => {
               if (editing) {

@@ -61,6 +61,57 @@ export const isSafeCapture = (seq: string[]): boolean =>
 export const sameCapture = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((step, i) => step === right[i]);
 
+export const unusedCapture = (
+  taken: string[],
+  ...more: string[][]
+): string[] => {
+  const blocked = [taken, ...more];
+  for (const preset of CAPTURE_PRESETS) {
+    if (blocked.every((seq) => !sameCapture(preset.sequence, seq))) {
+      return [...preset.sequence];
+    }
+  }
+  return ["Mod+Shift+V"];
+};
+
+export const defaultVoiceCapture = (): string[] =>
+  unusedCapture(defaultCapture());
+
+export const defaultDrawCapture = (): string[] => ["Mod+Shift", "Mod+Shift"];
+
+export const sanitizeVoiceCapture = (
+  raw: unknown,
+  taken: string[]
+): string[] => {
+  if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
+    const seq = raw.filter((step) => step.length > 0 && step.length < 48);
+    if (isSafeCapture(seq) && !sameCapture(seq, taken)) {
+      return seq;
+    }
+  }
+  return unusedCapture(taken);
+};
+
+export const sanitizeDrawCapture = (
+  raw: unknown,
+  ...taken: string[][]
+): string[] => {
+  if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
+    const seq = raw.filter((step) => step.length > 0 && step.length < 48);
+    if (
+      isSafeCapture(seq) &&
+      taken.every((other) => !sameCapture(seq, other))
+    ) {
+      return seq;
+    }
+  }
+  const fallback = defaultDrawCapture();
+  if (taken.every((other) => !sameCapture(fallback, other))) {
+    return fallback;
+  }
+  return unusedCapture(taken[0] ?? defaultCapture(), ...taken.slice(1));
+};
+
 export const sanitizeCapture = (
   raw: unknown,
   legacyChord?: unknown
@@ -116,4 +167,23 @@ export const parseCapture = (seq: string[]): CaptureStep[] => {
     });
   }
   return steps;
+};
+
+const MOD_GLYPH: Record<CaptureMod, string> = {
+  command: "⌘",
+  control: "⌃",
+  option: "⌥",
+  shift: "⇧",
+};
+
+export const formatHold = (seq: string[]): string => {
+  const [first] = parseCapture(seq);
+  if (first?.kind === "mod") {
+    return `hold ${MOD_GLYPH[first.name]}`;
+  }
+  const [step] = seq;
+  if (step === undefined) {
+    return "hold";
+  }
+  return `hold ${formatCapture([step])}`;
 };

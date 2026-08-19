@@ -37,9 +37,11 @@ export const PreviewApp = () => {
     const offB = window.slip.onSlipsChanged(() => {
       apply().catch(() => undefined);
     });
+    const offC = window.slip.onSettings(setSettings);
     return () => {
       offA();
       offB();
+      offC();
     };
   }, [apply]);
 

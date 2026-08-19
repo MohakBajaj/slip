@@ -1,6 +1,13 @@
 import type { FontId, ThemeId, TrayIconId } from "./appearance";
 import { isFontId, isThemeId, isTrayIconId } from "./appearance";
-import { defaultCapture, sanitizeCapture } from "./capture-bind";
+import {
+  defaultCapture,
+  defaultDrawCapture,
+  defaultVoiceCapture,
+  sanitizeCapture,
+  sanitizeDrawCapture,
+  sanitizeVoiceCapture,
+} from "./capture-bind";
 import type { Shortcuts } from "./shortcuts";
 import { defaultShortcuts, sanitizeShortcuts } from "./shortcuts";
 
@@ -11,6 +18,7 @@ export type Scheme = "system" | "light" | "dark";
 
 export interface Slip {
   archived: boolean;
+  audio: string[];
   content: string;
   createdAt: string;
   done: boolean;
@@ -31,6 +39,7 @@ export interface Settings {
   alwaysOnTop: boolean;
   capture: string[];
   dock: boolean;
+  drawCapture: string[];
   font: FontId;
   notify: boolean;
   scheme: Scheme;
@@ -39,6 +48,7 @@ export interface Settings {
   theme: ThemeId;
   trayIcon: TrayIconId;
   vaultPath: string;
+  voiceCapture: string[];
   zoom: number;
 }
 
@@ -66,6 +76,7 @@ export const defaultSettings = (): Settings => ({
   alwaysOnTop: true,
   capture: defaultCapture(),
   dock: true,
+  drawCapture: defaultDrawCapture(),
   font: "geist",
   notify: false,
   scheme: "system",
@@ -74,6 +85,7 @@ export const defaultSettings = (): Settings => ({
   theme: "paper",
   trayIcon: "slip",
   vaultPath: defaultVaultPath(),
+  voiceCapture: defaultVoiceCapture(),
   zoom: 1,
 });
 
@@ -107,8 +119,19 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (!isAccent(next.accent)) {
     next.accent = "amber";
   }
-  const legacy = input as { capture?: unknown; chord?: unknown };
+  const legacy = input as {
+    capture?: unknown;
+    chord?: unknown;
+    drawCapture?: unknown;
+    voiceCapture?: unknown;
+  };
   next.capture = sanitizeCapture(legacy.capture, legacy.chord);
+  next.voiceCapture = sanitizeVoiceCapture(legacy.voiceCapture, next.capture);
+  next.drawCapture = sanitizeDrawCapture(
+    legacy.drawCapture,
+    next.capture,
+    next.voiceCapture
+  );
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
   }
@@ -137,6 +160,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
     dock: next.dock,
+    drawCapture: next.drawCapture,
     font: next.font,
     notify: next.notify,
     scheme: next.scheme,
@@ -145,6 +169,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     theme: next.theme,
     trayIcon: next.trayIcon,
     vaultPath: next.vaultPath,
+    voiceCapture: next.voiceCapture,
     zoom: next.zoom,
   };
 };

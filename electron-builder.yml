@@ -38,6 +38,7 @@ mac:
   extendInfo:
     NSAutoFillHeuristicControllerEnabled: false
     NSDocumentsFolderUsageDescription: Slip keeps your notes as markdown in Documents.
+    NSMicrophoneUsageDescription: Slip records a voice note when you capture by speaking.
   notarize: false
   extraFiles:
     - from: dist/cli/slip

@@ -1,6 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { is } from "@electron-toolkit/utils";
 import {
@@ -12,19 +20,21 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
-  net,
   Notification,
   protocol,
+  screen,
   session,
   shell,
+  systemPreferences,
   Tray,
 } from "electron";
-import type { MenuItemConstructorOptions } from "electron";
+import type { MenuItemConstructorOptions, WebContents } from "electron";
 
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
-import { formatCapture, sameCapture } from "../shared/capture-bind";
+import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
+import { attachmentType, MAX_AUDIO_BYTES } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import { emptyContext } from "../shared/source";
@@ -43,6 +53,7 @@ import {
   deleteSlips,
   ensureVault,
   listSlips,
+  mergeSlips,
   resolveAttachment,
   restoreSlips,
   updateSlip,
@@ -52,9 +63,12 @@ import {
 import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
 import { applyDockIcon } from "./dock-icon";
+import { startFrontContext } from "./front-context";
 
 const ACCESS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
+const MIC =
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
 const SETTINGS_FILE = settingsFile();
 
 const writeClipboard = (text: string, paths: string[]): void => {
@@ -102,6 +116,7 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
       secure: true,
       standard: true,
+      stream: true,
       supportFetchAPI: true,
     },
     scheme: "slip-img",
@@ -112,6 +127,9 @@ let win: BrowserWindow | null = null;
 let winReady = false;
 let previewWin: BrowserWindow | null = null;
 let preview: PreviewState | null = null;
+let voiceCtx: ReturnType<typeof startFrontContext> | null = null;
+let voiceWin: BrowserWindow | null = null;
+let drawWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let captureCtl: CaptureHandle | null = null;
 let stopWatch: (() => void) | null = null;
@@ -152,6 +170,29 @@ const isDark = (): boolean =>
 const windowHex = (): string => {
   const theme = THEMES.find((item) => item.id === settings.theme) ?? THEMES[0];
   return isDark() ? theme.darkHex : theme.lightHex;
+};
+
+const applyThemeSource = (): void => {
+  if (settings.scheme === "light" || settings.scheme === "dark") {
+    nativeTheme.themeSource = settings.scheme;
+    return;
+  }
+  nativeTheme.themeSource = "system";
+};
+
+const paintWindows = (): void => {
+  const hex = windowHex();
+  win?.setBackgroundColor(hex);
+  previewWin?.setBackgroundColor(hex);
+  voiceWin?.setBackgroundColor(hex);
+  drawWin?.setBackgroundColor(hex);
+};
+
+const tellSettings = (): void => {
+  win?.webContents.send("settings-changed", settings);
+  previewWin?.webContents.send("settings-changed", settings);
+  voiceWin?.webContents.send("settings-changed", settings);
+  drawWin?.webContents.send("settings-changed", settings);
 };
 
 const trayFile = (id: TrayIconId): string => {
@@ -308,10 +349,12 @@ const rebuildTray = (): void => {
   const { hidden, open, shown } = trayShown(listSlips(vaultRoot()));
   const chord = formatCapture(settings.capture);
   tray.setTitle(open > 0 ? String(open) : "");
+  const voiceChord = formatHold(settings.voiceCapture);
+  const drawChord = formatCapture(settings.drawCapture);
   tray.setToolTip(
     open > 0
-      ? `Slip — ${open} open — ${chord} to capture`
-      : `Slip — ${chord} to capture`
+      ? `Slip — ${open} open — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
+      : `Slip — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
   );
   const login = loginKnown;
   const canLogin = login === "on" || login === "off";
@@ -336,6 +379,8 @@ const rebuildTray = (): void => {
       { type: "separator" },
       { click: () => showWindow(), label: "Open Slip" },
       { click: () => composeSlip(), label: "New Slip" },
+      { click: () => showVoice(), label: "Voice Slip" },
+      { click: () => showDraw(), label: "Draw" },
       {
         click: () => {
           shell.openPath(vaultRoot()).catch(() => undefined);
@@ -413,7 +458,55 @@ const asBytes = (value: unknown): Uint8Array | undefined => {
   if (value instanceof ArrayBuffer) {
     return new Uint8Array(value);
   }
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
   return undefined;
+};
+
+const byteRange = (
+  header: string | null,
+  size: number
+): { end: number; start: number } | null => {
+  if (!header || size <= 0) {
+    return null;
+  }
+  const match = /^bytes=(?<start>\d*)-(?<end>\d*)$/u.exec(header.trim());
+  if (!match) {
+    return null;
+  }
+  const left = match.groups?.start ?? "";
+  const right = match.groups?.end ?? "";
+  let start = 0;
+  let end = size - 1;
+  if (left === "" && right !== "") {
+    start = Math.max(0, size - Number(right));
+  } else {
+    start = left === "" ? 0 : Number(left);
+    end = right === "" ? size - 1 : Number(right);
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+    return null;
+  }
+  if (start >= size) {
+    return null;
+  }
+  return { end: Math.min(end, size - 1), start };
+};
+
+const readRange = (file: string, start: number, end: number): ArrayBuffer => {
+  const len = Math.max(0, end - start + 1);
+  const raw = new ArrayBuffer(len);
+  if (len === 0) {
+    return raw;
+  }
+  const fd = openSync(file, "r");
+  try {
+    readSync(fd, new Uint8Array(raw), 0, len, start);
+  } finally {
+    closeSync(fd);
+  }
+  return raw;
 };
 
 const parseImageInputs = (raw: unknown): ImagePayload[] => {
@@ -491,11 +584,26 @@ const bootCapture = (): void => {
   captureCtl?.stop();
   try {
     captureCtl = startCapture({
+      drawSequence: settings.drawCapture,
       imageDir: path.join(vaultRoot(), "attachments", "inbox"),
+      onDraw: showDraw,
       onEvent: ingest,
       onState: setCapture,
+      onVoice: () => {
+        showVoice("tap");
+      },
+      onVoiceCancel: () => {
+        hideVoice();
+      },
+      onVoiceHold: () => {
+        showVoice("hold");
+      },
+      onVoiceRelease: () => {
+        releaseVoice();
+      },
       sequence: settings.capture,
       skip: [app.getName(), "Electron"],
+      voiceSequence: settings.voiceCapture,
     });
   } catch {
     captureCtl = null;
@@ -563,14 +671,12 @@ const createWindow = (): void => {
   }
 };
 
-const loadPreviewPage = (target: BrowserWindow): void => {
+const loadHashPage = (target: BrowserWindow, hash: string): void => {
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
-    target.loadURL(`${process.env.ELECTRON_RENDERER_URL}/#preview`);
+    target.loadURL(`${process.env.ELECTRON_RENDERER_URL}/#${hash}`);
     return;
   }
-  target.loadFile(path.join(__dirname, "../renderer/index.html"), {
-    hash: "preview",
-  });
+  target.loadFile(path.join(__dirname, "../renderer/index.html"), { hash });
 };
 
 const showPreview = (): void => {
@@ -607,15 +713,221 @@ const showPreview = (): void => {
   previewWin.on("closed", () => {
     previewWin = null;
   });
-  loadPreviewPage(previewWin);
+  loadHashPage(previewWin, "preview");
+};
+
+const askMic = async (): Promise<boolean> => {
+  if (process.platform !== "darwin") {
+    return true;
+  }
+  if (systemPreferences.getMediaAccessStatus("microphone") === "granted") {
+    return true;
+  }
+  return await systemPreferences.askForMediaAccess("microphone");
+};
+
+const placeVoice = (target: BrowserWindow): void => {
+  const area = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint()
+  ).workArea;
+  const [width, height] = target.getSize();
+  target.setPosition(
+    Math.round(area.x + (area.width - width) / 2),
+    Math.round(area.y + area.height - height - 56)
+  );
+};
+
+let voiceQueued: "cancel" | "commit" | null = null;
+let voiceGen = 0;
+let voiceReady = false;
+
+const hideVoice = (): void => {
+  voiceGen += 1;
+  voiceQueued = null;
+  voiceReady = false;
+  voiceCtx = null;
+  if (voiceWin && !voiceWin.isDestroyed()) {
+    voiceWin.close();
+  }
+  voiceWin = null;
+};
+
+const flushVoice = (): void => {
+  if (!voiceWin || voiceWin.isDestroyed() || !voiceReady) {
+    return;
+  }
+  if (voiceQueued === "commit") {
+    voiceQueued = null;
+    voiceWin.webContents.send("voice-commit");
+    return;
+  }
+  if (voiceQueued === "cancel") {
+    hideVoice();
+  }
+};
+
+const revealVoice = (): void => {
+  if (!voiceWin || voiceWin.isDestroyed()) {
+    return;
+  }
+  placeVoice(voiceWin);
+  voiceWin.showInactive();
+  flushVoice();
+};
+
+const releaseVoice = (): void => {
+  voiceQueued = "commit";
+  flushVoice();
+};
+
+const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
+  voiceGen += 1;
+  const gen = voiceGen;
+  voiceCtx = startFrontContext([app.getName(), "Electron"]);
+  void (async () => {
+    await askMic();
+    if (gen !== voiceGen) {
+      return;
+    }
+    if (voiceWin && !voiceWin.isDestroyed()) {
+      if (mode === "tap") {
+        voiceQueued = "commit";
+        flushVoice();
+      }
+      return;
+    }
+    voiceWin = new BrowserWindow({
+      alwaysOnTop: true,
+      backgroundColor: windowHex(),
+      focusable: true,
+      frame: false,
+      height: 52,
+      maximizable: false,
+      minimizable: false,
+      resizable: false,
+      roundedCorners: true,
+      show: false,
+      skipTaskbar: true,
+      title: "Voice",
+      webPreferences: {
+        backgroundThrottling: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, "../preload/index.js"),
+        sandbox: true,
+        spellcheck: false,
+        webgl: false,
+      },
+      width: 240,
+    });
+    voiceWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    voiceWin.on("ready-to-show", () => {
+      revealVoice();
+    });
+    voiceWin.on("closed", () => {
+      voiceWin = null;
+    });
+    loadHashPage(voiceWin, "voice");
+  })();
+};
+
+let drawAttach = false;
+
+const hideDraw = (): void => {
+  if (drawWin && !drawWin.isDestroyed()) {
+    drawWin.close();
+  }
+  drawWin = null;
+  drawAttach = false;
+};
+
+const tellDrawMode = (): void => {
+  drawWin?.webContents.send("draw-mode", drawAttach ? "attach" : "slip");
+};
+
+const showDraw = (attach = false): void => {
+  drawAttach = attach;
+  if (drawWin && !drawWin.isDestroyed()) {
+    tellDrawMode();
+    tellSettings();
+    drawWin.show();
+    drawWin.focus();
+    return;
+  }
+  const area = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint()
+  ).workArea;
+  const width = Math.min(880, Math.round(area.width * 0.58));
+  const height = Math.min(620, Math.round(area.height * 0.68));
+  drawWin = new BrowserWindow({
+    alwaysOnTop: settings.alwaysOnTop,
+    backgroundColor: windowHex(),
+    height,
+    minHeight: 400,
+    minWidth: 640,
+    show: false,
+    title: "Slip Draw",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 12, y: 12 },
+    webPreferences: {
+      contextIsolation: true,
+      preload: path.join(__dirname, "../preload/index.js"),
+      sandbox: true,
+      spellcheck: false,
+      webgl: false,
+    },
+    width,
+  });
+  drawWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  drawWin.on("ready-to-show", () => {
+    if (!drawWin || drawWin.isDestroyed()) {
+      return;
+    }
+    const next = screen.getDisplayNearestPoint(
+      screen.getCursorScreenPoint()
+    ).workArea;
+    const [w, h] = drawWin.getSize();
+    drawWin.setPosition(
+      Math.round(next.x + (next.width - w) / 2),
+      Math.round(next.y + (next.height - h) / 2)
+    );
+    drawWin.show();
+    drawWin.focus();
+  });
+  drawWin.on("closed", () => {
+    drawWin = null;
+    drawAttach = false;
+  });
+  drawWin.webContents.once("did-finish-load", tellDrawMode);
+  loadHashPage(drawWin, "draw");
 };
 
 const boot = async (): Promise<void> => {
   await app.whenReady();
   session.defaultSession.setSpellCheckerEnabled(false);
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => {
-    cb(false);
-  });
+  const voiceMic = (
+    wc: WebContents | null,
+    perm: string,
+    types?: string[]
+  ): boolean =>
+    perm === "media" &&
+    voiceWin !== null &&
+    !voiceWin.isDestroyed() &&
+    wc === voiceWin.webContents &&
+    (types === undefined || types.every((kind) => kind === "audio"));
+  session.defaultSession.setPermissionCheckHandler(
+    (wc, perm, _origin, details) =>
+      voiceMic(
+        wc,
+        perm,
+        details.mediaType === undefined ? undefined : [details.mediaType]
+      )
+  );
+  session.defaultSession.setPermissionRequestHandler(
+    (wc, perm, cb, details) => {
+      const types = "mediaTypes" in details ? details.mediaTypes : undefined;
+      cb(voiceMic(wc, perm, types));
+    }
+  );
   app.on("web-contents-created", (_e, contents) => {
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.setWindowOpenHandler(({ url }) => {
@@ -625,24 +937,47 @@ const boot = async (): Promise<void> => {
   });
 
   ensureVault(vaultRoot());
+  applyThemeSource();
   applyDock(settings.dock);
   loginKnown = loginState();
 
   protocol.handle("slip-img", (request) => {
-    const filePath = decodeURIComponent(new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    let filePath = pathname;
+    try {
+      filePath = decodeURIComponent(pathname);
+    } catch {
+      filePath = pathname;
+    }
     const allowed = resolveAttachment(vaultRoot(), filePath);
     if (!allowed) {
       return new Response("forbidden", { status: 403 });
     }
-    return net.fetch(pathToFileURL(allowed).href);
+    const type = attachmentType(allowed);
+    const { size } = statSync(allowed);
+    const range = byteRange(request.headers.get("Range"), size);
+    const start = range?.start ?? 0;
+    const end = range?.end ?? Math.max(0, size - 1);
+    const body =
+      size === 0 ? new ArrayBuffer(0) : readRange(allowed, start, end);
+    return new Response(body, {
+      headers: {
+        "Accept-Ranges": "bytes",
+        "Content-Length": String(body.byteLength),
+        "Content-Type": type,
+        ...(range === null
+          ? {}
+          : { "Content-Range": `bytes ${range.start}-${range.end}/${size}` }),
+      },
+      status: range === null ? 200 : 206,
+    });
   });
 
   tray = new Tray(nativeImage.createEmpty());
   applyTrayIcon();
   rebuildTray();
   nativeTheme.on("updated", () => {
-    win?.setBackgroundColor(windowHex());
-    previewWin?.setBackgroundColor(windowHex());
+    paintWindows();
     if (settings.dock) {
       applyDockIcon(isDark());
     }
@@ -660,7 +995,10 @@ const boot = async (): Promise<void> => {
     const prevBg = windowHex();
     const prevDark = isDark();
     saveSettings(next);
-    const captureChanged = !sameCapture(settings.capture, prev.capture);
+    const captureChanged =
+      !sameCapture(settings.capture, prev.capture) ||
+      !sameCapture(settings.voiceCapture, prev.voiceCapture) ||
+      !sameCapture(settings.drawCapture, prev.drawCapture);
     const vaultChanged = settings.vaultPath !== prev.vaultPath;
     if (settings.dock !== prev.dock) {
       applyDock(settings.dock);
@@ -673,11 +1011,15 @@ const boot = async (): Promise<void> => {
     if (settings.alwaysOnTop !== prev.alwaysOnTop) {
       win?.setAlwaysOnTop(settings.alwaysOnTop);
       previewWin?.setAlwaysOnTop(settings.alwaysOnTop);
+      drawWin?.setAlwaysOnTop(settings.alwaysOnTop);
+    }
+    if (settings.scheme !== prev.scheme) {
+      applyThemeSource();
     }
     if (windowHex() !== prevBg) {
-      win?.setBackgroundColor(windowHex());
-      previewWin?.setBackgroundColor(windowHex());
+      paintWindows();
     }
+    tellSettings();
     if (settings.zoom !== prev.zoom) {
       applyZoom(settings.zoom, prev.zoom);
     }
@@ -689,6 +1031,8 @@ const boot = async (): Promise<void> => {
     } else if (captureChanged) {
       if (captureCtl) {
         captureCtl.setSequence(settings.capture);
+        captureCtl.setVoiceSequence(settings.voiceCapture);
+        captureCtl.setDrawSequence(settings.drawCapture);
       } else {
         bootCapture();
       }
@@ -705,6 +1049,101 @@ const boot = async (): Promise<void> => {
       section: currentSection,
     });
     rebuildTray();
+    return slip;
+  });
+  ipcMain.handle("mergeSlips", (_e, ids: unknown, section: unknown) => {
+    if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
+      return null;
+    }
+    const named = typeof section === "string" ? section : currentSection;
+    const result = mergeSlips(vaultRoot(), ids, named);
+    rebuildTray();
+    return result;
+  });
+  ipcMain.handle(
+    "createVoiceSlip",
+    async (_e, content: unknown, audio: unknown = null) => {
+      const text = typeof content === "string" ? content.trim() : "";
+      const [file] = parseImageInputs(audio === null ? [] : [audio]);
+      if (
+        file?.bytes !== undefined &&
+        file.bytes.byteLength > MAX_AUDIO_BYTES
+      ) {
+        hideVoice();
+        return null;
+      }
+      if (!text && file === undefined) {
+        return null;
+      }
+      ensureVault(vaultRoot());
+      const ctx = voiceCtx
+        ? await voiceCtx.ready.catch(() => emptyContext())
+        : emptyContext();
+      const slip = createSlip(vaultRoot(), {
+        audio: file,
+        content: text || "Voice note",
+        page: ctx.page,
+        section: currentSection,
+        source: ctx.source,
+        url: ctx.url,
+      });
+      if (settings.notify && Notification.isSupported()) {
+        new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
+      }
+      send("slips-changed");
+      rebuildTray();
+      hideVoice();
+      return slip;
+    }
+  );
+  ipcMain.handle("voiceReady", () => {
+    voiceReady = true;
+    flushVoice();
+  });
+  ipcMain.handle("closeVoice", () => {
+    hideVoice();
+  });
+  ipcMain.handle("closeDraw", () => {
+    hideDraw();
+  });
+  ipcMain.handle("openDraw", (_e, mode: unknown) => {
+    showDraw(mode === "attach");
+  });
+  ipcMain.handle("copyImage", (_e, bytes: unknown) => {
+    const image = asBytes(bytes);
+    if (image === undefined || image.byteLength === 0) {
+      return false;
+    }
+    const native = nativeImage.createFromBuffer(Buffer.from(image));
+    if (native.isEmpty()) {
+      return false;
+    }
+    clipboard.writeImage(native);
+    return true;
+  });
+  ipcMain.handle("createDrawSlip", (_e, image: unknown) => {
+    const [file] = parseImageInputs(image === null ? [] : [image]);
+    if (file === undefined) {
+      return null;
+    }
+    if (drawAttach) {
+      if (file.bytes && file.bytes.byteLength > 0) {
+        win?.webContents.send("draw-attach", file.bytes);
+      }
+      hideDraw();
+      return null;
+    }
+    const slip = createSlip(vaultRoot(), {
+      content: "Drawing",
+      images: [file],
+      section: currentSection,
+    });
+    if (settings.notify && Notification.isSupported()) {
+      new Notification({ body: "Drawing", title: "Slip" }).show();
+    }
+    send("slips-changed");
+    rebuildTray();
+    hideDraw();
     return slip;
   });
   ipcMain.handle("addImages", (_e, id: string, images: unknown) => {
@@ -834,6 +1273,11 @@ const boot = async (): Promise<void> => {
     return folder;
   });
   ipcMain.handle("openAccess", () => shell.openExternal(ACCESS));
+  ipcMain.handle("openMic", () => shell.openExternal(MIC));
+  ipcMain.handle("openVoice", () => {
+    showVoice();
+  });
+  ipcMain.handle("askMic", () => askMic());
   ipcMain.handle("setLogin", (_e, on: boolean) => applyLogin(on));
   ipcMain.handle(
     "popupMenu",
@@ -911,6 +1355,14 @@ const boot = async (): Promise<void> => {
             label: "New Slip",
           },
           {
+            click: () => showVoice(),
+            label: "Voice Slip",
+          },
+          {
+            click: () => showDraw(),
+            label: "Draw",
+          },
+          {
             click: () => {
               shell.openPath(vaultRoot()).catch(() => undefined);
             },
@@ -965,6 +1417,8 @@ boot().catch(() => {
 app.on("before-quit", () => {
   captureCtl?.stop();
   stopWatch?.();
+  hideVoice();
+  hideDraw();
 });
 
 app.on("window-all-closed", () => undefined);

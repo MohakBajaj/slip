@@ -10,6 +10,27 @@ export const IMAGE_EXT = new Set([
   ".webp",
 ]);
 
+const AUDIO_MIME: Record<string, string> = {
+  ".m4a": "audio/mp4",
+  ".mp3": "audio/mpeg",
+  ".mp4": "audio/mp4",
+  ".ogg": "audio/ogg",
+  ".wav": "audio/wav",
+  ".webm": "audio/webm",
+};
+
+const IMAGE_MIME: Record<string, string> = {
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".heic": "image/heic",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".webp": "image/webp",
+};
+
 const EXT = /\.[^.]+$/u;
 
 export const extOf = (name: string): string => {
@@ -28,11 +49,23 @@ export const imageExt = (name: string): string => {
   return IMAGE_EXT.has(ext) ? ext : "";
 };
 
+export const audioExt = (name: string): string => {
+  const ext = extOf(name);
+  return AUDIO_MIME[ext] === undefined ? "" : ext;
+};
+
+export const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+
 export const imageTitle = (name: string): string =>
   name.replace(EXT, "").trim() || "Untitled";
 
 export const slipImgSrc = (filePath: string): string =>
   `slip-img://img${filePath}`;
+
+export const attachmentType = (filePath: string): string =>
+  AUDIO_MIME[extOf(filePath)] ??
+  IMAGE_MIME[extOf(filePath)] ??
+  "application/octet-stream";
 
 export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
   if (

@@ -14,7 +14,6 @@ import {
   isSafeCapture,
   sameCapture,
 } from "../../../shared/capture-bind";
-import type { Settings } from "../../../shared/types";
 
 const MOD_STEP: Record<string, string> = {
   Alt: "Option",
@@ -52,24 +51,26 @@ const CapturePreset = ({
 );
 
 export const CaptureBind = ({
+  hint,
   onBind,
-  onChange,
-  settings,
+  onSequence,
+  presets = true,
+  value,
 }: {
+  hint: string;
   onBind: (on: boolean) => void;
-  onChange: (next: Settings) => void;
-  settings: Settings;
+  onSequence: (next: string[]) => void;
+  presets?: boolean;
+  value: string[];
 }) => {
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const draftRef = useRef(draft);
   const idleRef = useRef<number>(0);
   const ignoreTapRef = useRef(false);
-  const settingsRef = useRef(settings);
   const stopRef = useRef<(next: string[] | null) => void>(() => undefined);
 
   draftRef.current = draft;
-  settingsRef.current = settings;
 
   const stop = (next: string[] | null): void => {
     window.clearTimeout(idleRef.current);
@@ -77,7 +78,7 @@ export const CaptureBind = ({
     setDraft([]);
     ignoreTapRef.current = false;
     if (next !== null && isSafeCapture(next)) {
-      onChange({ ...settingsRef.current, capture: next });
+      onSequence(next);
     }
   };
   stopRef.current = stop;
@@ -172,11 +173,11 @@ export const CaptureBind = ({
     };
   }, [recording]);
 
-  let hint = formatCapture(settings.capture);
+  let shown = formatCapture(value);
   if (recording) {
-    hint = "Press keys";
+    shown = "Press keys";
     if (draft.length > 0) {
-      hint = formatCapture(draft);
+      shown = formatCapture(draft);
     }
   }
 
@@ -198,24 +199,26 @@ export const CaptureBind = ({
         }}
         type="button"
       >
-        <span className="block text-[15px] tracking-wide">{hint}</span>
+        <span className="block text-[15px] tracking-wide">{shown}</span>
         <span className="text-muted-foreground mt-1 block text-[11px]">
-          Double-tap a modifier, or a shortcut that includes one
+          {hint}
         </span>
       </button>
-      <div className="grid grid-cols-4 gap-1.5">
-        {CAPTURE_PRESETS.map((preset) => (
-          <CapturePreset
-            key={preset.label}
-            on={sameCapture(settings.capture, preset.sequence)}
-            onPick={() => {
-              stop(null);
-              onChange({ ...settings, capture: preset.sequence });
-            }}
-            preset={preset}
-          />
-        ))}
-      </div>
+      {presets ? (
+        <div className="grid grid-cols-4 gap-1.5">
+          {CAPTURE_PRESETS.map((preset) => (
+            <CapturePreset
+              key={preset.label}
+              on={sameCapture(value, preset.sequence)}
+              onPick={() => {
+                stop(null);
+                onSequence(preset.sequence);
+              }}
+              preset={preset}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };

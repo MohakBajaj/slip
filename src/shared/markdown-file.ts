@@ -5,12 +5,21 @@ import type { Slip } from "./types";
 const asString = (value: unknown, fallback: string): string =>
   typeof value === "string" && value.length > 0 ? value : fallback;
 
+const asPaths = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => asString(item, "")).filter(Boolean);
+  }
+  const one = asString(value, "");
+  return one ? [one] : [];
+};
+
 const leadingNewlines = /^\n+/u;
 const markdownExt = /\.md$/u;
 
 export const serializeSlip = (slip: Slip): string =>
   matter.stringify(slip.content.replace(leadingNewlines, ""), {
     archived: slip.archived,
+    ...(slip.audio.length > 0 ? { audio: slip.audio } : {}),
     created: slip.createdAt,
     done: slip.done,
     id: slip.id,
@@ -32,6 +41,7 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
     const created = asString(data.created, new Date().toISOString());
     return {
       archived: Boolean(data.archived),
+      audio: asPaths(data.audio),
       content: asString(parsed.content, "").replace(leadingNewlines, ""),
       createdAt: created,
       done: Boolean(data.done),

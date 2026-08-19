@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   unlinkSync,
   watch,
@@ -14,9 +15,10 @@ import type { FSWatcher } from "node:fs";
 import path from "node:path";
 
 import { filenameFor, renderIndex } from "./shared/format";
-import { imageExt } from "./shared/images";
+import { audioExt, imageExt, MAX_AUDIO_BYTES } from "./shared/images";
 import type { ImagePayload } from "./shared/images";
 import { parseSlip, serializeSlip } from "./shared/markdown-file";
+import { mergeDraft } from "./shared/merge";
 import type { Slip } from "./shared/types";
 import { SKILL_MD } from "./skill-template";
 
@@ -81,6 +83,19 @@ const applyPatch = (current: Slip, patch: Partial<Slip>): Slip => ({
   updatedAt: new Date().toISOString(),
 });
 
+const attachmentDir = (root: string, id: string): string | null => {
+  if (!SLIP_ID.test(id)) {
+    return null;
+  }
+  const attachments = path.resolve(root, "attachments");
+  const dir = path.resolve(attachments, id);
+  const rel = path.relative(attachments, dir);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    return null;
+  }
+  return dir;
+};
+
 export const ensureVault = (root: string): void => {
   mkdirSync(path.join(root, "attachments"), { recursive: true });
   writeIfChanged(path.join(root, "SKILL.md"), SKILL_MD);
@@ -108,26 +123,14 @@ export const writeSlip = (root: string, slip: Slip): Slip[] => {
   return slips;
 };
 
-const attachmentDir = (root: string, id: string): string | null => {
-  if (!SLIP_ID.test(id)) {
-    return null;
-  }
-  const attachments = path.resolve(root, "attachments");
-  const dir = path.resolve(attachments, id);
-  const rel = path.relative(attachments, dir);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    return null;
-  }
-  return dir;
-};
-
-const ingestImage = (root: string, id: string, input: ImagePayload): string => {
+const ingestFile = (
+  root: string,
+  id: string,
+  input: ImagePayload,
+  ext: string
+): string => {
   const dir = attachmentDir(root, id);
-  if (dir === null) {
-    return "";
-  }
-  const ext = imageExt(input.path ?? input.name) || (input.bytes ? ".png" : "");
-  if (!ext) {
+  if (dir === null || !ext) {
     return "";
   }
   mkdirSync(dir, { recursive: true });
@@ -136,7 +139,14 @@ const ingestImage = (root: string, id: string, input: ImagePayload): string => {
     `${Date.now()}-${randomInt(1e9).toString(36)}${ext}`
   );
   if (input.path !== undefined && existsSync(input.path)) {
-    copyFileSync(input.path, dest);
+    const inbox = path.resolve(root, "attachments", "inbox");
+    const resolved = path.resolve(input.path);
+    const rel = path.relative(inbox, resolved);
+    if (rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+      renameSync(resolved, dest);
+    } else {
+      copyFileSync(input.path, dest);
+    }
     return dest;
   }
   if (input.bytes !== undefined && input.bytes.byteLength > 0) {
@@ -144,6 +154,26 @@ const ingestImage = (root: string, id: string, input: ImagePayload): string => {
     return dest;
   }
   return "";
+};
+
+const ingestImage = (root: string, id: string, input: ImagePayload): string =>
+  ingestFile(
+    root,
+    id,
+    input,
+    imageExt(input.path ?? input.name) || (input.bytes ? ".png" : "")
+  );
+
+const ingestAudio = (root: string, id: string, input: ImagePayload): string => {
+  if (input.bytes !== undefined && input.bytes.byteLength > MAX_AUDIO_BYTES) {
+    return "";
+  }
+  return ingestFile(
+    root,
+    id,
+    input,
+    audioExt(input.path ?? input.name) || (input.bytes ? ".webm" : "")
+  );
 };
 
 const ingestImages = (
@@ -156,27 +186,51 @@ const ingestImages = (
     return dest ? [dest] : [];
   });
 
+const ingestAudios = (
+  root: string,
+  id: string,
+  inputs: ImagePayload[]
+): string[] =>
+  inputs.flatMap((input) => {
+    const dest = ingestAudio(root, id, input);
+    return dest ? [dest] : [];
+  });
+
 const asImageInputs = (raw: (string | ImagePayload)[]): ImagePayload[] =>
   raw.map((item) =>
     typeof item === "string" ? { name: path.basename(item), path: item } : item
   );
 
+const asAudioInputs = (
+  raw: undefined | string | ImagePayload | (string | ImagePayload)[]
+): ImagePayload[] => {
+  if (raw === undefined) {
+    return [];
+  }
+  return asImageInputs(Array.isArray(raw) ? raw : [raw]);
+};
+
 export const createSlip = (
   root: string,
   input: {
+    audio?: string | ImagePayload | (string | ImagePayload)[];
     content: string;
     images?: (string | ImagePayload)[];
     page?: string;
+    pin?: boolean;
     section?: string;
     source?: string;
+    tags?: string[];
     url?: string;
   }
 ): Slip => {
   const createdAt = new Date().toISOString();
   const id = shortId();
   const images = ingestImages(root, id, asImageInputs(input.images ?? []));
+  const audio = ingestAudios(root, id, asAudioInputs(input.audio));
   const slip: Slip = {
     archived: false,
+    audio,
     content: input.content,
     createdAt,
     done: false,
@@ -184,10 +238,10 @@ export const createSlip = (
     id,
     images,
     page: input.page ?? "",
-    pin: false,
+    pin: Boolean(input.pin),
     section: input.section ?? "",
     source: input.source ?? "",
-    tags: [],
+    tags: [...new Set((input.tags ?? []).filter(Boolean))],
     updatedAt: createdAt,
     url: input.url ?? "",
   };
@@ -221,6 +275,40 @@ export const updateSlip = (
 ): Slip | null => {
   const slips = updateSlips(root, [id], patch);
   return slips.find((slip) => slip.id === id) ?? null;
+};
+
+export const mergeSlips = (
+  root: string,
+  ids: string[],
+  section?: string
+): { created: Slip; slips: Slip[] } | null => {
+  ensureVault(root);
+  const byId = new Map(readSlips(root).map((slip) => [slip.id, slip]));
+  const items = ids.flatMap((id) => {
+    const slip = byId.get(id);
+    return slip ? [slip] : [];
+  });
+  if (items.length < 2) {
+    return null;
+  }
+  const draft = mergeDraft(items);
+  const created = createSlip(root, {
+    audio: draft.audio,
+    content: draft.content,
+    images: draft.images,
+    page: draft.page,
+    pin: draft.pin,
+    section: section ?? items[0]?.section ?? "",
+    source: draft.source,
+    tags: draft.tags,
+    url: draft.url,
+  });
+  const slips = updateSlips(
+    root,
+    items.map((slip) => slip.id),
+    { archived: true }
+  );
+  return { created, slips };
 };
 
 export const deleteSlips = (root: string, ids: string[]): Slip[] => {

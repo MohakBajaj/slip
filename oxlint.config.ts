@@ -48,6 +48,7 @@ export default defineConfig({
         "src/main/ax-context.ts",
         "src/main/capture.ts",
         "src/main/front-context.ts",
+        "src/shared/capture-hold.ts",
         "src/shared/capture-match.ts",
         "src/main/dock-icon.ts",
         "src/main/index.ts",
@@ -71,6 +72,8 @@ export default defineConfig({
         "src/renderer/src/components/image-strip.tsx",
         "src/renderer/src/lib/drop-images.ts",
         "src/renderer/src/preview.tsx",
+        "src/renderer/src/draw.tsx",
+        "src/renderer/src/voice.tsx",
       ],
       rules: {
         "eslint/complexity": "off",

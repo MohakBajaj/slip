@@ -17,7 +17,9 @@ import type { Slip } from "../../../shared/types";
 export const CommandPalette = ({
   onCopyList,
   onCopyPrompt,
+  onDraw,
   onInbox,
+  onVoice,
   onMerge,
   onOpen,
   onOpenChange,
@@ -33,7 +35,9 @@ export const CommandPalette = ({
 }: {
   onCopyList: () => void;
   onCopyPrompt: () => void;
+  onDraw: () => void;
   onInbox: () => void;
+  onVoice: () => void;
   onMerge: () => void;
   onOpen: (id: string) => void;
   onOpenChange: (open: boolean) => void;
@@ -80,6 +84,8 @@ export const CommandPalette = ({
           Merge
         </CommandItem>
         <CommandItem onSelect={onOpenVault}>Open vault</CommandItem>
+        <CommandItem onSelect={onDraw}>Draw</CommandItem>
+        <CommandItem onSelect={onVoice}>Voice</CommandItem>
       </CommandGroup>
       <CommandGroup heading="Slips">
         {slips

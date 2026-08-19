@@ -26,7 +26,7 @@ import { handleSectionMenu, sectionMenuEntries } from "@/lib/section-menu";
 import { handleSlipMenu, slipMenuEntries } from "@/lib/slip-menu";
 import { runMenuCommand, useSlipHotkeys } from "@/lib/use-slip-hotkeys";
 
-import { formatCapture } from "../../shared/capture-bind";
+import { formatCapture, formatHold } from "../../shared/capture-bind";
 import { imageTitle } from "../../shared/images";
 import {
   groupedRows,
@@ -55,6 +55,7 @@ const SettingsPanel = lazy(async () => {
 const snapshot = (slips: Slip[]): Slip[] =>
   slips.map((slip) => ({
     ...slip,
+    audio: [...slip.audio],
     images: [...slip.images],
     tags: [...slip.tags],
   }));
@@ -335,18 +336,16 @@ const App = () => {
         setSection(intoSection);
         await window.slip.setSection(intoSection);
       }
-      const content = items.map((slip) => slip.content.trim()).join("\n\n");
-      const images = items.flatMap((slip) => slip.images);
-      const created = await window.slip.createSlip(content, images);
-      if (created !== null) {
-        setUndo((cur) => (cur ? { ...cur, drop: [created.id] } : cur));
-      }
-      setSlips(
-        await window.slip.updateSlips(
-          items.map((slip) => slip.id),
-          { archived: true }
-        )
+      const result = await window.slip.mergeSlips(
+        items.map((slip) => slip.id),
+        intoSection
       );
+      if (result === null) {
+        return;
+      }
+      setUndo((cur) => (cur ? { ...cur, drop: [result.created.id] } : cur));
+      setSlips(result.slips);
+      setFocused(result.created.id);
       setMarked([]);
     },
     [remember]
@@ -544,6 +543,9 @@ const App = () => {
         undo: () => {
           runUndo().catch(() => undefined);
         },
+        voice: () => {
+          void window.slip.openVoice();
+        },
         zoom_in: () => {
           writeSettings({ ...settings, zoom: clampZoom(settings.zoom + 0.1) });
         },
@@ -624,14 +626,16 @@ const App = () => {
   });
 
   const chordName = formatCapture(settings.capture);
-  let emptyCopy = `${chordName} a selection, drop images, or type below.`;
+  const voiceName = formatHold(settings.voiceCapture);
+  const drawName = formatCapture(settings.drawCapture);
+  let emptyCopy = `${chordName} a selection, ${voiceName} to speak, ${drawName} to draw, drop images, or type below.`;
   if (query) {
     emptyCopy = "No matches";
   }
 
   return (
     <div
-      className={`bg-background text-foreground flex h-screen flex-col scroll-smooth antialiased ${dark ? "dark" : ""} ${settingsOpen ? "no-pick" : ""}`}
+      className={`bg-background text-foreground relative flex h-screen flex-col scroll-smooth antialiased ${dark ? "dark" : ""} ${settingsOpen ? "no-pick" : ""}`}
       data-accent={settings.accent}
       data-font={settings.font}
       data-theme={settings.theme}
@@ -813,6 +817,9 @@ const App = () => {
           }
           emptyCopy={emptyCopy}
           focused={focused}
+          onVoice={() => {
+            void window.slip.openVoice();
+          }}
           list={list}
           marked={marked}
           onCancelRename={stopRename}
@@ -907,6 +914,14 @@ const App = () => {
             onCopyPrompt={() => {
               setSettingsOpen(false);
               copyPrompt().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onDraw={() => {
+              window.slip.openDraw().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onVoice={() => {
+              void window.slip.openVoice();
               setPaletteOpen(false);
             }}
             onInbox={() => {

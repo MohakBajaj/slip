@@ -99,7 +99,7 @@ export const MOD_KEYCODES = new Set([
 
 export type Compiled =
   | { code: number; flags: number; kind: "key" }
-  | { kind: "mod"; mask: number };
+  | { held: number; kind: "mod"; mask: number };
 
 export type MatchInput =
   | { flags: number; type: "flags" }
@@ -114,13 +114,17 @@ const MASK: Record<CaptureMod, number> = {
 
 const compileStep = (step: CaptureStep): Compiled | null => {
   if (step.kind === "mod") {
-    return { kind: "mod", mask: MASK[step.name] };
+    return { held: 0, kind: "mod", mask: MASK[step.name] };
   }
   const physical = KEY_ALIAS[step.key] ?? step.key;
-  const code = KEYCODES[physical];
-  if (code === undefined) {
-    return null;
-  }
+  const tappedName = physical.toLowerCase();
+  const tapped =
+    tappedName === "command" ||
+    tappedName === "control" ||
+    tappedName === "option" ||
+    tappedName === "shift"
+      ? MASK[tappedName]
+      : undefined;
   let flags = 0;
   if (step.shift) {
     flags |= FLAG_SHIFT;
@@ -133,6 +137,13 @@ const compileStep = (step: CaptureStep): Compiled | null => {
   }
   if (step.meta) {
     flags |= FLAG_COMMAND;
+  }
+  if (tapped !== undefined) {
+    return { held: flags & ~tapped, kind: "mod", mask: tapped };
+  }
+  const code = KEYCODES[physical];
+  if (code === undefined) {
+    return null;
   }
   return { code, flags, kind: "key" };
 };
@@ -194,19 +205,23 @@ export const createCaptureMatcher = (
     if (step === undefined || step.kind !== "mod") {
       return false;
     }
-    if (flags === step.mask) {
+    const down = step.mask | step.held;
+    if (flags === down) {
       modDown = true;
       return false;
     }
-    if (flags !== 0 || !modDown) {
-      if (flags !== 0) {
-        reset();
-      }
+    if (flags === step.held && modDown) {
       modDown = false;
-      return false;
+      return advance();
     }
-    modDown = false;
-    return advance();
+    if (flags !== 0 && flags !== step.held) {
+      reset();
+    } else if (flags === 0 && step.held !== 0) {
+      reset();
+    } else {
+      modDown = false;
+    }
+    return false;
   };
 
   const onKey = (code: number, flags: number): boolean => {
