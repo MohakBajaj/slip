@@ -6,21 +6,11 @@ import { clipboard, nativeImage, systemPreferences } from "electron";
 import koffi from "koffi";
 
 import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
+import { IMAGE_EXT } from "../shared/images";
 import type { CaptureState } from "../shared/types";
 
 const COPY_SETTLE_MS = 120;
 const TRUST_POLL_MS = 2000;
-const IMAGE_EXT = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".tif",
-  ".tiff",
-  ".heic",
-  ".bmp",
-]);
 
 const kCGSessionEventTap = 1;
 const kCGHeadInsertEventTap = 0;

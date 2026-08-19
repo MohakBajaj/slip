@@ -5,6 +5,8 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
+  unlinkSync,
   watch,
   writeFileSync,
 } from "node:fs";
@@ -12,6 +14,8 @@ import type { FSWatcher } from "node:fs";
 import path from "node:path";
 
 import { filenameFor, renderIndex } from "./shared/format";
+import { imageExt } from "./shared/images";
+import type { ImagePayload } from "./shared/images";
 import { parseSlip, serializeSlip } from "./shared/markdown-file";
 import type { Slip } from "./shared/types";
 import { SKILL_MD } from "./skill-template";
@@ -104,37 +108,71 @@ export const writeSlip = (root: string, slip: Slip): Slip[] => {
   return slips;
 };
 
-const importImage = (root: string, id: string, src: string): string => {
+const attachmentDir = (root: string, id: string): string | null => {
   if (!SLIP_ID.test(id)) {
-    return "";
+    return null;
   }
   const attachments = path.resolve(root, "attachments");
   const dir = path.resolve(attachments, id);
   const rel = path.relative(attachments, dir);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    return null;
+  }
+  return dir;
+};
+
+const ingestImage = (root: string, id: string, input: ImagePayload): string => {
+  const dir = attachmentDir(root, id);
+  if (dir === null) {
+    return "";
+  }
+  const ext = imageExt(input.path ?? input.name) || (input.bytes ? ".png" : "");
+  if (!ext) {
     return "";
   }
   mkdirSync(dir, { recursive: true });
-  const ext = path.extname(src) || ".png";
-  const dest = path.join(dir, `${Date.now()}${ext}`);
-  if (existsSync(src)) {
-    copyFileSync(src, dest);
+  const dest = path.join(
+    dir,
+    `${Date.now()}-${randomInt(1e9).toString(36)}${ext}`
+  );
+  if (input.path !== undefined && existsSync(input.path)) {
+    copyFileSync(input.path, dest);
+    return dest;
   }
-  return dest;
+  if (input.bytes !== undefined && input.bytes.byteLength > 0) {
+    writeFileSync(dest, input.bytes);
+    return dest;
+  }
+  return "";
 };
+
+const ingestImages = (
+  root: string,
+  id: string,
+  inputs: ImagePayload[]
+): string[] =>
+  inputs.flatMap((input) => {
+    const dest = ingestImage(root, id, input);
+    return dest ? [dest] : [];
+  });
+
+const asImageInputs = (raw: (string | ImagePayload)[]): ImagePayload[] =>
+  raw.map((item) =>
+    typeof item === "string" ? { name: path.basename(item), path: item } : item
+  );
 
 export const createSlip = (
   root: string,
   input: {
     content: string;
-    images?: string[];
+    images?: (string | ImagePayload)[];
     section?: string;
     source?: string;
   }
 ): Slip => {
   const createdAt = new Date().toISOString();
   const id = shortId();
-  const images = (input.images ?? []).map((src) => importImage(root, id, src));
+  const images = ingestImages(root, id, asImageInputs(input.images ?? []));
   const slip: Slip = {
     archived: false,
     content: input.content,
@@ -179,6 +217,44 @@ export const updateSlip = (
 ): Slip | null => {
   const slips = updateSlips(root, [id], patch);
   return slips.find((slip) => slip.id === id) ?? null;
+};
+
+export const deleteSlips = (root: string, ids: string[]): Slip[] => {
+  ensureVault(root);
+  const want = new Set(ids);
+  for (const slip of readSlips(root)) {
+    if (!want.has(slip.id) || !slip.archived) {
+      continue;
+    }
+    const file = slipPath(root, slip.filename);
+    if (file !== null && existsSync(file)) {
+      unlinkSync(file);
+    }
+    // ponytail: undo rewrites the note; attachment bytes stay gone
+    const dir = attachmentDir(root, slip.id);
+    if (dir !== null) {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  }
+  const slips = readSlips(root);
+  writeIndex(root, slips);
+  return slips;
+};
+
+export const addImages = (
+  root: string,
+  id: string,
+  inputs: (string | ImagePayload)[]
+): Slip | null => {
+  const current = listSlips(root).find((slip) => slip.id === id);
+  if (!current) {
+    return null;
+  }
+  const imported = ingestImages(root, id, asImageInputs(inputs));
+  if (imported.length === 0) {
+    return current;
+  }
+  return updateSlip(root, id, { images: [...current.images, ...imported] });
 };
 
 export const restoreSlips = (

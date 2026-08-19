@@ -25,7 +25,9 @@ import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, sameCapture } from "../shared/capture-bind";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
+import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
+import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
   sanitizeSettings,
@@ -33,8 +35,10 @@ import {
 } from "../shared/types";
 import type { CaptureState, LoginState, Settings, Slip } from "../shared/types";
 import {
+  addImages,
   atRef,
   createSlip,
+  deleteSlips,
   ensureVault,
   listSlips,
   resolveAttachment,
@@ -104,6 +108,8 @@ protocol.registerSchemesAsPrivileged([
 
 let win: BrowserWindow | null = null;
 let winReady = false;
+let previewWin: BrowserWindow | null = null;
+let preview: PreviewState | null = null;
 let tray: Tray | null = null;
 let captureCtl: CaptureHandle | null = null;
 let stopWatch: (() => void) | null = null;
@@ -166,6 +172,7 @@ const applyTrayIcon = (): void => {
 
 const send = (channel: string, ...args: unknown[]): void => {
   win?.webContents.send(channel, ...args);
+  previewWin?.webContents.send(channel, ...args);
 };
 
 const loginItem = () => app.getLoginItemSettings({ type: "mainAppService" });
@@ -227,15 +234,48 @@ const captureLabel = (state: CaptureState): string => {
   return "Starting…";
 };
 
-const loginLabel = (login: LoginState): string => {
-  if (login === "on") {
-    return "Start at Login — On";
-  }
-  if (login === "off") {
-    return "Start at Login — Off";
-  }
-  return "Start at Login — needs installed Slip";
+const copySlip = (slip: Slip): void => {
+  writeClipboard(slip.content, slip.images);
 };
+
+const revealSlip = (id: string): void => {
+  showWindow(() => send("reveal-slip", id));
+};
+
+const composeSlip = (): void => {
+  showWindow(() => send("command", "compose"));
+};
+
+const patchFromTray = (id: string, patch: Partial<Slip>): void => {
+  updateSlip(vaultRoot(), id, patch);
+  send("slips-changed");
+  rebuildTray();
+};
+
+const slipTrayItems = (slips: Slip[]): MenuItemConstructorOptions[] =>
+  slips.map((slip) => ({
+    label: trayLabel(slip),
+    submenu: [
+      {
+        click: () => copySlip(slip),
+        label: "Copy",
+      },
+      {
+        click: () => revealSlip(slip.id),
+        label: "Open",
+      },
+      { type: "separator" },
+      {
+        click: () => patchFromTray(slip.id, { done: true }),
+        label: "Mark Done",
+      },
+      {
+        click: () => patchFromTray(slip.id, { archived: true }),
+        label: "Archive",
+      },
+    ],
+    toolTip: trayTip(slip),
+  }));
 
 const menuTemplate = (
   entries: MenuEntry[],
@@ -263,36 +303,71 @@ const rebuildTray = (): void => {
   if (!tray) {
     return;
   }
-  const open = listSlips(vaultRoot()).filter(
-    (slip) => !slip.done && !slip.archived
-  ).length;
-  tray.setTitle(open ? String(open) : "");
-  tray.setToolTip(`Slip — ${formatCapture(settings.capture)} to capture`);
+  const { hidden, open, shown } = trayShown(listSlips(vaultRoot()));
+  const chord = formatCapture(settings.capture);
+  tray.setTitle(open > 0 ? String(open) : "");
+  tray.setToolTip(
+    open > 0
+      ? `Slip — ${open} open — ${chord} to capture`
+      : `Slip — ${chord} to capture`
+  );
   const login = loginKnown;
+  const canLogin = login === "on" || login === "off";
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
         enabled: false,
-        label: open ? `${open} open` : "Nothing captured yet",
+        label: trayHead(open),
         sublabel: captureLabel(capture),
       },
+      ...(shown.length > 0
+        ? [{ type: "separator" as const }, ...slipTrayItems(shown)]
+        : []),
+      ...(hidden > 0
+        ? [
+            {
+              click: () => showWindow(),
+              label: `${hidden} more…`,
+            },
+          ]
+        : []),
       { type: "separator" },
       { click: () => showWindow(), label: "Open Slip" },
+      { click: () => composeSlip(), label: "New Slip" },
       {
         click: () => {
-          shell.openExternal(ACCESS).catch(() => undefined);
+          shell.openPath(vaultRoot()).catch(() => undefined);
         },
-        enabled: capture === "denied",
-        label: "Grant Accessibility…",
+        label: "Open vault",
+      },
+      { type: "separator" },
+      {
+        click: () => {
+          showWindow(() => send("command", "settings"));
+        },
+        label: "Settings…",
       },
       {
+        checked: login === "on",
         click: () => {
           applyLogin(login !== "on");
         },
-        enabled: login === "on" || login === "off",
-        label: loginLabel(login),
+        enabled: canLogin,
+        label: canLogin
+          ? "Start at Login"
+          : "Start at Login — needs installed Slip",
+        type: "checkbox",
       },
-      { type: "separator" },
+      ...(capture === "denied"
+        ? [
+            {
+              click: () => {
+                shell.openExternal(ACCESS).catch(() => undefined);
+              },
+              label: "Grant Accessibility…",
+            },
+          ]
+        : []),
       {
         accelerator: "Command+Q",
         click: () => {
@@ -328,6 +403,41 @@ const setCapture = (next: CaptureState): void => {
 
 const basenameImage = (filePath: string): string =>
   filePath.split("/").pop() ?? "image";
+
+const asBytes = (value: unknown): Uint8Array | undefined => {
+  if (value instanceof Uint8Array) {
+    return value;
+  }
+  if (value instanceof ArrayBuffer) {
+    return new Uint8Array(value);
+  }
+  return undefined;
+};
+
+const parseImageInputs = (raw: unknown): ImagePayload[] => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const inputs: ImagePayload[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      inputs.push({ name: basenameImage(item), path: item });
+      continue;
+    }
+    if (item === null || typeof item !== "object") {
+      continue;
+    }
+    const rec = item as { bytes?: unknown; name?: unknown; path?: unknown };
+    const name = typeof rec.name === "string" ? rec.name : "image.png";
+    const filePath = typeof rec.path === "string" ? rec.path : undefined;
+    const bytes = asBytes(rec.bytes);
+    if (filePath === undefined && bytes === undefined) {
+      continue;
+    }
+    inputs.push({ bytes, name, path: filePath });
+  }
+  return inputs;
+};
 
 const ingest = (event: CaptureEvent): void => {
   ensureVault(vaultRoot());
@@ -425,6 +535,53 @@ const createWindow = (): void => {
   }
 };
 
+const loadPreviewPage = (target: BrowserWindow): void => {
+  if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+    target.loadURL(`${process.env.ELECTRON_RENDERER_URL}/#preview`);
+    return;
+  }
+  target.loadFile(path.join(__dirname, "../renderer/index.html"), {
+    hash: "preview",
+  });
+};
+
+const showPreview = (): void => {
+  if (previewWin && !previewWin.isDestroyed()) {
+    previewWin.webContents.send("preview-state", preview);
+    previewWin.show();
+    previewWin.focus();
+    return;
+  }
+  previewWin = new BrowserWindow({
+    alwaysOnTop: settings.alwaysOnTop,
+    backgroundColor: windowHex(),
+    height: 560,
+    minHeight: 280,
+    minWidth: 360,
+    show: false,
+    title: "Preview",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 12, y: 12 },
+    webPreferences: {
+      backgroundThrottling: true,
+      contextIsolation: true,
+      preload: path.join(__dirname, "../preload/index.js"),
+      sandbox: true,
+      spellcheck: false,
+      webgl: false,
+    },
+    width: 780,
+  });
+  previewWin.on("ready-to-show", () => {
+    previewWin?.show();
+    previewWin?.focus();
+  });
+  previewWin.on("closed", () => {
+    previewWin = null;
+  });
+  loadPreviewPage(previewWin);
+};
+
 const boot = async (): Promise<void> => {
   await app.whenReady();
   session.defaultSession.setSpellCheckerEnabled(false);
@@ -457,6 +614,7 @@ const boot = async (): Promise<void> => {
   rebuildTray();
   nativeTheme.on("updated", () => {
     win?.setBackgroundColor(windowHex());
+    previewWin?.setBackgroundColor(windowHex());
     if (settings.dock) {
       applyDockIcon(isDark());
     }
@@ -486,9 +644,11 @@ const boot = async (): Promise<void> => {
     }
     if (settings.alwaysOnTop !== prev.alwaysOnTop) {
       win?.setAlwaysOnTop(settings.alwaysOnTop);
+      previewWin?.setAlwaysOnTop(settings.alwaysOnTop);
     }
     if (windowHex() !== prevBg) {
       win?.setBackgroundColor(windowHex());
+      previewWin?.setBackgroundColor(windowHex());
     }
     if (settings.zoom !== prev.zoom) {
       applyZoom(settings.zoom, prev.zoom);
@@ -507,18 +667,23 @@ const boot = async (): Promise<void> => {
     }
     rebuildTray();
   });
-  ipcMain.handle("createSlip", (_e, content: string, images: string[] = []) => {
+  ipcMain.handle("createSlip", (_e, content: string, images: unknown = []) => {
     if (typeof content !== "string") {
       return null;
     }
-    const files = Array.isArray(images)
-      ? images.filter((item) => typeof item === "string")
-      : [];
     const slip = createSlip(vaultRoot(), {
       content,
-      images: files,
+      images: parseImageInputs(images),
       section: currentSection,
     });
+    rebuildTray();
+    return slip;
+  });
+  ipcMain.handle("addImages", (_e, id: string, images: unknown) => {
+    if (typeof id !== "string") {
+      return null;
+    }
+    const slip = addImages(vaultRoot(), id, parseImageInputs(images));
     rebuildTray();
     return slip;
   });
@@ -538,6 +703,17 @@ const boot = async (): Promise<void> => {
       vaultRoot(),
       ids.filter((id) => typeof id === "string"),
       patch
+    );
+    rebuildTray();
+    return slips;
+  });
+  ipcMain.handle("deleteSlips", (_e, ids: string[]) => {
+    if (!Array.isArray(ids)) {
+      return listSlips(vaultRoot());
+    }
+    const slips = deleteSlips(
+      vaultRoot(),
+      ids.filter((id) => typeof id === "string")
     );
     rebuildTray();
     return slips;
@@ -600,6 +776,20 @@ const boot = async (): Promise<void> => {
       clipboard.writeText(atRef(slip));
     }
   });
+  ipcMain.handle("openPreview", (_e, slipId: string, index: unknown) => {
+    if (typeof slipId !== "string") {
+      return;
+    }
+    const slip = listSlips(vaultRoot()).find((item) => item.id === slipId);
+    if (!slip || slip.images.length === 0) {
+      return;
+    }
+    const raw = typeof index === "number" && Number.isFinite(index) ? index : 0;
+    const next = Math.min(Math.max(0, Math.trunc(raw)), slip.images.length - 1);
+    preview = { index: next, slipId };
+    showPreview();
+  });
+  ipcMain.handle("loadPreview", () => preview);
   ipcMain.handle("openVault", () => shell.openPath(vaultRoot()));
   ipcMain.handle("pickVault", async () => {
     const opts: Electron.OpenDialogOptions = {
@@ -654,7 +844,12 @@ const boot = async (): Promise<void> => {
             label: "Settings…",
           },
           { type: "separator" },
+          { role: "services" },
+          { type: "separator" },
           { role: "hide" },
+          { role: "hideOthers" },
+          { role: "unhide" },
+          { type: "separator" },
           { label: "Quit Slip", role: "quit" },
         ],
       },
@@ -680,8 +875,20 @@ const boot = async (): Promise<void> => {
         ],
       },
       {
-        label: "Slip",
+        label: "Inbox",
         submenu: [
+          {
+            accelerator: "Command+N",
+            click: () => composeSlip(),
+            label: "New Slip",
+          },
+          {
+            click: () => {
+              shell.openPath(vaultRoot()).catch(() => undefined);
+            },
+            label: "Open Vault",
+          },
+          { type: "separator" },
           {
             click: () => send("command", "undo"),
             label: "Undo Last Action",
@@ -708,6 +915,7 @@ const boot = async (): Promise<void> => {
           },
         ],
       },
+      { role: "windowMenu" },
     ])
   );
 

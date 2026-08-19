@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import type { CaptureState, LoginState, Settings, Slip } from "../shared/types";
 
 const api = {
+  addImages: (id: string, images: ImagePayload[]) =>
+    ipcRenderer.invoke("addImages", id, images) as Promise<Slip | null>,
   copyAtRef: (id: string) => ipcRenderer.invoke("copyAtRef", id),
   copyBundle: (text: string, paths: string[]) =>
     ipcRenderer.invoke("copyBundle", text, paths),
@@ -11,8 +14,10 @@ const api = {
   copyPath: (id: string) => ipcRenderer.invoke("copyPath", id),
   copyPrompt: (ids: string[]) => ipcRenderer.invoke("copyPrompt", ids),
   copyText: (text: string) => ipcRenderer.invoke("copyText", text),
-  createSlip: (content: string, images?: string[]) =>
+  createSlip: (content: string, images?: (string | ImagePayload)[]) =>
     ipcRenderer.invoke("createSlip", content, images) as Promise<Slip | null>,
+  deleteSlips: (ids: string[]) =>
+    ipcRenderer.invoke("deleteSlips", ids) as Promise<Slip[]>,
   load: () =>
     ipcRenderer.invoke("load") as Promise<{
       slips: Slip[];
@@ -21,6 +26,8 @@ const api = {
       login: LoginState;
       vaultPath: string;
     }>,
+  loadPreview: () =>
+    ipcRenderer.invoke("loadPreview") as Promise<PreviewState | null>,
   onCaptureState: (fn: (state: CaptureState) => void) => {
     const listener = (_: unknown, state: CaptureState) => fn(state);
     ipcRenderer.on("capture-state", listener);
@@ -42,6 +49,20 @@ const api = {
       ipcRenderer.removeListener("login-state", listener);
     };
   },
+  onPreview: (fn: (state: PreviewState) => void) => {
+    const listener = (_: unknown, state: PreviewState) => fn(state);
+    ipcRenderer.on("preview-state", listener);
+    return () => {
+      ipcRenderer.removeListener("preview-state", listener);
+    };
+  },
+  onRevealSlip: (fn: (id: string) => void) => {
+    const listener = (_: unknown, id: string) => fn(id);
+    ipcRenderer.on("reveal-slip", listener);
+    return () => {
+      ipcRenderer.removeListener("reveal-slip", listener);
+    };
+  },
   onSlipsChanged: (fn: () => void) => {
     const listener = () => fn();
     ipcRenderer.on("slips-changed", listener);
@@ -50,6 +71,8 @@ const api = {
     };
   },
   openAccess: () => ipcRenderer.invoke("openAccess"),
+  openPreview: (slipId: string, index: number) =>
+    ipcRenderer.invoke("openPreview", slipId, index),
   openVault: () => ipcRenderer.invoke("openVault"),
   pickVault: () => ipcRenderer.invoke("pickVault") as Promise<string | null>,
   popupMenu: (items: MenuEntry[]) =>

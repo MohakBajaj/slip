@@ -26,6 +26,7 @@ const inControl = (target: EventTarget | null): boolean => {
 export const runMenuCommand = (
   name: string,
   actions: {
+    compose: () => void;
     copy_as_list: () => void;
     copy_as_prompt: () => void;
     merge: () => void;

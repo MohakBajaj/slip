@@ -11,22 +11,26 @@ import {
 
 export const BulkBar = ({
   archiveLabel,
+  canDelete,
   canMerge,
   doneLabel,
   onArchive,
   onClear,
   onCopyList,
   onCopyPrompt,
+  onDelete,
   onDone,
   onMerge,
 }: {
   archiveLabel: string;
+  canDelete: boolean;
   canMerge: boolean;
   doneLabel: string;
   onArchive: () => void;
   onClear: () => void;
   onCopyList: () => void;
   onCopyPrompt: () => void;
+  onDelete: () => void;
   onDone: () => void;
   onMerge: () => void;
 }) => (
@@ -60,6 +64,17 @@ export const BulkBar = ({
       >
         Merge
       </Button>
+      {canDelete ? (
+        <Button
+          className="press"
+          onClick={onDelete}
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
+          Delete
+        </Button>
+      ) : null}
     </div>
     <div className="flex items-center gap-0.5">
       <ButtonGroup>

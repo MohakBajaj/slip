@@ -20,12 +20,14 @@ import { InboxPane } from "@/components/inbox-pane";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { copySlip } from "@/lib/copy-slip";
+import { filesToPayloads } from "@/lib/drop-images";
 import { applyPick } from "@/lib/range-ids";
 import { handleSectionMenu, sectionMenuEntries } from "@/lib/section-menu";
 import { handleSlipMenu, slipMenuEntries } from "@/lib/slip-menu";
 import { runMenuCommand, useSlipHotkeys } from "@/lib/use-slip-hotkeys";
 
 import { formatCapture } from "../../shared/capture-bind";
+import { imageTitle } from "../../shared/images";
 import {
   groupedRows,
   sectionsOf,
@@ -80,6 +82,12 @@ const patchLabel = (next: Partial<Slip>): string | null => {
   if (next.done === false) {
     return "Reopened";
   }
+  if (next.images) {
+    return "Updated images";
+  }
+  if (next.content !== undefined) {
+    return "Edited";
+  }
   return null;
 };
 
@@ -97,6 +105,7 @@ const App = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [binding, setBinding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [flash, setFlash] = useState("");
   const [undo, setUndo] = useState<{
@@ -144,15 +153,20 @@ const App = () => {
     [slips]
   );
 
-  const goToSlip = (id: string): void => {
-    const slip = slips.find((item) => item.id === id);
-    setSettingsOpen(false);
-    setSection("");
-    setShowArchived(Boolean(slip?.archived));
-    setFocused(id);
-    setMarked([]);
-    setPaletteOpen(false);
-  };
+  const goToSlip = useCallback(
+    (id: string): void => {
+      const slip = slips.find((item) => item.id === id);
+      setSettingsOpen(false);
+      setSection("");
+      setShowArchived(Boolean(slip?.archived));
+      setFocused(id);
+      setMarked([]);
+      setPaletteOpen(false);
+    },
+    [slips]
+  );
+
+  useEffect(() => window.slip.onRevealSlip(goToSlip), [goToSlip]);
 
   const runUndo = useCallback(async (): Promise<void> => {
     if (!undo) {
@@ -171,6 +185,14 @@ const App = () => {
   const listIds = useMemo(() => slipIdsOf(groupedRows(list)), [list]);
   const sections = useMemo(() => sectionsOf(slips), [slips]);
   const current = list.find((slip) => slip.id === focused) ?? null;
+  useEffect(() => {
+    if (
+      editingId !== null &&
+      (settingsOpen || marked.length > 1 || current?.id !== editingId)
+    ) {
+      setEditingId(null);
+    }
+  }, [current, editingId, marked.length, settingsOpen]);
   let subject = slips.filter((slip) => marked.includes(slip.id));
   if (subject.length === 0 && current) {
     subject = [current];
@@ -203,6 +225,61 @@ const App = () => {
     apply(ids, { [key]: !items.every((item) => item[key]) }).catch(
       () => undefined
     );
+  };
+
+  const attachFiles = async (id: string, files: File[]): Promise<void> => {
+    const payloads = await filesToPayloads(files);
+    if (payloads.length === 0) {
+      return;
+    }
+    const slip = await window.slip.addImages(id, payloads);
+    if (slip === null) {
+      return;
+    }
+    remember("Added images");
+    setFocused(id);
+    setSlips((cur) => cur.map((item) => (item.id === slip.id ? slip : item)));
+  };
+
+  const addFromFiles = async (
+    files: File[],
+    content?: string
+  ): Promise<boolean> => {
+    const payloads = await filesToPayloads(files);
+    const [first] = payloads;
+    if (
+      first === undefined &&
+      (content === undefined || content.length === 0)
+    ) {
+      return false;
+    }
+    const slip = await window.slip.createSlip(
+      content !== undefined && content.length > 0
+        ? content
+        : imageTitle(first?.name ?? "image"),
+      payloads
+    );
+    if (slip === null) {
+      return false;
+    }
+    remember("Added", [slip.id]);
+    setSlips((cur) => [...cur, slip]);
+    setFocused(slip.id);
+    return true;
+  };
+
+  const removeSlips = async (ids: string[]): Promise<void> => {
+    const archived = slips.filter(
+      (slip) => ids.includes(slip.id) && slip.archived
+    );
+    if (archived.length === 0) {
+      return;
+    }
+    const drop = archived.map((slip) => slip.id);
+    remember("Deleted");
+    setSlips(await window.slip.deleteSlips(drop));
+    setMarked((cur) => cur.filter((id) => !drop.includes(id)));
+    setFocused((cur) => (cur !== null && drop.includes(cur) ? null : cur));
   };
 
   const pick = (id: string, mods: { meta: boolean; shift: boolean }): void => {
@@ -259,7 +336,8 @@ const App = () => {
         await window.slip.setSection(intoSection);
       }
       const content = items.map((slip) => slip.content.trim()).join("\n\n");
-      const created = await window.slip.createSlip(content);
+      const images = items.flatMap((slip) => slip.images);
+      const created = await window.slip.createSlip(content, images);
       if (created !== null) {
         setUndo((cur) => (cur ? { ...cur, drop: [created.id] } : cur));
       }
@@ -343,6 +421,11 @@ const App = () => {
       copyRef: (itemId) => {
         copyNamed("Copied @", () => window.slip.copyAtRef(itemId));
       },
+      edit: (item) => {
+        setFocused(item.id);
+        setMarked([]);
+        setEditingId(item.id);
+      },
       merge: () => {
         merge().catch(() => undefined);
       },
@@ -350,6 +433,9 @@ const App = () => {
         apply(ids, next).catch(() => undefined);
       },
       pick,
+      remove: (ids) => {
+        removeSlips(ids).catch(() => undefined);
+      },
       scope,
       setArchived,
       setDone,
@@ -430,6 +516,20 @@ const App = () => {
   useEffect(() => {
     const off = window.slip.onCommand((name) => {
       runMenuCommand(name, {
+        compose: () => {
+          setSettingsOpen(false);
+          setPaletteOpen(false);
+          setShowArchived(false);
+          setEditingId(null);
+          setFocused(null);
+          setMarked([]);
+          setRenaming(null);
+          window.setTimeout(() => {
+            document
+              .querySelector<HTMLTextAreaElement>("[data-composer]")
+              ?.focus();
+          }, 50);
+        },
         copy_as_list: () => {
           copyList().catch(() => undefined);
         },
@@ -514,7 +614,7 @@ const App = () => {
       runUndo().catch(() => undefined);
     },
     paletteOpen,
-    paused: binding,
+    paused: binding || editingId !== null,
     setFocused,
     setMarked,
     setQuery,
@@ -524,7 +624,7 @@ const App = () => {
   });
 
   const chordName = formatCapture(settings.capture);
-  let emptyCopy = `${chordName} a selection, or type below.`;
+  let emptyCopy = `${chordName} a selection, drop images, or type below.`;
   if (query) {
     emptyCopy = "No matches";
   }
@@ -672,6 +772,7 @@ const App = () => {
                   archiveLabel: subject.every((slip) => slip.archived)
                     ? "Restore"
                     : "Archive",
+                  canDelete: subject.every((slip) => slip.archived),
                   canMerge: marked.length > 1,
                   doneLabel: subject.every((slip) => slip.done)
                     ? "Reopen"
@@ -691,6 +792,9 @@ const App = () => {
                   onCopyPrompt: () => {
                     copyPrompt().catch(() => undefined);
                   },
+                  onDelete: () => {
+                    removeSlips(marked).catch(() => undefined);
+                  },
                   onDone: () => {
                     toggle(marked, "done");
                   },
@@ -702,17 +806,34 @@ const App = () => {
           }
           current={marked.length > 1 ? null : current}
           draft={draft}
+          editing={
+            editingId !== null &&
+            editingId === current?.id &&
+            marked.length <= 1
+          }
           emptyCopy={emptyCopy}
           focused={focused}
           list={list}
           marked={marked}
           onCancelRename={stopRename}
+          onAddImages={(id, files) => {
+            attachFiles(id, files).catch(() => undefined);
+          }}
+          onDelete={(id) => {
+            removeSlips([id]).catch(() => undefined);
+          }}
           onCopy={(slip) => {
             if (marked.length > 1 && marked.includes(slip.id)) {
               copyList().catch(() => undefined);
               return;
             }
             copyNamed("Copied", () => copySlip(slip));
+          }}
+          onEditing={(on) => {
+            setEditingId(on ? (current?.id ?? null) : null);
+          }}
+          onCreateImages={(files) => {
+            addFromFiles(files).catch(() => undefined);
           }}
           onDraft={setDraft}
           onFile={(name) => {
@@ -738,25 +859,23 @@ const App = () => {
             setSection(name);
             setMarked([]);
           }}
-          onSubmit={() => {
+          onSubmit={(files) => {
             const text = draft.trim();
-            if (!text) {
-              return;
-            }
             if (renaming !== null) {
+              if (!text) {
+                return;
+              }
               renameSection(renaming, text).catch(() => undefined);
               return;
             }
-            remember("Added");
-            window.slip
-              .createSlip(text)
-              .then((slip) => {
-                if (slip === null) {
-                  return;
+            if (!(text || files.length > 0)) {
+              return;
+            }
+            addFromFiles(files, text || undefined)
+              .then((ok) => {
+                if (ok) {
+                  setDraft("");
                 }
-                setUndo((cur) => (cur ? { ...cur, drop: [slip.id] } : cur));
-                setDraft("");
-                setSlips((cur) => [...cur, slip]);
               })
               .catch(() => undefined);
           }}

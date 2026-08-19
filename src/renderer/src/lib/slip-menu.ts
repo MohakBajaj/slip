@@ -80,6 +80,17 @@ export const slipMenuEntries = ({
       id: "archive",
       label: archiveLabel,
     },
+    ...(setArchived
+      ? [
+          {
+            id: "delete",
+            label: useSet ? "Delete Selected" : "Delete",
+          },
+        ]
+      : []),
+    ...(useSet
+      ? []
+      : [{ type: "separator" as const }, { id: "edit", label: "Edit" }]),
   ];
 };
 
@@ -92,9 +103,11 @@ export const handleSlipMenu = (
     copyPath: (itemId: string) => void;
     copyPrompt: (itemIds: string[]) => void;
     copyRef: (itemId: string) => void;
+    edit: (item: Slip) => void;
     merge: () => void;
     patch: (ids: string[], next: Partial<Slip>) => void;
     pick: (itemId: string, mods: { meta: boolean; shift: boolean }) => void;
+    remove: (ids: string[]) => void;
     scope: string[];
     setArchived: boolean;
     setDone: boolean;
@@ -131,6 +144,10 @@ export const handleSlipMenu = (
     act.pick(slip.id, { meta: false, shift: true });
     return;
   }
+  if (id === "edit") {
+    act.edit(slip);
+    return;
+  }
   if (id === "done") {
     act.patch(act.scope, { done: !act.setDone });
     return;
@@ -145,6 +162,10 @@ export const handleSlipMenu = (
   }
   if (id === "archive") {
     act.patch(act.scope, { archived: !act.setArchived });
+    return;
+  }
+  if (id === "delete") {
+    act.remove(act.scope);
     return;
   }
   if (id.startsWith("section:")) {

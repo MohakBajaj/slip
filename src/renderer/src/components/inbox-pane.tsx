@@ -1,19 +1,32 @@
+import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BulkBar } from "@/components/bulk-bar";
 import { DetailWell } from "@/components/detail-well";
+import { ImagePicker, ImageStrip } from "@/components/image-strip";
 import { SectionPicker } from "@/components/section-picker";
 import { SlipMark } from "@/components/slip-mark";
 import { Button } from "@/components/ui/button";
+import {
+  filesFromClipboard,
+  forgetPending,
+  pendingFromFiles,
+  useDraggingFiles,
+  useFileDrop,
+} from "@/lib/drop-images";
+import type { PendingImage } from "@/lib/drop-images";
 import { cn } from "@/lib/utils";
 
 import { titleOf } from "../../../shared/format";
+import { moveItem, slipImgSrc } from "../../../shared/images";
 import { groupedRows, whenLabel } from "../../../shared/logic";
 import type { Slip } from "../../../shared/types";
 
 interface BulkActions {
   archiveLabel: string;
+  canDelete: boolean;
   canMerge: boolean;
   doneLabel: string;
   fileValue: string;
@@ -21,6 +34,7 @@ interface BulkActions {
   onClear: () => void;
   onCopyList: () => void;
   onCopyPrompt: () => void;
+  onDelete: () => void;
   onDone: () => void;
   onMerge: () => void;
 }
@@ -28,24 +42,28 @@ interface BulkActions {
 const MarkedActions = ({ actions }: { actions: BulkActions }) => {
   const {
     archiveLabel,
+    canDelete,
     canMerge,
     doneLabel,
     onArchive: handleArchive,
     onClear: handleClear,
     onCopyList: handleCopyList,
     onCopyPrompt: handleCopyPrompt,
+    onDelete: handleDelete,
     onDone: handleDone,
     onMerge: handleMerge,
   } = actions;
   return (
     <BulkBar
       archiveLabel={archiveLabel}
+      canDelete={canDelete}
       canMerge={canMerge}
       doneLabel={doneLabel}
       onArchive={handleArchive}
       onClear={handleClear}
       onCopyList={handleCopyList}
       onCopyPrompt={handleCopyPrompt}
+      onDelete={handleDelete}
       onDone={handleDone}
       onMerge={handleMerge}
     />
@@ -64,81 +82,126 @@ const composerHint = (renaming: string | null, section: string): string => {
 
 let menuAt = 0;
 
+const SlipThumb = ({ slip }: { slip: Slip }) => {
+  const [first] = slip.images;
+  if (first === undefined) {
+    return null;
+  }
+  return (
+    <span
+      className="relative mt-0.5 shrink-0 after:absolute after:-inset-1.5 after:content-['']"
+      data-slip-preview=""
+    >
+      <img
+        alt=""
+        className={`pointer-events-none size-7 rounded-[5px] object-cover outline outline-black/10 dark:outline-white/10 ${slip.done ? "opacity-50" : ""}`}
+        draggable={false}
+        src={slipImgSrc(first)}
+      />
+      {slip.images.length > 1 ? (
+        <span className="bg-background/90 text-foreground absolute -right-1 -bottom-1 rounded-full px-1 text-[8px] leading-3 tabular-nums outline outline-black/10 dark:outline-white/10">
+          {slip.images.length}
+        </span>
+      ) : null}
+    </span>
+  );
+};
+
 const SlipRow = ({
   focused,
   marked,
   onCopy,
   onDone,
+  onDropImages,
   onMenu,
   onPick,
+  onPreview,
   slip,
 }: {
   focused: boolean;
   marked: boolean;
   onCopy: () => void;
   onDone: () => void;
+  onDropImages: (files: File[]) => void;
   onMenu: () => void;
   onPick: (mods: { meta: boolean; shift: boolean }) => void;
+  onPreview: () => void;
   slip: Slip;
-}) => (
-  <button
-    className={cn(
-      "flex w-full items-start gap-1.5 rounded-lg px-1.5 py-1 text-left text-[13px] leading-snug select-none",
-      !marked && !focused && "hover:bg-muted/60",
-      focused && !marked && "bg-primary/10",
-      marked && "bg-primary/15 shadow-[inset_0_0_0_1px_var(--primary)]"
-    )}
-    data-slip-row=""
-    onClick={(event) => {
-      if (Date.now() - menuAt < 250) {
-        return;
-      }
-      if (
-        event.target instanceof Element &&
-        event.target.closest("[data-slip-mark]")
-      ) {
-        if (event.detail > 1) {
+}) => {
+  const drop = useFileDrop(onDropImages);
+  return (
+    <button
+      className={cn(
+        "flex w-full items-start gap-1.5 rounded-lg px-1.5 py-1 text-left text-[13px] leading-snug select-none",
+        !marked && !focused && "hover:bg-muted/60",
+        focused && !marked && "bg-primary/10",
+        marked && "bg-primary/15 shadow-[inset_0_0_0_1px_var(--primary)]",
+        drop.over && "bg-primary/15 shadow-[inset_0_0_0_1px_var(--primary)]"
+      )}
+      {...drop.props}
+      data-slip-row=""
+      onClick={(event) => {
+        if (Date.now() - menuAt < 250) {
           return;
         }
-        onDone();
-        return;
-      }
-      if (event.detail > 1) {
-        onCopy();
-        return;
-      }
-      onPick({
-        meta: event.metaKey || event.ctrlKey,
-        shift: event.shiftKey,
-      });
-    }}
-    onContextMenu={(event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      menuAt = Date.now();
-      onMenu();
-    }}
-    type="button"
-  >
-    <span
-      className="text-muted-foreground group/mark relative mt-0.5 after:absolute after:-inset-2 after:content-['']"
-      data-slip-mark=""
+        if (
+          event.target instanceof Element &&
+          event.target.closest("[data-slip-mark]")
+        ) {
+          if (event.detail > 1) {
+            return;
+          }
+          onDone();
+          return;
+        }
+        if (
+          event.target instanceof Element &&
+          event.target.closest("[data-slip-preview]")
+        ) {
+          if (event.detail > 1) {
+            return;
+          }
+          onPreview();
+          return;
+        }
+        if (event.detail > 1) {
+          onCopy();
+          return;
+        }
+        onPick({
+          meta: event.metaKey || event.ctrlKey,
+          shift: event.shiftKey,
+        });
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        menuAt = Date.now();
+        onMenu();
+      }}
+      type="button"
     >
-      <SlipMark marked={marked} slip={slip} />
-    </span>
-    <span className="min-w-0 flex-1">
       <span
-        className={`block truncate ${slip.done ? "text-muted-foreground line-through" : ""}`}
+        className="text-muted-foreground group/mark relative mt-0.5 after:absolute after:-inset-2 after:content-['']"
+        data-slip-mark=""
       >
-        {titleOf(slip.content)}
+        <SlipMark marked={marked} slip={slip} />
       </span>
-      <span className="text-muted-foreground text-[10px] tabular-nums">
-        {whenLabel(slip.createdAt)}
-        {slip.tags.length ? ` · ${slip.tags.join(" ")}` : ""}
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block truncate ${slip.done ? "text-muted-foreground line-through" : ""}`}
+        >
+          {titleOf(slip.content)}
+        </span>
+        <span className="text-muted-foreground text-[10px] tabular-nums">
+          {whenLabel(slip.createdAt)}
+          {slip.tags.length ? ` · ${slip.tags.join(" ")}` : ""}
+        </span>
       </span>
-    </span>
-  </button>
-);
+      <SlipThumb slip={slip} />
+    </button>
+  );
+};
 
 const SectionHeader = ({
   current,
@@ -169,13 +232,18 @@ export const InboxPane = ({
   bulk,
   current,
   draft,
+  editing,
   emptyCopy,
   focused,
   list,
   marked,
+  onAddImages,
   onCancelRename,
   onCopy,
+  onCreateImages,
+  onDelete,
   onDraft,
+  onEditing,
   onFile,
   onFocus,
   onHeaderMenu,
@@ -191,13 +259,18 @@ export const InboxPane = ({
   bulk: BulkActions | null;
   current: Slip | null;
   draft: string;
+  editing: boolean;
   emptyCopy: string;
   focused: string | null;
   list: Slip[];
   marked: string[];
+  onAddImages: (id: string, files: File[]) => void;
   onCancelRename: () => void;
   onCopy: (slip: Slip) => void;
+  onCreateImages: (files: File[]) => void;
+  onDelete: (id: string) => void;
   onDraft: (value: string) => void;
+  onEditing: (on: boolean) => void;
   onFile: (name: string) => void;
   onFocus: (id: string | null) => void;
   onHeaderMenu: (name: string) => void;
@@ -205,7 +278,7 @@ export const InboxPane = ({
   onPick: (id: string, mods: { meta: boolean; shift: boolean }) => void;
   onPatch: (id: string, next: Partial<Slip>) => void;
   onSection: (name: string) => void;
-  onSubmit: () => void;
+  onSubmit: (files: File[]) => void;
   renaming: string | null;
   section: string;
   sections: string[];
@@ -213,6 +286,16 @@ export const InboxPane = ({
   const rows = useMemo(() => groupedRows(list), [list]);
   const marks = useMemo(() => new Set(marked), [marked]);
   const parentRef = useRef<HTMLDivElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<PendingImage[]>([]);
+  const pendingRef = useRef<PendingImage[]>([]);
+  pendingRef.current = pending;
+  const dragging = useDraggingFiles();
+  const composing = renaming === null && !bulk;
+  const listDrop = useFileDrop(onCreateImages, composing);
+  const composeDrop = useFileDrop((files) => {
+    setPending((cur) => [...cur, ...pendingFromFiles(files)]);
+  }, composing);
   const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: (index) => (rows[index]?.kind === "header" ? 26 : 40),
@@ -223,6 +306,13 @@ export const InboxPane = ({
     paddingStart: 2,
   });
   const isRename = renaming !== null;
+
+  useEffect(
+    () => () => {
+      forgetPending(pendingRef.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (focused === null) {
@@ -237,15 +327,26 @@ export const InboxPane = ({
     virtualizer.scrollToIndex(index, { align: "auto" });
   }, [focused, rows, virtualizer]);
 
+  const takePending = (): File[] => {
+    const files = pending.map((item) => item.file);
+    forgetPending(pending);
+    setPending([]);
+    return files;
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
-        className="no-scrollbar scroll-fade min-h-0 flex-1 overflow-y-auto"
+        className={cn(
+          "no-scrollbar scroll-fade relative min-h-0 flex-1 overflow-y-auto",
+          listDrop.over && "bg-primary/5"
+        )}
         ref={parentRef}
+        {...listDrop.props}
       >
         {list.length === 0 ? (
           <p className="text-muted-foreground px-4 py-5 text-center text-[13px] text-pretty">
-            {emptyCopy}
+            {dragging || listDrop.over ? "Drop to capture images" : emptyCopy}
           </p>
         ) : (
           <div
@@ -286,11 +387,20 @@ export const InboxPane = ({
                       onDone={() => {
                         onPatch(row.slip.id, { done: !row.slip.done });
                       }}
+                      onDropImages={(files) => {
+                        onAddImages(row.slip.id, files);
+                      }}
                       onMenu={() => {
                         onMenu(row.slip);
                       }}
                       onPick={(mods) => {
                         onPick(row.slip.id, mods);
+                      }}
+                      onPreview={() => {
+                        onPick(row.slip.id, { meta: false, shift: false });
+                        window.slip
+                          .openPreview(row.slip.id, 0)
+                          .catch(() => undefined);
                       }}
                       slip={row.slip}
                     />
@@ -300,19 +410,31 @@ export const InboxPane = ({
             })}
           </div>
         )}
+        {dragging && list.length > 0 ? (
+          <p className="text-muted-foreground pointer-events-none sticky bottom-0 px-4 py-1.5 text-center text-[10px]">
+            Drop on a slip to attach, or on empty space to start one
+          </p>
+        ) : null}
       </div>
 
       {current ? (
         <DetailWell
+          editing={editing}
+          onAddImages={(files) => {
+            onAddImages(current.id, files);
+          }}
           onClose={() => {
+            onEditing(false);
             onFocus(null);
           }}
+          onDelete={() => {
+            onDelete(current.id);
+          }}
+          onEditing={onEditing}
           onMenu={() => {
             onMenu(current);
           }}
-          onPatch={(next) => {
-            onPatch(current.id, next);
-          }}
+          onPatch={onPatch}
           sections={sections}
           slip={current}
         />
@@ -325,10 +447,25 @@ export const InboxPane = ({
           if (bulk && !isRename) {
             return;
           }
-          onSubmit();
+          onSubmit(isRename ? [] : takePending());
         }}
       >
-        <div className="bg-card flex flex-col gap-1.5 rounded-[16px] p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+        <ImagePicker
+          inputRef={picker}
+          onFiles={(files) => {
+            if (!composing) {
+              return;
+            }
+            setPending((cur) => [...cur, ...pendingFromFiles(files)]);
+          }}
+        />
+        <div
+          className={cn(
+            "bg-card flex flex-col gap-1.5 rounded-[16px] p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
+            composeDrop.over && "shadow-[0_0_0_1px_var(--primary)]"
+          )}
+          {...composeDrop.props}
+        >
           {bulk && !isRename ? (
             <MarkedActions actions={bulk} />
           ) : (
@@ -337,6 +474,7 @@ export const InboxPane = ({
               autoCorrect="off"
               autoFocus={isRename}
               className="placeholder:text-muted-foreground min-h-11 w-full resize-none bg-transparent px-1.5 py-1 text-[13px] outline-none"
+              data-composer=""
               key={renaming ?? "compose"}
               spellCheck={false}
               onChange={(event) => {
@@ -348,6 +486,11 @@ export const InboxPane = ({
                     onCancelRename();
                     return;
                   }
+                  if (pending.length > 0) {
+                    forgetPending(pending);
+                    setPending([]);
+                    return;
+                  }
                   event.currentTarget.blur();
                   return;
                 }
@@ -356,11 +499,48 @@ export const InboxPane = ({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder={composerHint(renaming, section)}
+              onPaste={(event) => {
+                if (!composing) {
+                  return;
+                }
+                const files = filesFromClipboard(event.clipboardData);
+                if (files.length === 0) {
+                  return;
+                }
+                setPending((cur) => [...cur, ...pendingFromFiles(files)]);
+                if (!event.clipboardData.getData("text")) {
+                  event.preventDefault();
+                }
+              }}
+              placeholder={
+                composeDrop.over
+                  ? "Drop images"
+                  : composerHint(renaming, section)
+              }
               rows={2}
               value={draft}
             />
           )}
+          {composing && pending.length > 0 ? (
+            <div className="px-0.5">
+              <ImageStrip
+                items={pending.map((item) => ({
+                  key: item.id,
+                  src: item.url,
+                }))}
+                onRemove={(key) => {
+                  setPending((cur) => {
+                    const next = cur.filter((item) => item.id !== key);
+                    forgetPending(cur.filter((item) => item.id === key));
+                    return next;
+                  });
+                }}
+                onReorder={(from, to) => {
+                  setPending((cur) => moveItem(cur, from, to));
+                }}
+              />
+            </div>
+          ) : null}
           <div className="flex items-center gap-1">
             {isRename ? (
               <span className="text-muted-foreground min-w-0 flex-1 truncate px-1.5 text-xs">
@@ -390,6 +570,20 @@ export const InboxPane = ({
                 variant="ghost"
               >
                 ×
+              </Button>
+            ) : null}
+            {composing ? (
+              <Button
+                aria-label="Attach images"
+                className="press"
+                onClick={() => {
+                  picker.current?.click();
+                }}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <HugeiconsIcon className="size-3.5" icon={ImageAdd01Icon} />
               </Button>
             ) : null}
             {bulk && !isRename ? null : (
