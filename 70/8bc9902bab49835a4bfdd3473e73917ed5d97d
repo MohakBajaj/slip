@@ -1,0 +1,96 @@
+src/cli/index.ts
+  s_9f43ca4cd291a4::t_47b99aa8aed4de 81
+  s_9f43ca4cd291a4::t_fa10c70cde8ab0 10
+  s_9f43ca4cd291a4::t_1e0c5716f99a3e 82
+src/main/ax-context.ts
+  s_9f43ca4cd291a4::t_0530afbb033550 55
+  s_9f43ca4cd291a4::t_52a8987aa2953a 1-32,34-54,56-99,103-163,165-169
+  s_9f43ca4cd291a4::t_daadfd612dee58 164
+  s_9f43ca4cd291a4::t_3411288d0c8746 33
+  s_9f43ca4cd291a4::t_19478c0a8b28bb 100-102
+src/shared/source.ts
+  s_9f43ca4cd291a4::t_5a982a3bacb539 137-138
+  s_9f43ca4cd291a4::t_913fe19b0002fb 100-108,111-122
+  s_9f43ca4cd291a4::t_378a66fbcc5787 135
+  s_9f43ca4cd291a4::t_b256d7566cb0ae 1-12,16,23-46,48-55,67-83,85-86,96-97,123-134,136,139-147
+  s_9f43ca4cd291a4::t_7d3edecf2f9ea5 84,87,89-95,98-99,110
+  s_9f43ca4cd291a4::t_e39483f7307679 15,17-19,22
+  s_9f43ca4cd291a4::t_aebdc126c93667 13-14,20-21
+  s_9f43ca4cd291a4::t_96dc717d013be8 88,109
+  s_9f43ca4cd291a4::t_3c203ce0b4211d 47,56-66
+  s_9f43ca4cd291a4::t_42a417050d9eae 148-159
+src/shared/markdown-file.ts
+  s_9f43ca4cd291a4::t_13fff90e2e45f1 43,51
+  s_9f43ca4cd291a4::t_bfb9fbe686aa4e 21-22
+oxlint.config.ts
+  s_9f43ca4cd291a4::t_055379a848d57f 50
+  s_9f43ca4cd291a4::t_4f83df18fb4a8a 48
+src/main/front-context.ts
+  s_9f43ca4cd291a4::t_a0e4d045c38943 3,5,18-22,25,29,35-38,40-41,47-48
+  s_9f43ca4cd291a4::t_4dee82c01a21a8 7-10,12-16
+  s_9f43ca4cd291a4::t_7ca1721e17ada4 11
+  s_9f43ca4cd291a4::t_f457a2d028cd74 1-2,4,6,17,23-24,26-28,30-34,39,42-46,49
+src/main/index.ts
+  s_9f43ca4cd291a4::t_bb9e8d0865668e 31
+  s_9f43ca4cd291a4::t_af010495c7d1a3 30
+  s_9f43ca4cd291a4::t_8586524b3d0d22 444,449,454,456-457,464-468,485
+  s_9f43ca4cd291a4::t_50e604faf8edf4 469-484,486-487
+src/renderer/src/components/detail-well.tsx
+  s_9f43ca4cd291a4::t_849a775432d871 36
+  s_9f43ca4cd291a4::t_d4122f87298076 1,179-181,183
+  s_9f43ca4cd291a4::t_3f3b1d94e19de4 177
+  s_9f43ca4cd291a4::t_6c80510c93695f 152-176,178,182,184-187,189
+  s_9f43ca4cd291a4::t_a6f34619321e9f 188,190
+  s_9f43ca4cd291a4::t_ede2fec50cbcfd 125-151
+  s_9f43ca4cd291a4::t_cbe89d1e2dd066 403,418
+  s_9f43ca4cd291a4::t_79435af3c850b3 385-392
+  s_9f43ca4cd291a4::t_4ace4aa0b41a9e 235
+src/shared/types.ts
+  s_9f43ca4cd291a4::t_db072b0371bc94 20,26
+src/vault.ts
+  s_9f43ca4cd291a4::t_0e8bf3f6a84b90 169,172,186,192
+src/renderer/src/components/inbox-pane.tsx
+  s_9f43ca4cd291a4::t_1f56715fa5cf5d 25
+  s_9f43ca4cd291a4::t_96ff1830a3b237 198
+  s_9f43ca4cd291a4::t_b753a0cbcfb2aa 133
+  s_9f43ca4cd291a4::t_a0e9288a493f74 200
+src/shared/tray-menu.ts
+  s_9f43ca4cd291a4::t_9bad261c1579af 39-40
+  s_9f43ca4cd291a4::t_c5e4e948257641 3
+src/skill-template.ts
+  s_9f43ca4cd291a4::t_c1b084221e94cf 38
+  s_9f43ca4cd291a4::t_260205388eb71d 27-28
+  s_9f43ca4cd291a4::t_377bd98b7c0771 36-37
+src/main/capture.ts
+  s_9f43ca4cd291a4::t_d7ad5188afcd81 290
+  s_9f43ca4cd291a4::t_27b211b0bf5398 81
+  s_9f43ca4cd291a4::t_66446d62cd5e09 278
+  s_9f43ca4cd291a4::t_d122f72d205f9a 11
+  s_9f43ca4cd291a4::t_71c6a050226660 32-41
+  s_9f43ca4cd291a4::t_ef2263aef0ad2e 61
+  s_9f43ca4cd291a4::t_afdcf59abe692c 239-242,254,263,268
+src/shared/logic.ts
+  s_9f43ca4cd291a4::t_ba139849159b46 28
+  s_9f43ca4cd291a4::t_16631ae3cc7faf 2
+src/renderer/src/components/section-picker.tsx
+  s_9f43ca4cd291a4::t_be1b299910d543 238,241
+src/shared/format.ts
+  s_9f43ca4cd291a4::t_0f4042f110ee16 1
+  s_9f43ca4cd291a4::t_f522885841d964 35-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "708bc9902bab49835a4bfdd3473e73917ed5d97d",
+  "prompts": {},
+  "sessions": {
+    "s_9f43ca4cd291a4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e4345d28-b84c-4170-8070-fb3ea8110d1d",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
