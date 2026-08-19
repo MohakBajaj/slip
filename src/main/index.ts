@@ -62,6 +62,7 @@ import {
   updateSlips,
   watchVault,
 } from "../vault";
+import { installSkill, skillStatus } from "./agent-skill";
 import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
 import { applyDockIcon } from "./dock-icon";
@@ -1289,6 +1290,8 @@ const boot = async (): Promise<void> => {
   });
   ipcMain.handle("loadPreview", () => preview);
   ipcMain.handle("openVault", () => shell.openPath(vaultRoot()));
+  ipcMain.handle("skillStatus", () => skillStatus());
+  ipcMain.handle("installSkill", () => installSkill());
   ipcMain.handle("pickVault", async () => {
     const opts: Electron.OpenDialogOptions = {
       defaultPath: vaultRoot(),

@@ -2,7 +2,13 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
-import type { CaptureState, LoginState, Settings, Slip } from "../shared/types";
+import type {
+  CaptureState,
+  LoginState,
+  Settings,
+  SkillStatus,
+  Slip,
+} from "../shared/types";
 
 const api = {
   addImages: (id: string, images: ImagePayload[]) =>
@@ -31,6 +37,8 @@ const api = {
     ) as Promise<Slip | null>,
   deleteSlips: (ids: string[]) =>
     ipcRenderer.invoke("deleteSlips", ids) as Promise<Slip[]>,
+  installSkill: () =>
+    ipcRenderer.invoke("installSkill") as Promise<SkillStatus>,
   load: () =>
     ipcRenderer.invoke("load") as Promise<{
       slips: Slip[];
@@ -133,6 +141,7 @@ const api = {
   setLogin: (on: boolean) =>
     ipcRenderer.invoke("setLogin", on) as Promise<LoginState>,
   setSection: (section: string) => ipcRenderer.invoke("setSection", section),
+  skillStatus: () => ipcRenderer.invoke("skillStatus") as Promise<SkillStatus>,
   updateSlip: (id: string, patch: Partial<Slip>) =>
     ipcRenderer.invoke("updateSlip", id, patch) as Promise<Slip | null>,
   updateSlips: (ids: string[], patch: Partial<Slip>) =>

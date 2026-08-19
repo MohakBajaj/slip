@@ -71,3 +71,13 @@ CLI uses the vault path from Slip settings, then
 - To drop it from the inbox, set \`archived: true\`.
 - \`INDEX.md\` is rewritten by the app and the CLI after every write.
 `;
+
+export const AGENT_SKILL_MD = `---
+name: slip
+description: >
+  Local capture inbox. One markdown file per slip. Use when reading,
+  searching, filing, tagging, or adding slips; using the Slip CLI;
+  or when the user mentions Slip, their inbox, or captured notes.
+---
+
+${SKILL_MD}`;

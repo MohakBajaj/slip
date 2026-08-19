@@ -52,6 +52,12 @@ export interface Settings {
   zoom: number;
 }
 
+export interface SkillStatus {
+  installed: boolean;
+  path: string;
+  stale: boolean;
+}
+
 const homeDir = (): string | undefined => {
   if (typeof process === "undefined") {
     return undefined;

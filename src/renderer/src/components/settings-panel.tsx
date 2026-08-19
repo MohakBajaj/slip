@@ -2,6 +2,7 @@ import "@fontsource-variable/newsreader/wght.css";
 import { Folder02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,7 +13,12 @@ import { FONTS, THEMES, TRAY_ICONS } from "../../../shared/appearance";
 import type { FontId, ThemeId, TrayIconId } from "../../../shared/appearance";
 import { sameCapture, unusedCapture } from "../../../shared/capture-bind";
 import { ACCENTS, clampZoom, ZOOM_MAX, ZOOM_MIN } from "../../../shared/types";
-import type { Accent, LoginState, Settings } from "../../../shared/types";
+import type {
+  Accent,
+  LoginState,
+  Settings,
+  SkillStatus,
+} from "../../../shared/types";
 import { CaptureBind } from "./capture-bind";
 import { DockLook } from "./dock-look";
 import { SettingsKeys } from "./settings-keys";
@@ -120,6 +126,15 @@ export const SettingsPanel = ({
   onLogin: (next: LoginState) => void;
   settings: Settings;
 }) => {
+  const [skill, setSkill] = useState<SkillStatus | null>(null);
+
+  useEffect(() => {
+    window.slip
+      .skillStatus()
+      .then(setSkill)
+      .catch(() => undefined);
+  }, []);
+
   const pickTheme = (theme: ThemeId): void => {
     onChange({ ...settings, theme });
   };
@@ -136,6 +151,13 @@ export const SettingsPanel = ({
   let loginDetail: string | undefined;
   if (login === "unavailable") {
     loginDetail = "Needs an installed Slip";
+  }
+
+  let skillDetail = "Claude and other agents";
+  let skillLabel = "Install";
+  if (skill?.installed === true) {
+    skillDetail = vaultLabel(skill.path);
+    skillLabel = skill.stale ? "Update" : "Installed";
   }
 
   return (
@@ -433,6 +455,21 @@ export const SettingsPanel = ({
                   Open
                 </Button>
               </div>
+            </SettingsRow>
+            <SettingsRow detail={skillDetail} label="Skill">
+              <Button
+                className="press"
+                onClick={() => {
+                  window.slip
+                    .installSkill()
+                    .then(setSkill)
+                    .catch(() => undefined);
+                }}
+                size="xs"
+                variant="ghost"
+              >
+                {skillLabel}
+              </Button>
             </SettingsRow>
           </Card>
         </section>
