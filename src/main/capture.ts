@@ -1,18 +1,28 @@
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { clipboard, nativeImage, systemPreferences } from "electron";
 import koffi from "koffi";
 
+import { clipChanged, clipDelta } from "../shared/capture-clip";
+import type { ClipSnap } from "../shared/capture-clip";
 import { createVoiceHold, HOLD_MS } from "../shared/capture-hold";
 import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
-import { IMAGE_EXT } from "../shared/images";
+import {
+  htmlImages,
+  isTinyHtmlImage,
+  parseDataImage,
+} from "../shared/clipboard-html";
+import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
 import type { CaptureState } from "../shared/types";
 import { startFrontContext } from "./front-context";
 
 const COPY_SETTLE_MS = 120;
 const TRUST_POLL_MS = 2000;
+const FETCH_MS = 2000;
+const MAX_HTML_IMAGES = 8;
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 const kCGSessionEventTap = 1;
 const kCGHeadInsertEventTap = 0;
@@ -29,17 +39,11 @@ const kVK_ANSI_C = 0x08;
 const FLAGS_MASK = 1 << kCGEventFlagsChanged;
 const KEY_MASK = (1 << kCGEventKeyDown) | FLAGS_MASK;
 
-export type CaptureEvent =
-  | {
-      context: ReturnType<typeof startFrontContext>;
-      kind: "text";
-      text: string;
-    }
-  | {
-      context: ReturnType<typeof startFrontContext>;
-      kind: "image";
-      path: string;
-    };
+export interface CaptureEvent {
+  context: ReturnType<typeof startFrontContext>;
+  images: string[];
+  text: string;
+}
 
 export interface CaptureHandle {
   setDrawSequence: (seq: string[]) => void;
@@ -250,7 +254,37 @@ const install = (opts: {
 
   const whitespace = /\s+/u;
 
-  const clipboardFile = (): string | null => {
+  const takeFileUrl = (
+    raw: string,
+    found: string[],
+    seen: Set<string>
+  ): void => {
+    for (const part of raw.split(whitespace)) {
+      const line = part.trim();
+      if (!line.startsWith("file://")) {
+        continue;
+      }
+      try {
+        const filePath = fileURLToPath(line);
+        const ext = path.extname(filePath).toLowerCase();
+        if (
+          seen.has(filePath) ||
+          !IMAGE_EXT.has(ext) ||
+          !existsSync(filePath)
+        ) {
+          continue;
+        }
+        seen.add(filePath);
+        found.push(filePath);
+      } catch {
+        // Pasteboard flavor is optional; text/image paths still run.
+      }
+    }
+  };
+
+  const clipboardFiles = (): string[] => {
+    const found: string[] = [];
+    const seen = new Set<string>();
     for (const format of clipboard.availableFormats()) {
       if (format !== "public.file-url" && format !== "text/uri-list") {
         continue;
@@ -263,53 +297,59 @@ const install = (opts: {
                 .toString("utf-8")
                 .replaceAll("\0", "")
             : clipboard.read(format);
-        const line = raw
-          .split(whitespace)
-          .map((part) => part.trim())
-          .find((part) => part.startsWith("file://"));
-        if (!line) {
-          continue;
-        }
-        const filePath = fileURLToPath(line);
-        if (
-          IMAGE_EXT.has(path.extname(filePath).toLowerCase()) &&
-          existsSync(filePath)
-        ) {
-          return filePath;
-        }
+        takeFileUrl(raw, found, seen);
       } catch {
         // Pasteboard flavor is optional; text/image paths still run.
       }
     }
-    return null;
+    return found;
   };
 
-  interface ClipSnap {
-    file: string | null;
-    imagePng: Buffer | null;
-    text: string;
-  }
+  const readHtml = (): string => {
+    try {
+      const html = clipboard.readHTML();
+      if (html) {
+        return html;
+      }
+    } catch {
+      // HTML flavor is optional.
+    }
+    for (const format of ["text/html", "public.html"]) {
+      try {
+        if (!clipboard.availableFormats().includes(format)) {
+          continue;
+        }
+        const html =
+          format === "public.html"
+            ? clipboard.readBuffer(format).toString("utf-8")
+            : clipboard.read(format);
+        if (html) {
+          return html;
+        }
+      } catch {
+        // HTML flavor is optional.
+      }
+    }
+    return "";
+  };
 
   const snapClip = (): ClipSnap => {
     const image = clipboard.readImage();
     return {
-      file: clipboardFile(),
+      files: clipboardFiles(),
+      html: readHtml(),
       imagePng: image.isEmpty() ? null : image.toPNG(),
       text: clipboard.readText(),
     };
   };
 
-  const samePng = (left: Buffer | null, right: Buffer | null): boolean => {
-    if (left === null || right === null) {
-      return left === right;
-    }
-    return left.equals(right);
-  };
-
   const restoreClip = (snap: ClipSnap): void => {
-    if (snap.imagePng) {
+    if (snap.html || snap.imagePng) {
       clipboard.write({
-        image: nativeImage.createFromBuffer(snap.imagePng),
+        ...(snap.html ? { html: snap.html } : {}),
+        ...(snap.imagePng
+          ? { image: nativeImage.createFromBuffer(snap.imagePng) }
+          : {}),
         text: snap.text,
       });
       return;
@@ -317,37 +357,152 @@ const install = (opts: {
     clipboard.writeText(snap.text);
   };
 
-  const grab = (
+  const sniffExt = (bytes: Buffer): string => {
+    if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50) {
+      return ".png";
+    }
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+      return ".jpg";
+    }
+    if (bytes.length >= 6 && bytes.subarray(0, 3).toString() === "GIF") {
+      return ".gif";
+    }
+    if (
+      bytes.length >= 12 &&
+      bytes.subarray(0, 4).toString() === "RIFF" &&
+      bytes.subarray(8, 12).toString() === "WEBP"
+    ) {
+      return ".webp";
+    }
+    return "";
+  };
+
+  const fetchImage = async (
+    url: string
+  ): Promise<{ bytes: Buffer; ext: string } | null> => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FETCH_MS);
+      const res = await fetch(url, {
+        redirect: "follow",
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        return null;
+      }
+      const len = Number(res.headers.get("content-length") ?? 0);
+      if (len > MAX_IMAGE_BYTES) {
+        return null;
+      }
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) {
+        return null;
+      }
+      const ext =
+        extFromMime(res.headers.get("content-type") ?? "") ||
+        imageExt(url) ||
+        sniffExt(bytes);
+      if (!ext) {
+        return null;
+      }
+      return { bytes, ext };
+    } catch {
+      return null;
+    }
+  };
+
+  const collectHtmlImages = async (
+    html: string
+  ): Promise<{ bytes: Buffer; ext: string }[]> => {
+    const out: { bytes: Buffer; ext: string }[] = [];
+    const pending: Promise<void>[] = [];
+    for (const image of htmlImages(html)) {
+      if (out.length + pending.length >= MAX_HTML_IMAGES) {
+        break;
+      }
+      if (isTinyHtmlImage(image)) {
+        continue;
+      }
+      const data = parseDataImage(image.src);
+      if (data) {
+        out.push({
+          bytes: data.bytes,
+          ext: extFromMime(data.mime) || sniffExt(data.bytes) || ".png",
+        });
+        continue;
+      }
+      if (image.src.startsWith("file://")) {
+        try {
+          const filePath = fileURLToPath(image.src);
+          const ext = path.extname(filePath).toLowerCase();
+          if (IMAGE_EXT.has(ext) && existsSync(filePath)) {
+            out.push({ bytes: readFileSync(filePath), ext });
+          }
+        } catch {
+          // Bad file URL in markup.
+        }
+        continue;
+      }
+      if (image.src.startsWith("http://") || image.src.startsWith("https://")) {
+        pending.push(
+          fetchImage(image.src).then((fetched) => {
+            if (fetched) {
+              out.push(fetched);
+            }
+          })
+        );
+      }
+    }
+    if (pending.length > 0) {
+      await Promise.all(pending);
+    }
+    return out;
+  };
+
+  const grab = async (
     before: ClipSnap,
+    after: ClipSnap,
     context: ReturnType<typeof startFrontContext>
-  ): void => {
-    const after = snapClip();
-    const imageChanged =
-      after.imagePng !== null && !samePng(after.imagePng, before.imagePng);
-    const fileChanged = after.file !== null && after.file !== before.file;
-    const textChanged = after.text.trim() !== before.text.trim();
-    if (!(imageChanged || fileChanged || textChanged)) {
+  ): Promise<void> => {
+    const delta = clipDelta(before, after);
+    if (!clipChanged(delta)) {
       return;
     }
-    if (imageChanged && after.imagePng) {
-      const imagePath = path.join(opts.imageDir, `capture-${Date.now()}.png`);
-      writeFileSync(imagePath, after.imagePng);
-      opts.onEvent({ context, kind: "image", path: imagePath });
-      return;
-    }
-    if (fileChanged && after.file) {
+    const paths: string[] = [];
+    const seen: Buffer[] = [];
+    const take = (bytes: Buffer, ext: string): void => {
+      if (bytes.byteLength === 0 || seen.some((item) => item.equals(bytes))) {
+        return;
+      }
+      seen.push(bytes);
       const dest = path.join(
         opts.imageDir,
-        `capture-${Date.now()}${path.extname(after.file) || ".png"}`
+        `capture-${Date.now()}-${paths.length}${ext}`
       );
-      copyFileSync(after.file, dest);
-      opts.onEvent({ context, kind: "image", path: dest });
+      writeFileSync(dest, bytes);
+      paths.push(dest);
+    };
+    if (delta.files.length > 0) {
+      for (const file of delta.files) {
+        const ext = path.extname(file).toLowerCase();
+        take(readFileSync(file), IMAGE_EXT.has(ext) ? ext : ".png");
+      }
+    } else if (delta.imagePng) {
+      take(delta.imagePng, ".png");
+    }
+    if (delta.html) {
+      const extras = await collectHtmlImages(delta.html);
+      // First markup image is usually the same bitmap already taken.
+      const skip = paths.length > 0 ? 1 : 0;
+      for (const image of extras.slice(skip)) {
+        take(image.bytes, image.ext);
+      }
+    }
+    if (paths.length === 0 && !delta.text) {
       return;
     }
-    const text = after.text.trim();
-    if (textChanged && text) {
-      opts.onEvent({ context, kind: "text", text });
-    }
+    opts.onEvent({ context, images: paths, text: delta.text });
   };
 
   const fire = (): void => {
@@ -367,12 +522,10 @@ const install = (opts: {
       return;
     }
     setTimeout(() => {
-      try {
-        grab(before, context);
-      } finally {
-        restoreClip(before);
-        grabbing = false;
-      }
+      const after = snapClip();
+      restoreClip(before);
+      grabbing = false;
+      void grab(before, after, context).catch(() => undefined);
     }, COPY_SETTLE_MS);
   };
 

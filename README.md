@@ -23,7 +23,7 @@ menu-bar item keeps capturing.
 
 Defaults, remappable in Settings:
 
-- **⇧ ⇧** — the current selection, or a screenshot on the clipboard
+- **⇧ ⇧** — the current selection, including images in it, or a screenshot on the clipboard
 - **⌥** hold — speak a note; **⌥ ⌥** latches the recorder
 - **⌘⇧ ⌘⇧** — draw on a transparent overlay
 

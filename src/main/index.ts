@@ -33,10 +33,12 @@ import type { MenuItemConstructorOptions, WebContents } from "electron";
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
+import { bundleHtml } from "../shared/clipboard-html";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
-import { attachmentType, MAX_AUDIO_BYTES } from "../shared/images";
+import { attachmentType, imageExt, MAX_AUDIO_BYTES } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
+import { isMergeCaption } from "../shared/merge";
 import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
@@ -71,15 +73,43 @@ const MIC =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
 const SETTINGS_FILE = settingsFile();
 
+const embedImage = (
+  filePath: string
+): { bytes: Buffer; mime: string } | null => {
+  const native = nativeImage.createFromPath(filePath);
+  if (!native.isEmpty()) {
+    return { bytes: native.toPNG(), mime: "image/png" };
+  }
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  const mime = attachmentType(filePath);
+  return {
+    bytes: readFileSync(filePath),
+    mime: mime.startsWith("image/") ? mime : "image/png",
+  };
+};
+
 const writeClipboard = (text: string, paths: string[]): void => {
-  if (paths.length === 0) {
+  const images = paths.flatMap((filePath) => {
+    const image = embedImage(filePath);
+    return image ? [image] : [];
+  });
+  if (images.length === 0) {
     clipboard.writeText(text);
     return;
   }
-  clipboard.write({
-    image: nativeImage.createFromPath(paths[0]),
-    text,
-  });
+  const html = bundleHtml(text, images);
+  const [first] = images;
+  const imageOnly = isMergeCaption(text) || Boolean(imageExt(text.trim()));
+  if (imageOnly && first) {
+    clipboard.write({
+      html,
+      image: nativeImage.createFromBuffer(first.bytes),
+    });
+    return;
+  }
+  clipboard.write({ html, text });
 };
 
 app.disableHardwareAcceleration();
@@ -535,9 +565,10 @@ const parseImageInputs = (raw: unknown): ImagePayload[] => {
 };
 
 const writeCapture = (event: CaptureEvent, ctx: FrontContext): Slip | null => {
-  const images = event.kind === "image" ? [event.path] : [];
+  const { images, text } = event;
+  const [firstImage] = images;
   const content =
-    event.kind === "image" ? basenameImage(event.path) : event.text.trim();
+    text.trim() || (firstImage === undefined ? "" : basenameImage(firstImage));
   if (!content) {
     return null;
   }

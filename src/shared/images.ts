@@ -67,6 +67,19 @@ export const attachmentType = (filePath: string): string =>
   IMAGE_MIME[extOf(filePath)] ??
   "application/octet-stream";
 
+export const extFromMime = (mime: string): string => {
+  const type = mime.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (type === "image/jpg") {
+    return ".jpg";
+  }
+  for (const [ext, kind] of Object.entries(IMAGE_MIME)) {
+    if (kind === type) {
+      return ext;
+    }
+  }
+  return "";
+};
+
 export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
   if (
     from === to ||
