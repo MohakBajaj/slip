@@ -1,0 +1,19 @@
+.gitignore
+  s_371a06e261db98::t_a23b2198547c5d 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c55b90354f86be8fccf56044dc8ccf61efdf3390",
+  "prompts": {},
+  "sessions": {
+    "s_371a06e261db98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dbca8c68-697b-45ef-8f3a-fd881eaa5b76",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
