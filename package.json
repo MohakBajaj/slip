@@ -18,6 +18,7 @@
     "postinstall": "electron-builder install-app-deps",
     "make:tray": "xcrun swift scripts/make-tray-icons.swift resources/tray",
     "make:dock": "xcrun swift scripts/mask-dock-icon.swift resources/dock/light.png resources/dock/dark.png",
+    "make:dmg": "xcrun swift scripts/make-dmg-background.swift build && tiffutil -cathidpicheck build/background.png build/background@2x.png -out build/background.tiff",
     "build:cli": "sh scripts/build-cli.sh",
     "package:mac": "electron-vite build && sh scripts/build-cli.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --publish never",
     "release:mac": "electron-vite build && sh scripts/build-cli.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never"

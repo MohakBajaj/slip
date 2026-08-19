@@ -44,7 +44,25 @@ mac:
     - from: dist/cli/slip
       to: Helpers/slip
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Slip-${version}.${ext}
+  background: build/background.tiff
+  icon: build/icon.icns
+  iconSize: 80
+  iconTextSize: 12
+  title: Slip
+  window:
+    x: 280
+    y: 160
+    width: 660
+    height: 400
+  contents:
+    - x: 168
+      y: 188
+      type: file
+    - x: 492
+      y: 188
+      type: link
+      path: /Applications
 linux:
   target:
     - AppImage
