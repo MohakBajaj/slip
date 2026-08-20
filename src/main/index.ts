@@ -279,6 +279,22 @@ const applyLogin = (on: boolean): LoginState => {
   return loginKnown;
 };
 
+const visibleWindows = (): boolean =>
+  [win, previewWin, voiceWin, drawWin].some(
+    (target) => target !== null && !target.isDestroyed() && target.isVisible()
+  );
+
+const syncActivation = (): void => {
+  if (process.platform !== "darwin") {
+    return;
+  }
+  if (settings.dock || visibleWindows()) {
+    app.setActivationPolicy("regular");
+    return;
+  }
+  app.setActivationPolicy("accessory");
+};
+
 const applyDock = (show: boolean): void => {
   if (process.platform !== "darwin" || !app.dock) {
     return;
@@ -288,11 +304,15 @@ const applyDock = (show: boolean): void => {
       app.dock.show();
     }
     applyDockIcon(isDark());
+    syncActivation();
     return;
   }
   if (app.dock.isVisible()) {
     app.dock.hide();
   }
+  // hide() forces accessory and drops the Slip menu bar. Restore it
+  // while a window is up so Inbox / Edit / Settings still work.
+  syncActivation();
 };
 
 const captureLabel = (state: CaptureState): string => {
@@ -328,6 +348,7 @@ const patchFromTray = (id: string, patch: Partial<Slip>): void => {
 
 const slipTrayItems = (slips: Slip[]): MenuItemConstructorOptions[] =>
   slips.map((slip) => ({
+    click: () => revealSlip(slip.id),
     label: trayLabel(slip),
     submenu: [
       {
@@ -373,11 +394,81 @@ const menuTemplate = (
     };
   });
 
+const trayTemplate = (): MenuItemConstructorOptions[] => {
+  const { hidden, open, shown } = trayShown(listSlips(vaultRoot()));
+  const login = loginKnown;
+  const canLogin = login === "on" || login === "off";
+  return [
+    {
+      enabled: false,
+      label: trayHead(open),
+      sublabel: captureLabel(capture),
+    },
+    ...(shown.length > 0
+      ? [{ type: "separator" as const }, ...slipTrayItems(shown)]
+      : []),
+    ...(hidden > 0
+      ? [
+          {
+            click: () => showWindow(),
+            label: `${hidden} more…`,
+          },
+        ]
+      : []),
+    { type: "separator" },
+    { click: () => showWindow(), label: "Open Slip" },
+    { click: () => composeSlip(), label: "New Slip" },
+    { click: () => showVoice(), label: "Voice Slip" },
+    { click: () => showDraw(), label: "Draw" },
+    {
+      click: () => {
+        shell.openPath(vaultRoot()).catch(() => undefined);
+      },
+      label: "Open vault",
+    },
+    { type: "separator" },
+    {
+      click: () => {
+        showWindow(() => send("command", "settings"));
+      },
+      label: "Settings…",
+    },
+    {
+      checked: login === "on",
+      click: () => {
+        applyLogin(login !== "on");
+      },
+      enabled: canLogin,
+      label: canLogin
+        ? "Start at Login"
+        : "Start at Login — needs installed Slip",
+      type: "checkbox",
+    },
+    ...(capture === "denied"
+      ? [
+          {
+            click: () => {
+              shell.openExternal(ACCESS).catch(() => undefined);
+            },
+            label: "Grant Accessibility…",
+          },
+        ]
+      : []),
+    {
+      accelerator: "Command+Q",
+      click: () => {
+        app.quit();
+      },
+      label: "Quit Slip",
+    },
+  ];
+};
+
 const rebuildTray = (): void => {
   if (!tray) {
     return;
   }
-  const { hidden, open, shown } = trayShown(listSlips(vaultRoot()));
+  const { open } = trayShown(listSlips(vaultRoot()));
   const chord = formatCapture(settings.capture);
   tray.setTitle(open > 0 ? String(open) : "");
   const voiceChord = formatHold(settings.voiceCapture);
@@ -387,74 +478,13 @@ const rebuildTray = (): void => {
       ? `Slip — ${open} open — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
       : `Slip — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
   );
-  const login = loginKnown;
-  const canLogin = login === "on" || login === "off";
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        enabled: false,
-        label: trayHead(open),
-        sublabel: captureLabel(capture),
-      },
-      ...(shown.length > 0
-        ? [{ type: "separator" as const }, ...slipTrayItems(shown)]
-        : []),
-      ...(hidden > 0
-        ? [
-            {
-              click: () => showWindow(),
-              label: `${hidden} more…`,
-            },
-          ]
-        : []),
-      { type: "separator" },
-      { click: () => showWindow(), label: "Open Slip" },
-      { click: () => composeSlip(), label: "New Slip" },
-      { click: () => showVoice(), label: "Voice Slip" },
-      { click: () => showDraw(), label: "Draw" },
-      {
-        click: () => {
-          shell.openPath(vaultRoot()).catch(() => undefined);
-        },
-        label: "Open vault",
-      },
-      { type: "separator" },
-      {
-        click: () => {
-          showWindow(() => send("command", "settings"));
-        },
-        label: "Settings…",
-      },
-      {
-        checked: login === "on",
-        click: () => {
-          applyLogin(login !== "on");
-        },
-        enabled: canLogin,
-        label: canLogin
-          ? "Start at Login"
-          : "Start at Login — needs installed Slip",
-        type: "checkbox",
-      },
-      ...(capture === "denied"
-        ? [
-            {
-              click: () => {
-                shell.openExternal(ACCESS).catch(() => undefined);
-              },
-              label: "Grant Accessibility…",
-            },
-          ]
-        : []),
-      {
-        accelerator: "Command+Q",
-        click: () => {
-          app.quit();
-        },
-        label: "Quit Slip",
-      },
-    ])
-  );
+};
+
+const popupTray = (): void => {
+  if (!tray) {
+    return;
+  }
+  tray.popUpContextMenu(Menu.buildFromTemplate(trayTemplate()));
 };
 
 const showWindow = (whenReady?: () => void): void => {
@@ -462,11 +492,15 @@ const showWindow = (whenReady?: () => void): void => {
     createWindow();
   }
   if (!winReady) {
-    win?.once("ready-to-show", () => whenReady?.());
+    win?.once("ready-to-show", () => {
+      applyDock(settings.dock);
+      whenReady?.();
+    });
     return;
   }
   win?.show();
   win?.focus();
+  applyDock(settings.dock);
   whenReady?.();
 };
 
@@ -691,10 +725,12 @@ const createWindow = (): void => {
     winReady = true;
     win?.show();
     win?.focus();
+    applyDock(settings.dock);
   });
   win.on("closed", () => {
     win = null;
     winReady = false;
+    applyDock(settings.dock);
   });
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -1005,9 +1041,14 @@ const boot = async (): Promise<void> => {
     });
   });
 
-  tray = new Tray(nativeImage.createEmpty());
+  const image = nativeImage.createFromPath(trayFile(settings.trayIcon));
+  image.setTemplateImage(true);
+  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
+  tray.setIgnoreDoubleClickEvents(true);
   applyTrayIcon();
   rebuildTray();
+  tray.on("click", popupTray);
+  tray.on("right-click", popupTray);
   nativeTheme.on("updated", () => {
     paintWindows();
     if (settings.dock) {
