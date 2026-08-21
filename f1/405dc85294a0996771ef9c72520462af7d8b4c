@@ -1,0 +1,19 @@
+package.json
+  s_effa0fd9bbafe6::t_c44288c8c4df5c 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f1405dc85294a0996771ef9c72520462af7d8b4c",
+  "prompts": {},
+  "sessions": {
+    "s_effa0fd9bbafe6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e85804d0-1cb9-43bf-a2ab-8a5abab6e874",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
