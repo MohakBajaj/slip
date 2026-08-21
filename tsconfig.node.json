@@ -1,0 +1,25 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "electron.vite.config.*",
+    "oxlint.config.ts",
+    "oxfmt.config.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "src/cli/**/*",
+    "src/vault.ts",
+    "src/skill-template.ts"
+  ],
+  "exclude": ["src/**/*.test.ts"],
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    },
+    "strictNullChecks": true,
+    "types": ["electron-vite/node"]
+  }
+}
