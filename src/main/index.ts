@@ -226,6 +226,8 @@ const tellSettings = (): void => {
   drawWin?.webContents.send("settings-changed", settings);
 };
 
+const TRAY_GUID = "9f2e4c1a-7b83-4d6e-a510-c8d3f1b6e294";
+
 const trayFile = (id: TrayIconId): string => {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "tray", `${id}Template.png`);
@@ -233,16 +235,25 @@ const trayFile = (id: TrayIconId): string => {
   return path.join(__dirname, "../../resources/tray", `${id}Template.png`);
 };
 
+const trayImage = (): Electron.NativeImage => {
+  const image = nativeImage.createFromPath(trayFile(settings.trayIcon));
+  if (!image.isEmpty()) {
+    image.setTemplateImage(true);
+  }
+  return image;
+};
+
 const applyTrayIcon = (): void => {
   if (!tray) {
     return;
   }
-  const image = nativeImage.createFromPath(trayFile(settings.trayIcon));
-  image.setTemplateImage(true);
+  const image = trayImage();
   if (!image.isEmpty()) {
     tray.setImage(image);
   }
 };
+
+let remountTray = (): void => undefined;
 
 const send = (channel: string, ...args: unknown[]): void => {
   win?.webContents.send(channel, ...args);
@@ -284,15 +295,26 @@ const visibleWindows = (): boolean =>
     (target) => target !== null && !target.isDestroyed() && target.isVisible()
   );
 
+let activation: "accessory" | "regular" = "regular";
+
+const setActivation = (next: "accessory" | "regular"): void => {
+  if (process.platform !== "darwin" || activation === next) {
+    return;
+  }
+  activation = next;
+  app.setActivationPolicy(next);
+  remountTray();
+};
+
 const syncActivation = (): void => {
   if (process.platform !== "darwin") {
     return;
   }
   if (settings.dock || visibleWindows()) {
-    app.setActivationPolicy("regular");
+    setActivation("regular");
     return;
   }
-  app.setActivationPolicy("accessory");
+  setActivation("accessory");
 };
 
 const applyDock = (show: boolean): void => {
@@ -302,17 +324,30 @@ const applyDock = (show: boolean): void => {
   if (show) {
     if (!app.dock.isVisible()) {
       app.dock.show();
+      // show() forces regular and can drop the status item.
+      activation = "regular";
+      remountTray();
     }
     applyDockIcon(isDark());
-    syncActivation();
+    setActivation("regular");
     return;
   }
   if (app.dock.isVisible()) {
     app.dock.hide();
+    // hide() forces accessory and drops the Slip menu bar. Remount
+    // the extra, then restore regular while a window is up so Inbox /
+    // Edit / Settings still work.
+    activation = "accessory";
+    remountTray();
   }
-  // hide() forces accessory and drops the Slip menu bar. Restore it
-  // while a window is up so Inbox / Edit / Settings still work.
   syncActivation();
+};
+
+const pinWorkspace = (target: BrowserWindow): void => {
+  target.setVisibleOnAllWorkspaces(true, {
+    skipTransformProcessType: true,
+    visibleOnFullScreen: true,
+  });
 };
 
 const captureLabel = (state: CaptureState): string => {
@@ -485,6 +520,30 @@ const popupTray = (): void => {
     return;
   }
   tray.popUpContextMenu(Menu.buildFromTemplate(trayTemplate()));
+};
+
+const createTray = (): void => {
+  const image = trayImage();
+  const next = new Tray(
+    image.isEmpty() ? nativeImage.createEmpty() : image,
+    TRAY_GUID
+  );
+  next.setIgnoreDoubleClickEvents(true);
+  next.on("click", popupTray);
+  next.on("right-click", popupTray);
+  tray?.destroy();
+  tray = next;
+  applyTrayIcon();
+  rebuildTray();
+  if (image.isEmpty()) {
+    tray.setTitle("Slip");
+  }
+};
+
+remountTray = () => {
+  if (tray) {
+    createTray();
+  }
 };
 
 const showWindow = (whenReady?: () => void): void => {
@@ -777,9 +836,11 @@ const showPreview = (): void => {
   previewWin.on("ready-to-show", () => {
     previewWin?.show();
     previewWin?.focus();
+    applyDock(settings.dock);
   });
   previewWin.on("closed", () => {
     previewWin = null;
+    applyDock(settings.dock);
   });
   loadHashPage(previewWin, "preview");
 };
@@ -840,6 +901,7 @@ const revealVoice = (): void => {
   }
   placeVoice(voiceWin);
   voiceWin.showInactive();
+  applyDock(settings.dock);
   flushVoice();
 };
 
@@ -887,12 +949,13 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
       },
       width: 240,
     });
-    voiceWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    pinWorkspace(voiceWin);
     voiceWin.on("ready-to-show", () => {
       revealVoice();
     });
     voiceWin.on("closed", () => {
       voiceWin = null;
+      applyDock(settings.dock);
     });
     loadHashPage(voiceWin, "voice");
   })();
@@ -945,7 +1008,7 @@ const showDraw = (attach = false): void => {
     },
     width,
   });
-  drawWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  pinWorkspace(drawWin);
   drawWin.on("ready-to-show", () => {
     if (!drawWin || drawWin.isDestroyed()) {
       return;
@@ -960,10 +1023,12 @@ const showDraw = (attach = false): void => {
     );
     drawWin.show();
     drawWin.focus();
+    applyDock(settings.dock);
   });
   drawWin.on("closed", () => {
     drawWin = null;
     drawAttach = false;
+    applyDock(settings.dock);
   });
   drawWin.webContents.once("did-finish-load", tellDrawMode);
   loadHashPage(drawWin, "draw");
@@ -1041,14 +1106,7 @@ const boot = async (): Promise<void> => {
     });
   });
 
-  const image = nativeImage.createFromPath(trayFile(settings.trayIcon));
-  image.setTemplateImage(true);
-  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
-  tray.setIgnoreDoubleClickEvents(true);
-  applyTrayIcon();
-  rebuildTray();
-  tray.on("click", popupTray);
-  tray.on("right-click", popupTray);
+  createTray();
   nativeTheme.on("updated", () => {
     paintWindows();
     if (settings.dock) {

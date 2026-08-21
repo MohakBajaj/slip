@@ -3,7 +3,8 @@ import CoreGraphics
 import Foundation
 
 // Black-on-clear template glyphs for the menu bar. macOS tints these.
-// 18pt @1x and 36pt @2x, named *Template.png so Electron marks them.
+// 16pt @1x and 32pt @2x — Electron's recommended status-item sizes.
+// Named *Template.png so Electron marks them.
 
 let outDir = CommandLine.arguments.count > 1
   ? CommandLine.arguments[1]
@@ -150,13 +151,13 @@ try FileManager.default.createDirectory(
 )
 
 for name in icons {
-  for size in [18, 36] {
+  for size in [16, 32] {
     let ctx = context(size: size)
     draw(name, ctx)
     guard let image = ctx.makeImage() else {
       fatalError("no image for \(name) @\(size)")
     }
-    let suffix = size == 36 ? "@2x" : ""
+    let suffix = size == 32 ? "@2x" : ""
     let path = "\(outDir)/\(name)Template\(suffix).png"
     writePng(image, path)
     print("wrote \(path)")
