@@ -1,0 +1,34 @@
+src/main/index.ts
+  s_effa0fd9bbafe6::t_0129d49129dd71 229-230,238-239,242,250,256
+  s_effa0fd9bbafe6::t_6b91789b1c8e0d 952,958
+  s_effa0fd9bbafe6::t_989c143a4d4d16 1109
+  s_effa0fd9bbafe6::t_733dd0dbf8eb17 244,351,525-548
+  s_effa0fd9bbafe6::t_81f874e9bfab5e 1011,1026,1031
+  s_effa0fd9bbafe6::t_afb1d13bb78d4b 839,843
+  s_effa0fd9bbafe6::t_f3fbc524debac6 298-308,314,317,327-329,332,337-341,346-350
+  s_effa0fd9bbafe6::t_e3b34f6126667c 904
+  s_effa0fd9bbafe6::t_5c11c4e0c3c993 240-241
+  s_effa0fd9bbafe6::t_c03ef92d19e094 243
+  s_effa0fd9bbafe6::t_34a2e5f7798838 245
+  s_effa0fd9bbafe6::t_f2dc0e761fb8b5 257
+  s_effa0fd9bbafe6::t_a102eec75a2843 352
+scripts/make-tray-icons.swift
+  s_effa0fd9bbafe6::t_756ed8c8d9c413 154,160
+  s_effa0fd9bbafe6::t_de7a834e67c847 6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "592660b8e32047c8c0a0037d5a811e66f7407e64",
+  "prompts": {},
+  "sessions": {
+    "s_effa0fd9bbafe6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e85804d0-1cb9-43bf-a2ab-8a5abab6e874",
+        "model": "grok-4.6"
+      },
+      "human_author": "Mohak Bajaj <bmohak87@gmail.com>"
+    }
+  }
+}
