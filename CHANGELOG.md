@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-10-19
+
 ### Added
 
 - Transcription and cleanup each choose on-device or cloud. Cloud models come from Vercel AI Gateway, with one key stored in the keychain. A failed cloud transcription falls back to Parakeet. A failed cloud cleanup falls back to Apple Intelligence, then the raw transcript.
@@ -64,7 +66,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - CLI shipped inside Slip.app at Contents/Helpers/slip.
 - macOS disk image styled like Slip paper.
 
-[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/MohakBajaj/slip/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/MohakBajaj/slip/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/MohakBajaj/slip/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/MohakBajaj/slip/compare/v1.0.1...v1.0.2
