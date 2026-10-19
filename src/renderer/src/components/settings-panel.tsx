@@ -454,6 +454,19 @@ export const SettingsPanel = ({
                 {skillLabel}
               </Button>
             </SettingsRow>
+            <SettingsRow
+              detail="Every few hours, from GitHub releases"
+              label="Check for updates"
+            >
+              <Switch
+                aria-label="Check for updates"
+                checked={settings.checkUpdates}
+                onCheckedChange={(checkUpdates) =>
+                  onChange({ ...settings, checkUpdates })
+                }
+                size="sm"
+              />
+            </SettingsRow>
           </Card>
         </section>
       </div>

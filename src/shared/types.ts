@@ -40,6 +40,7 @@ export interface Settings {
   accent: Accent;
   alwaysOnTop: boolean;
   capture: string[];
+  checkUpdates: boolean;
   dock: boolean;
   drawCapture: string[];
   font: FontId;
@@ -84,6 +85,7 @@ export const defaultSettings = (): Settings => ({
   accent: "amber",
   alwaysOnTop: true,
   capture: defaultCapture(),
+  checkUpdates: true,
   dock: true,
   drawCapture: defaultDrawCapture(),
   font: "geist",
@@ -155,6 +157,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (typeof next.alwaysOnTop !== "boolean") {
     next.alwaysOnTop = true;
   }
+  if (typeof next.checkUpdates !== "boolean") {
+    next.checkUpdates = true;
+  }
   if (typeof next.dock !== "boolean") {
     next.dock = true;
   }
@@ -176,6 +181,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     accent: next.accent,
     alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
+    checkUpdates: next.checkUpdates,
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,

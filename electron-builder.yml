@@ -63,6 +63,8 @@ dmg:
       y: 188
       type: link
       path: /Applications
+zip:
+  artifactName: Slip-${version}-${arch}-mac.${ext}
 linux:
   target:
     - AppImage

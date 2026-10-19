@@ -53,9 +53,19 @@ export default defineConfig({
         "src/shared/capture-match.ts",
         "src/main/dock-icon.ts",
         "src/main/index.ts",
+        "src/main/updater.ts",
         "src/preload/index.ts",
       ],
       rules: electronFfi,
+    },
+    {
+      files: ["scripts/**/*.mjs"],
+      rules: {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/use-unknown-in-catch-callback-variable": "off",
+      },
     },
     {
       files: [

@@ -69,6 +69,7 @@ import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
 import { applyDockIcon } from "./dock-icon";
 import { activateBundle, frontApp, startFrontContext } from "./front-context";
+import { startUpdater } from "./updater";
 
 const ACCESS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
@@ -1736,6 +1737,11 @@ const boot = async (): Promise<void> => {
       })
   );
 
+  const updates = startUpdater({
+    autoCheck: () => settings.checkUpdates,
+    busy: () => noteOpen || voiceWin !== null || drawWin !== null,
+  });
+
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
@@ -1749,6 +1755,12 @@ const boot = async (): Promise<void> => {
               showWindow(() => send("command", "settings"));
             },
             label: "Settings…",
+          },
+          {
+            click: () => {
+              updates.checkNow().catch(() => undefined);
+            },
+            label: "Check for Updates…",
           },
           { type: "separator" },
           { role: "services" },

@@ -1,0 +1,16 @@
+# GitHub can group pull requests when someone drafts a release by hand.
+# The tag workflow does not use those notes. CHANGELOG.md is the source of truth.
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Added
+      labels:
+        - enhancement
+    - title: Fixed
+      labels:
+        - bug
+    - title: Other
+      labels:
+        - "*"
