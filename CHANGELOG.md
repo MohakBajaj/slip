@@ -15,12 +15,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Check for Updates, in the Slip menu and every few hours. The app downloads its own GitHub release zip, checks the SHA-256 from `latest.json`, then replaces the running app.
 - `bun run release patch|minor|major` bumps the version from this file, commits, and tags. It does not push.
 
+### Changed
+
+- Speech cleanup only deletes filler and fixes punctuation; it no longer rewrites words (#7).
+- Draw uses Quickdraw in place of the old draw overlay (#10).
+
 ### Fixed
 
 - A voice slip shows its transcription plus cleanup cost beside the time, and keeps that cost in frontmatter.
 - Cloud cleanup asks for effort `none` instead of the catalog value `instant`, and the default cleanup model is alibaba/qwen3.7-flash.
 - Stylesheet build, clipboard capture, and macOS CI (#2).
 - Remote capture images time out, stay under a byte cap, and do not follow redirects onto private hosts (#2).
+- Draw toolbar tooltips stay inside the window instead of being clipped (#11).
+- A release without `latest.json` counts as up to date, so the updater no longer shows a "Couldn't check for updates" error when that file is missing (#12).
 
 ## [1.0.4] - 2026-08-22
 
