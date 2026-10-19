@@ -1,0 +1,77 @@
+name: Release
+
+# A v* tag publishes a GitHub Release. Pull requests and manual runs package,
+# sign, checksum, and upload artifacts instead. Publishing uses GITHUB_TOKEN.
+#
+# This branch is also listed under push. GitHub skips pull_request while a
+# pull request conflicts, and it does not run later pull_request updates for a
+# workflow that exists only on the pull request. The branch push is the dry
+# run until this file is on the default branch. It does not publish.
+on:
+  pull_request:
+  push:
+    branches:
+      - cursor/macos-release-updater-9625
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Verify tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/verify-tag.mjs
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Check
+        run: bun run check
+      - name: Test
+        run: bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts
+      - name: Package, sign, and write the manifest
+        env:
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+        run: bash scripts/package-mac.sh
+      - name: Upload dry-run artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: slip-mac-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest.json
+            dist/SHA256SUMS
+            dist/release-notes.md
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          gh release create "$tag" \
+            --title "Slip ${version}" \
+            --notes-file dist/release-notes.md \
+            "dist/Slip-${version}.dmg" \
+            "dist/Slip-${version}-arm64-mac.zip" \
+            dist/latest.json \
+            dist/SHA256SUMS

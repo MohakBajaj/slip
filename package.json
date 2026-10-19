@@ -21,7 +21,8 @@
     "make:dmg": "xcrun swift scripts/make-dmg-background.swift build && tiffutil -cathidpicheck build/background.png build/background@2x.png -out build/background.tiff",
     "build:cli": "sh scripts/build-cli.sh",
     "package:mac": "electron-vite build && sh scripts/build-cli.sh && sh scripts/fetch-parakeet.sh && sh scripts/build-cleanup.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never",
-    "release:mac": "electron-vite build && sh scripts/build-cli.sh && sh scripts/fetch-parakeet.sh && sh scripts/build-cleanup.sh && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never"
+    "release": "sh scripts/cut-release.sh",
+    "release:mac": "bash scripts/package-mac.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -8,9 +8,9 @@ No account, no sync, no telemetry. Agents read the folder.
 
 Download the latest macOS archive from [Releases](https://github.com/MohakBajaj/slip/releases). Open the `.dmg` or unzip the `.zip`, then drag **Slip** into Applications.
 
-The build is unsigned. Right-click **Slip** and choose Open the first time.
+The build is not notarized. Right-click **Slip** and choose Open the first time. Slip needs macOS 12 or newer.
 
-Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing.
+Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing. **Check for Updates…** replaces the app in place. An ad-hoc signature changes every build, so macOS asks for Accessibility again after that kind of update.
 
 The first spoken slip downloads the speech model (about 200 MB) into Application Support. Nothing else leaves the machine. Transcription uses [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Spoken slips are cleaned up on device with Apple Intelligence when it is turned on: fillers and false starts come out, and the wording stays. The original transcript is kept on the slip. Settings can send that cleanup to an OpenAI-compatible endpoint instead. The API key is stored with the macOS keychain, not in the settings file.
 
@@ -66,8 +66,36 @@ Voice needs the transcriber binary: `sh scripts/fetch-parakeet.sh`. On a Mac, `s
 
 ## Release
 
+Cutting a release does not publish it. From a clean tree:
+
 ```sh
-bun run release:mac
+bun run release patch   # or minor, or major
+git push origin HEAD
+git push origin vX.Y.Z
 ```
 
-Writes `dist/Slip-<version>.dmg` and `dist/Slip-<version>-arm64-mac.zip`. Both contain `Slip.app` with the CLI at `Contents/Helpers/slip`. `bun run package:mac` writes the unpacked app only, at `dist/mac-arm64/Slip.app`.
+`bun run release` bumps `package.json`, moves the `Unreleased` notes in [CHANGELOG.md](CHANGELOG.md) under that version, commits, and tags. You push. The tag runs `.github/workflows/release.yml` on `macos-latest`, which checks the tag against `package.json`, runs typecheck, check, and tests, builds the arm64 dmg and zip, and publishes a GitHub Release with `latest.json` and `SHA256SUMS`. Packaging runs the same steps as `package:mac` before it signs: the CLI, `parakeet-cli`, and `slip-cleanup`. The zip must contain both helpers. The release notes are that version's changelog section. A pull request runs the same package and manifest steps and uploads artifacts. It does not publish. The updater copies the whole app, so those helpers come along, and it leaves the app in place if the download is missing either one. The speech model in Application Support is outside the app and is not touched.
+
+`bun run release:mac` is the local pack (dmg, zip, and `latest.json`) and does not upload. `bun run package:mac` writes the unpacked app only, at `dist/mac-arm64/Slip.app`.
+
+### Signing
+
+`electron-builder.yml` sets `identity: null`, so electron-builder does not sign even if `CSC_LINK` is set. The release script signs afterwards with `@electron/osx-sign` and `hardenedRuntime: false`.
+
+Both repository secrets must be set, or both left empty:
+
+- `CSC_LINK` — base64 of a PKCS#12 file, with the line breaks removed
+- `CSC_KEY_PASSWORD` — password for that file
+
+The certificate is self-signed. It is not an Apple Developer ID. On a Mac:
+
+1. Open Keychain Access → Certificate Assistant → Create a Certificate.
+2. Name it `Slip Release`. Identity Type: Self Signed Root. Certificate Type: Code Signing.
+3. Override the defaults and give it a long life, about ten years. Accept the rest.
+4. Select the certificate and its private key, then File → Export Items as a `.p12`. Choose a password.
+5. `base64 -i SlipRelease.p12 | tr -d '\n'`
+6. Add the two secrets under Settings → Secrets and variables → Actions. Do not commit the `.p12` or the password.
+
+When both secrets are present, the designated requirement stays `identifier "dev.mohak.slip" and certificate leaf = H"<that cert>"`, so the Accessibility and Input Monitoring grants can survive an update. When either secret is missing, the build is ad-hoc signed and that requirement includes a new cdhash every time, so macOS drops the grants.
+
+That stable certificate would satisfy Squirrel.Mac's check: it compares the update to the running app's designated requirement, and a self-signed cert is valid for that comparison. It is still not how Slip updates. Copies installed before the certificate exist have no stable signature, so Squirrel refuses them, and ShipIt does not strip quarantine. Without a Developer ID, Gatekeeper still treats the app as unidentified. Slip downloads `latest.json` from this repo's releases, checks the zip's SHA-256, checks the bundle id and version, then a helper replaces the `.app` after quit and strips quarantine.

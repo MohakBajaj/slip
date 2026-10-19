@@ -41,6 +41,7 @@ export interface Settings {
   accent: Accent;
   alwaysOnTop: boolean;
   capture: string[];
+  checkUpdates: boolean;
   cleanup: boolean;
   cleanupModel: string;
   cleanupUrl: string;
@@ -88,6 +89,7 @@ export const defaultSettings = (): Settings => ({
   accent: "amber",
   alwaysOnTop: true,
   capture: defaultCapture(),
+  checkUpdates: true,
   cleanup: true,
   cleanupModel: "",
   cleanupUrl: "",
@@ -170,6 +172,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (typeof next.alwaysOnTop !== "boolean") {
     next.alwaysOnTop = true;
   }
+  if (typeof next.checkUpdates !== "boolean") {
+    next.checkUpdates = true;
+  }
   if (typeof next.dock !== "boolean") {
     next.dock = true;
   }
@@ -191,6 +196,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     accent: next.accent,
     alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
+    checkUpdates: next.checkUpdates,
     cleanup: next.cleanup,
     cleanupModel: next.cleanupModel,
     cleanupUrl: next.cleanupUrl,
