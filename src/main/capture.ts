@@ -14,6 +14,7 @@ import {
   isTinyHtmlImage,
   parseDataImage,
 } from "../shared/clipboard-html";
+import { fetchPublicBytes } from "../shared/image-fetch";
 import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
 import type { CaptureState } from "../shared/types";
 import { startFrontContext } from "./front-context";
@@ -284,36 +285,22 @@ const install = (opts: {
   const fetchImage = async (
     url: string
   ): Promise<{ bytes: Buffer; ext: string } | null> => {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), FETCH_MS);
-      const res = await fetch(url, {
-        redirect: "follow",
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (!res.ok) {
-        return null;
-      }
-      const len = Number(res.headers.get("content-length") ?? 0);
-      if (len > MAX_IMAGE_BYTES) {
-        return null;
-      }
-      const bytes = Buffer.from(await res.arrayBuffer());
-      if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) {
-        return null;
-      }
-      const ext =
-        extFromMime(res.headers.get("content-type") ?? "") ||
-        imageExt(url) ||
-        sniffExt(bytes);
-      if (!ext) {
-        return null;
-      }
-      return { bytes, ext };
-    } catch {
+    const fetched = await fetchPublicBytes(url, {
+      maxBytes: MAX_IMAGE_BYTES,
+      maxRedirects: 3,
+      timeoutMs: FETCH_MS,
+    });
+    if (!fetched) {
       return null;
     }
+    const ext =
+      extFromMime(fetched.contentType) ||
+      imageExt(url) ||
+      sniffExt(fetched.bytes);
+    if (!ext) {
+      return null;
+    }
+    return { bytes: fetched.bytes, ext };
   };
 
   const collectHtmlImages = async (
