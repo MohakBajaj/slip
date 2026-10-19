@@ -22,6 +22,12 @@ export interface DrawSession {
 
 export const FLATTEN_MAX = 8192;
 
+/** Longest side of a blank drawing export. */
+export const BLANK_MAX = 4096;
+
+/** Page-space padding around a blank drawing export. */
+export const EXPORT_MARGIN = 24;
+
 const emptyRect = (): Rect => ({ h: 0, w: 0, x: 0, y: 0 });
 
 /** Fit `image` inside `viewport`, centered, keeping aspect ratio. */
@@ -115,3 +121,82 @@ export const appendAnnotatedImage = (
   images: readonly string[],
   added: readonly string[]
 ): string[] => [...images, ...added.filter((item) => item.length > 0)];
+
+/**
+ * Camera that contain-fits a fixed page-space frame.
+ * Quickdraw's camera is `screen = (page + camera) * zoom`.
+ */
+export const cameraForFrame = (
+  viewport: Size,
+  frame: Rect
+): { x: number; y: number; z: number } => {
+  const placed = fitFrame(viewport, frame);
+  if (!(placed.zoom > 0)) {
+    return { x: 0, y: 0, z: 1 };
+  }
+  return {
+    x: placed.pan[0] / placed.zoom,
+    y: placed.pan[1] / placed.zoom,
+    z: placed.zoom,
+  };
+};
+
+/**
+ * Pixel density for a blank export. At most 2× page space, and neither side
+ * of the padded bitmap may pass `max`.
+ */
+export const blankExportScale = (
+  content: Size,
+  margin = EXPORT_MARGIN,
+  max = BLANK_MAX
+): number => {
+  const height = content.h + margin * 2;
+  const width = content.w + margin * 2;
+  if (!(width > 0 && height > 0 && max > 0)) {
+    return 1;
+  }
+  return Math.min(2, max / width, max / height);
+};
+
+/**
+ * Where a Quickdraw PNG export lands on the native bitmap.
+ * `exported` is the page rect the PNG covers. `frame` is the image in that
+ * same page space. The screen scale (`dpr`) does not change the file.
+ */
+export const inkPlacement = (
+  frame: Rect,
+  exported: Rect,
+  native: Size,
+  dpr = 1
+): Rect => {
+  const bitmap = flattenBitmap(native, dpr);
+  const sx = frame.w === 0 ? 0 : bitmap.w / frame.w;
+  const sy = frame.h === 0 ? 0 : bitmap.h / frame.h;
+  return {
+    h: exported.h * sy,
+    w: exported.w * sx,
+    x: (exported.x - frame.x) * sx,
+    y: (exported.y - frame.y) * sy,
+  };
+};
+
+/** Draw the original image, then a transparent ink export, at native size. */
+export const paintFlatten = (
+  draw: (
+    slot: "ink" | "plate",
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ) => void,
+  frame: Rect,
+  exported: Rect,
+  native: Size,
+  dpr = 1
+): Size => {
+  const bitmap = flattenBitmap(native, dpr);
+  draw("plate", 0, 0, bitmap.w, bitmap.h);
+  const dest = inkPlacement(frame, exported, native, dpr);
+  draw("ink", dest.x, dest.y, dest.w, dest.h);
+  return bitmap;
+};
