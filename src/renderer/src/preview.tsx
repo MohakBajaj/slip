@@ -105,10 +105,23 @@ export const PreviewApp = () => {
       data-font={settings.font}
       data-theme={settings.theme}
     >
-      <header className="drag flex h-11 shrink-0 items-center justify-center">
+      <header className="drag relative flex h-11 shrink-0 items-center justify-center">
         <p className="text-muted-foreground text-[11px] tabular-nums">
           {count > 1 ? `${index + 1} / ${count}` : "Preview"}
         </p>
+        {slip !== null && src !== undefined && src.length > 0 ? (
+          <button
+            className="no-drag text-foreground absolute right-3 rounded-md px-2 py-1 text-[12px]"
+            onClick={() => {
+              window.slip
+                .openDraw({ imagePath: src, slipId: slip.id })
+                .catch(() => undefined);
+            }}
+            type="button"
+          >
+            Annotate
+          </button>
+        ) : null}
       </header>
       <div className="relative min-h-0 flex-1">
         {src !== undefined && src.length > 0 ? (

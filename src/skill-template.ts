@@ -36,7 +36,8 @@ The body is the note. First line is the title.
 
 \`source\` is the app, \`cli\`, or \`note\` for a quick note. Captures from a
 browser also set \`url\` and \`page\`. Voice captures set \`audio\` to the
-recording path(s). Drawings land in \`images\`.
+recording path(s). Drawings land in \`images\`. Annotating an image
+adds a new png there and leaves the original file in place.
 
 ## CLI
 

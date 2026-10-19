@@ -14,6 +14,7 @@ import {
 import type { FSWatcher } from "node:fs";
 import path from "node:path";
 
+import { appendAnnotatedImage } from "./shared/annotate";
 import { filenameFor, renderIndex } from "./shared/format";
 import { audioExt, imageExt, MAX_AUDIO_BYTES } from "./shared/images";
 import type { ImagePayload } from "./shared/images";
@@ -363,7 +364,9 @@ export const addImages = (
   if (imported.length === 0) {
     return current;
   }
-  return updateSlip(root, id, { images: [...current.images, ...imported] });
+  return updateSlip(root, id, {
+    images: appendAnnotatedImage(current.images, imported),
+  });
 };
 
 export const restoreSlips = (

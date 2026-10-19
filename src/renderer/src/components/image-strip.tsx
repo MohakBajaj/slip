@@ -1,5 +1,6 @@
 import { Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, RefObject } from "react";
 
@@ -35,12 +36,14 @@ export const ImagePicker = ({
 export const ImageStrip = ({
   items,
   onAdd,
+  onAnnotate,
   onOpen,
   onRemove,
   onReorder,
 }: {
   items: { key: string; src: string }[];
   onAdd?: () => void;
+  onAnnotate?: (key: string) => void;
   onOpen?: (key: string) => void;
   onRemove?: (key: string) => void;
   onReorder?: (from: number, to: number) => void;
@@ -140,6 +143,22 @@ export const ImageStrip = ({
               src={item.src}
             />
           </button>
+          {onAnnotate ? (
+            <Button
+              aria-label="Annotate"
+              className="press absolute bottom-0.5 left-0.5 size-4 rounded-full opacity-0 group-hover:opacity-100"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAnnotate(item.key);
+              }}
+              size="icon-xs"
+              title="Annotate"
+              type="button"
+              variant="secondary"
+            >
+              <Pencil className="size-2.5" />
+            </Button>
+          ) : null}
           {onRemove ? (
             <Button
               aria-label="Remove image"
