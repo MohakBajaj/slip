@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { whenLabel } from "../../../shared/logic";
 import { isWebUrl, sourceApp, urlLabel } from "../../../shared/source";
+import { costTip, formatUsd } from "../../../shared/speech-cost";
 import type { Slip } from "../../../shared/types";
 import { Markdown } from "../markdown";
 
@@ -528,6 +529,11 @@ export const DetailWell = ({
         >
           <span className="text-muted-foreground flex h-6 items-center gap-1 text-[10px] leading-none">
             <span className="tabular-nums">{whenLabel(slip.createdAt)}</span>
+            {slip.cost ? (
+              <span title={costTip(slip.cost)}>
+                {`· ${formatUsd(slip.cost.total)}`}
+              </span>
+            ) : null}
             {app ? (
               <>
                 <span>·</span>

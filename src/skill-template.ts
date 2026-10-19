@@ -37,6 +37,7 @@ The body is the note. First line is the title.
 \`source\` is the app, \`cli\`, \`note\` for a quick note, or \`voice\` for
 speech. Captures from a browser also set \`url\` and \`page\`. A voice
 slip's body is the cleaned note, and \`transcript\` is what was said.
+\`cost\` is that slip's transcription plus cleanup spend in USD.
 Older voice captures may set \`audio\` to a recording path. Drawings land
 in \`images\`. Annotating an image adds a new png there and leaves the
 original file in place.

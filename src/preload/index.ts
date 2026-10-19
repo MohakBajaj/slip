@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 import type { DrawSession, DrawTarget } from "../shared/annotate";
+import type { GatewayCatalog } from "../shared/gateway-models";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import type { VoiceStatus } from "../shared/speech";
+import type { AppleCleanupStatus } from "../shared/speech-engines";
 import type {
   CaptureState,
   LoginState,
@@ -15,6 +17,8 @@ import type {
 const api = {
   addImages: (id: string, images: ImagePayload[]) =>
     ipcRenderer.invoke("addImages", id, images) as Promise<Slip | null>,
+  appleCleanupStatus: () =>
+    ipcRenderer.invoke("appleCleanupStatus") as Promise<AppleCleanupStatus>,
   askMic: () => ipcRenderer.invoke("askMic") as Promise<boolean>,
   cleanupKeySet: () => ipcRenderer.invoke("cleanupKeySet") as Promise<boolean>,
   clipboardImage: () =>
@@ -46,6 +50,8 @@ const api = {
   deleteSlips: (ids: string[]) =>
     ipcRenderer.invoke("deleteSlips", ids) as Promise<Slip[]>,
   drawSession: () => ipcRenderer.invoke("drawSession") as Promise<DrawSession>,
+  gatewayCatalog: () =>
+    ipcRenderer.invoke("gatewayCatalog") as Promise<GatewayCatalog>,
   installSkill: () =>
     ipcRenderer.invoke("installSkill") as Promise<SkillStatus>,
   load: () =>
