@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DrawSession, DrawTarget } from "../shared/annotate";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
+import type { VoiceStatus } from "../shared/speech";
 import type {
   CaptureState,
   LoginState,
@@ -15,6 +16,7 @@ const api = {
   addImages: (id: string, images: ImagePayload[]) =>
     ipcRenderer.invoke("addImages", id, images) as Promise<Slip | null>,
   askMic: () => ipcRenderer.invoke("askMic") as Promise<boolean>,
+  cleanupKeySet: () => ipcRenderer.invoke("cleanupKeySet") as Promise<boolean>,
   clipboardImage: () =>
     ipcRenderer.invoke("clipboardImage") as Promise<{
       bytes: Uint8Array;
@@ -36,12 +38,11 @@ const api = {
     ipcRenderer.invoke("createDrawSlip", image) as Promise<Slip | null>,
   createSlip: (content: string, images?: (string | ImagePayload)[]) =>
     ipcRenderer.invoke("createSlip", content, images) as Promise<Slip | null>,
-  createVoiceSlip: (content: string, audio?: ImagePayload) =>
-    ipcRenderer.invoke(
-      "createVoiceSlip",
-      content,
-      audio
-    ) as Promise<Slip | null>,
+  createVoiceSlip: (wav: Uint8Array) =>
+    ipcRenderer.invoke("createVoiceSlip", wav) as Promise<{
+      error: string;
+      slip: Slip | null;
+    }>,
   deleteSlips: (ids: string[]) =>
     ipcRenderer.invoke("deleteSlips", ids) as Promise<Slip[]>,
   drawSession: () => ipcRenderer.invoke("drawSession") as Promise<DrawSession>,
@@ -146,6 +147,15 @@ const api = {
       ipcRenderer.removeListener("voice-commit", listener);
     };
   },
+  onVoiceStatus: (fn: (status: VoiceStatus) => void) => {
+    const listener = (_: unknown, status: VoiceStatus) => {
+      fn(status);
+    };
+    ipcRenderer.on("voice-status", listener);
+    return () => {
+      ipcRenderer.removeListener("voice-status", listener);
+    };
+  },
   openAccess: () => ipcRenderer.invoke("openAccess"),
   openDraw: (
     mode?:
@@ -172,6 +182,8 @@ const api = {
     ipcRenderer.invoke("saveNote", content) as Promise<Slip | null>,
   saveSettings: (settings: Settings) =>
     ipcRenderer.invoke("saveSettings", settings),
+  setCleanupKey: (key: string) =>
+    ipcRenderer.invoke("setCleanupKey", key) as Promise<boolean>,
   setLogin: (on: boolean) =>
     ipcRenderer.invoke("setLogin", on) as Promise<LoginState>,
   setSection: (section: string) => ipcRenderer.invoke("setSection", section),

@@ -36,12 +36,14 @@ import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { bundleHtml } from "../shared/clipboard-html";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
-import { attachmentType, imageExt, MAX_AUDIO_BYTES } from "../shared/images";
+import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
 import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
+import { VOICE_SOURCE } from "../shared/speech";
+import type { VoiceStatus } from "../shared/speech";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
@@ -67,8 +69,19 @@ import {
 import { installSkill, skillStatus } from "./agent-skill";
 import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
+import {
+  cleanTranscript,
+  cleanupKeySet,
+  readCleanupKey,
+  writeCleanupKey,
+} from "./cleanup-run";
 import { applyDockIcon } from "./dock-icon";
 import { activateBundle, frontApp, startFrontContext } from "./front-context";
+import {
+  bundledBin,
+  SpeechAbortedError,
+  transcribeCapture,
+} from "./transcribe";
 
 const ACCESS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
@@ -886,8 +899,11 @@ const placeVoice = (target: BrowserWindow): void => {
 let voiceQueued: "cancel" | "commit" | null = null;
 let voiceGen = 0;
 let voiceReady = false;
+let voiceJob: AbortController | null = null;
 
 const hideVoice = (): void => {
+  voiceJob?.abort();
+  voiceJob = null;
   voiceGen += 1;
   voiceQueued = null;
   voiceReady = false;
@@ -964,7 +980,7 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
         spellcheck: false,
         webgl: false,
       },
-      width: 240,
+      width: 280,
     });
     pinWorkspace(voiceWin);
     voiceWin.on("ready-to-show", () => {
@@ -1449,31 +1465,61 @@ const boot = async (): Promise<void> => {
     rebuildTray();
     return result;
   });
-  ipcMain.handle(
-    "createVoiceSlip",
-    async (_e, content: unknown, audio: unknown = null) => {
-      const text = typeof content === "string" ? content.trim() : "";
-      const [file] = parseImageInputs(audio === null ? [] : [audio]);
-      if (
-        file?.bytes !== undefined &&
-        file.bytes.byteLength > MAX_AUDIO_BYTES
-      ) {
-        hideVoice();
-        return null;
+  ipcMain.handle("createVoiceSlip", async (event, wav: unknown) => {
+    const bytes = asBytes(wav);
+    if (bytes === undefined) {
+      return { error: "", slip: null };
+    }
+    voiceJob?.abort();
+    const job = new AbortController();
+    voiceJob = job;
+    const tell = (status: VoiceStatus): void => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("voice-status", status);
       }
-      if (!text && file === undefined) {
-        return null;
+    };
+    const ctx = voiceCtx
+      ? await voiceCtx.ready.catch(() => emptyContext())
+      : emptyContext();
+    if (job.signal.aborted) {
+      return { error: "", slip: null };
+    }
+    try {
+      const text = await transcribeCapture({
+        bin: bundledBin("parakeet-cli"),
+        modelDir: path.join(app.getPath("userData"), "models"),
+        onStatus: tell,
+        signal: job.signal,
+        tempDir: app.getPath("temp"),
+        wav: bytes,
+      });
+      if (text === null || job.signal.aborted) {
+        hideVoice();
+        return { error: "", slip: null };
+      }
+      let body = text;
+      if (settings.cleanup) {
+        tell({ error: "", phase: "cleaning", received: 0, total: 0 });
+        const outcome = await cleanTranscript(text, {
+          bin: bundledBin("slip-cleanup"),
+          key: readCleanupKey(),
+          model: settings.cleanupModel,
+          signal: job.signal,
+          url: settings.cleanupUrl,
+        });
+        if (job.signal.aborted) {
+          return { error: "", slip: null };
+        }
+        const { body: cleanedBody } = outcome;
+        body = cleanedBody;
       }
       ensureVault(vaultRoot());
-      const ctx = voiceCtx
-        ? await voiceCtx.ready.catch(() => emptyContext())
-        : emptyContext();
       const slip = createSlip(vaultRoot(), {
-        audio: file,
-        content: text || "Voice note",
+        content: body,
         page: ctx.page,
         section: currentSection,
-        source: ctx.source,
+        source: VOICE_SOURCE,
+        transcript: text,
         url: ctx.url,
       });
       if (settings.notify && Notification.isSupported()) {
@@ -1482,9 +1528,28 @@ const boot = async (): Promise<void> => {
       send("slips-changed");
       rebuildTray();
       hideVoice();
-      return slip;
+      return { error: "", slip };
+    } catch (error) {
+      if (job.signal.aborted || error instanceof SpeechAbortedError) {
+        return { error: "", slip: null };
+      }
+      const message =
+        error instanceof Error ? error.message : "Could not transcribe";
+      tell({ error: message, phase: "error", received: 0, total: 0 });
+      return { error: message, slip: null };
+    } finally {
+      if (voiceJob === job) {
+        voiceJob = null;
+      }
     }
-  );
+  });
+  ipcMain.handle("setCleanupKey", (_e, key: unknown) => {
+    if (typeof key !== "string") {
+      return false;
+    }
+    return writeCleanupKey(key);
+  });
+  ipcMain.handle("cleanupKeySet", () => cleanupKeySet());
   ipcMain.handle("voiceReady", () => {
     voiceReady = true;
     flushVoice();

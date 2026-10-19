@@ -8,10 +8,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import {
+  encodeWavPcm16,
+  isSilentPcm,
+  resampleLinear,
+  SPEECH_RATE,
+} from "../../shared/speech";
+import type { VoiceStatus } from "../../shared/speech";
 import { defaultSettings } from "../../shared/types";
 
 const BARS = 28;
 const MAX_VOICE_MS = 5 * 60 * 1000;
+
+const clock = (secs: number): string => {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 
 const pickMime = (): string => {
   const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
@@ -23,17 +36,59 @@ const pickMime = (): string => {
   return "";
 };
 
-const extOf = (mime: string): string => {
-  if (mime.includes("mp4")) {
-    return "m4a";
+const monoFrom = (buffer: AudioBuffer): Float32Array => {
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) =>
+    buffer.getChannelData(index)
+  );
+  const [first, ...rest] = channels;
+  if (first === undefined) {
+    return new Float32Array();
   }
-  return "webm";
+  const out = new Float32Array(first);
+  for (const channel of rest) {
+    for (const [index, sample] of channel.entries()) {
+      out[index] = (out[index] ?? 0) + sample;
+    }
+  }
+  if (rest.length === 0) {
+    return out;
+  }
+  const scale = 1 / channels.length;
+  for (const [index, sample] of out.entries()) {
+    out[index] = sample * scale;
+  }
+  return out;
 };
 
-const clock = (secs: number): string => {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+const blobToWav = async (blob: Blob): Promise<Uint8Array | null> => {
+  const audio = new AudioContext();
+  try {
+    const decoded = await audio.decodeAudioData(await blob.arrayBuffer());
+    const samples = resampleLinear(
+      monoFrom(decoded),
+      decoded.sampleRate,
+      SPEECH_RATE
+    );
+    if (isSilentPcm(samples)) {
+      return null;
+    }
+    return encodeWavPcm16(samples, SPEECH_RATE);
+  } finally {
+    await audio.close();
+  }
+};
+
+const problemCopy = (
+  kind: "denied" | "error" | "failed",
+  detail: string
+): string => {
+  if (kind === "denied") {
+    return "Microphone is off";
+  }
+  if (kind === "failed") {
+    return "Could not record";
+  }
+  return detail.length > 0 ? detail : "Could not transcribe";
 };
 
 const Wave = ({ bars, live }: { bars: number[]; live: boolean }) => (
@@ -52,11 +107,28 @@ const Wave = ({ bars, live }: { bars: number[]; live: boolean }) => (
   </div>
 );
 
+const statusLabel = (status: VoiceStatus): string => {
+  if (status.phase === "cleaning") {
+    return "Cleaning";
+  }
+  if (status.phase === "transcribing") {
+    return "Transcribing";
+  }
+  if (status.phase === "error") {
+    return status.error || "Could not transcribe";
+  }
+  if (status.total > 0) {
+    return `Model ${Math.min(100, Math.round((status.received / status.total) * 100))}%`;
+  }
+  return "Downloading model";
+};
+
 export const VoiceApp = () => {
   const [settings, setSettings] = useState(defaultSettings);
   const [status, setStatus] = useState<
-    "asking" | "denied" | "failed" | "listening"
+    "asking" | "denied" | "error" | "failed" | "listening" | "working"
   >("asking");
+  const [label, setLabel] = useState("");
   const [bars, setBars] = useState<number[]>(() =>
     Array.from({ length: BARS }, () => 0.06)
   );
@@ -70,6 +142,7 @@ export const VoiceApp = () => {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const wavRef = useRef<Uint8Array | null>(null);
   const rafRef = useRef(0);
   const liveRef = useRef(false);
   const pendingRef = useRef(false);
@@ -83,10 +156,12 @@ export const VoiceApp = () => {
   const drop = useCallback((): void => {
     liveRef.current = false;
     window.cancelAnimationFrame(rafRef.current);
-    if (recorderRef.current && recorderRef.current.state !== "inactive") {
-      recorderRef.current.stop();
-    }
+    const recorder = recorderRef.current;
     recorderRef.current = null;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = null;
+      recorder.stop();
+    }
     for (const track of streamRef.current?.getTracks() ?? []) {
       track.stop();
     }
@@ -97,9 +172,25 @@ export const VoiceApp = () => {
     window.clearTimeout(capRef.current);
   }, []);
 
+  const submit = useCallback((wav: Uint8Array): void => {
+    wavRef.current = wav;
+    setStatus("working");
+    setLabel("Transcribing");
+    void (async () => {
+      const result = await window.slip.createVoiceSlip(wav);
+      if (result.error) {
+        setStatus("error");
+        setLabel(result.error);
+        return;
+      }
+      void window.slip.closeVoice();
+    })();
+  }, []);
+
   const listen = useCallback(async (): Promise<void> => {
     drop();
     busyRef.current = false;
+    wavRef.current = null;
     chunksRef.current = [];
     liveRef.current = true;
     histRef.current = Array.from({ length: BARS }, () => 0.06);
@@ -202,7 +293,7 @@ export const VoiceApp = () => {
     }
     const recorder = recorderRef.current;
     if (
-      (!recorder || recorder.state === "inactive") &&
+      (recorder === null || recorder.state === "inactive") &&
       chunksRef.current.length === 0
     ) {
       if (liveRef.current) {
@@ -215,33 +306,43 @@ export const VoiceApp = () => {
     }
     busyRef.current = true;
     liveRef.current = false;
-    const mime = recorder?.mimeType ?? pickMime();
-    const send = (blob: Blob | null): void => {
+    let mime = recorder?.mimeType ?? "";
+    if (mime.length === 0) {
+      mime = pickMime();
+    }
+    if (mime.length === 0) {
+      mime = "audio/webm";
+    }
+    const send = (): void => {
+      const blob = new Blob(chunksRef.current, { type: mime });
+      drop();
       void (async () => {
-        drop();
-        if (!(blob && blob.size > 44)) {
+        if (blob.size <= 44) {
           void window.slip.closeVoice();
           return;
         }
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        const slip = await window.slip.createVoiceSlip("Voice note", {
-          bytes,
-          name: `voice.${extOf(mime)}`,
-        });
-        if (slip === null) {
-          void window.slip.closeVoice();
+        try {
+          const wav = await blobToWav(blob);
+          if (wav === null) {
+            void window.slip.closeVoice();
+            return;
+          }
+          submit(wav);
+        } catch {
+          setStatus("error");
+          setLabel("Could not read the recording");
         }
       })();
     };
-    if (!recorder || recorder.state === "inactive") {
-      send(new Blob(chunksRef.current, { type: mime || "audio/webm" }));
+    if (recorder === null || recorder.state === "inactive") {
+      send();
       return;
     }
     recorder.onstop = () => {
-      send(new Blob(chunksRef.current, { type: mime || "audio/webm" }));
+      send();
     };
     recorder.stop();
-  }, [drop]);
+  }, [drop, submit]);
   finishRef.current = finish;
 
   useEffect(() => {
@@ -256,10 +357,20 @@ export const VoiceApp = () => {
     void boot();
     const offCommit = window.slip.onVoiceCommit(finish);
     const offSettings = window.slip.onSettings(setSettings);
+    const offStatus = window.slip.onVoiceStatus((next) => {
+      if (next.phase === "error") {
+        setStatus("error");
+        setLabel(statusLabel(next));
+        return;
+      }
+      setStatus("working");
+      setLabel(statusLabel(next));
+    });
     void window.slip.voiceReady();
     return () => {
       offCommit();
       offSettings();
+      offStatus();
     };
   }, [finish]);
 
@@ -333,16 +444,20 @@ export const VoiceApp = () => {
         dark && "dark"
       )}
     >
-      {status === "denied" || status === "failed" ? (
+      {status === "denied" || status === "failed" || status === "error" ? (
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <p className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]">
-            {status === "denied" ? "Microphone is off" : "Could not record"}
+            {problemCopy(status, label)}
           </p>
           <Button
             className="press"
             onClick={() => {
               if (status === "denied") {
                 void window.slip.openMic();
+                return;
+              }
+              if (status === "error" && wavRef.current) {
+                submit(wavRef.current);
                 return;
               }
               void listen();
@@ -361,9 +476,15 @@ export const VoiceApp = () => {
               live ? "bg-primary animate-pulse" : "bg-muted-foreground/40"
             )}
           />
-          <Wave bars={bars} live={live} />
+          {status === "working" ? (
+            <p className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]">
+              {label}
+            </p>
+          ) : (
+            <Wave bars={bars} live={live} />
+          )}
           <span className="text-muted-foreground w-8 shrink-0 text-right text-[11px] tabular-nums">
-            {clock(secs)}
+            {status === "working" ? "" : clock(secs)}
           </span>
           <Button
             aria-label="Discard"
@@ -377,14 +498,19 @@ export const VoiceApp = () => {
           >
             <HugeiconsIcon className="size-3.5" icon={Cancel01Icon} />
           </Button>
-          <Button
-            aria-label="Save"
-            className="press"
-            onClick={finish}
-            size="icon-xs"
-          >
-            <HugeiconsIcon className="size-3.5" icon={CheckmarkCircle02Icon} />
-          </Button>
+          {live ? (
+            <Button
+              aria-label="Save"
+              className="press"
+              onClick={finish}
+              size="icon-xs"
+            >
+              <HugeiconsIcon
+                className="size-3.5"
+                icon={CheckmarkCircle02Icon}
+              />
+            </Button>
+          ) : null}
         </>
       )}
     </div>

@@ -17,6 +17,7 @@ const slip = (next: Partial<Slip>): Slip => ({
   section: "",
   source: "",
   tags: [],
+  transcript: "",
   updatedAt: "2026-01-01T00:00:00.000Z",
   url: "",
   ...next,
@@ -113,6 +114,14 @@ test("collects every image and recording", () => {
   ]);
   expect(draft.images).toEqual(["/1.png", "/2.png", "/3.png"]);
   expect(draft.audio).toEqual(["/a.webm", "/b.webm"]);
+});
+
+test("keeps raw transcripts", () => {
+  const draft = mergeDraft([
+    slip({ transcript: "um one" }),
+    slip({ id: "bbbbbb", transcript: "uh two" }),
+  ]);
+  expect(draft.transcript).toBe("um one\n\nuh two");
 });
 
 test("caption helper", () => {

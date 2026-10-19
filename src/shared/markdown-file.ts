@@ -30,6 +30,7 @@ export const serializeSlip = (slip: Slip): string =>
     ...(slip.url ? { url: slip.url } : {}),
     ...(slip.page ? { page: slip.page } : {}),
     tags: slip.tags,
+    ...(slip.transcript ? { transcript: slip.transcript } : {}),
     updated: slip.updatedAt,
   });
 
@@ -57,6 +58,7 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
       tags: Array.isArray(data.tags)
         ? data.tags.map((item) => asString(item, ""))
         : [],
+      transcript: asString(data.transcript, ""),
       updatedAt: asString(data.updated, created),
       url: asString(data.url, ""),
     };
