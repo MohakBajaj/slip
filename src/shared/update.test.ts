@@ -16,6 +16,7 @@ import {
   decideUpdate,
   describeInstallTarget,
   manifestUrl,
+  noticeForManifestFailure,
   parseManifest,
   releaseZipUrl,
   signingMode,
@@ -126,6 +127,77 @@ describe("manifest", () => {
     expect(classifyReleaseUrl("http://127.0.0.1/latest.json", "manifest")).toBe(
       false
     );
+  });
+});
+
+describe("manifest check failure", () => {
+  const missing = new Error("status 404");
+
+  test("a 404 for a missing manifest means up to date", () => {
+    expect(
+      noticeForManifestFailure({
+        error: missing,
+        manual: true,
+        url: manifestUrl(),
+      })
+    ).toEqual({ kind: "current" });
+    expect(
+      noticeForManifestFailure({
+        error: missing,
+        manual: false,
+        url: manifestUrl(),
+      })
+    ).toEqual({ kind: "current" });
+  });
+
+  test("a network error during a background check stays silent", () => {
+    const detail = `Slip couldn't read ${manifestUrl()} (network error).`;
+    expect(
+      noticeForManifestFailure({
+        error: new Error("getaddrinfo ENOTFOUND github.com"),
+        manual: false,
+        url: manifestUrl(),
+      })
+    ).toEqual({ kind: "silent", log: detail });
+    expect(
+      noticeForManifestFailure({
+        error: new Error("timeout"),
+        manual: false,
+        url: manifestUrl(),
+      })
+    ).toEqual({ kind: "silent", log: detail });
+    expect(
+      noticeForManifestFailure({
+        error: new Error("status 500"),
+        manual: false,
+        url: manifestUrl(),
+      }).kind
+    ).toBe("silent");
+  });
+
+  test("a manual check names the manifest url and what failed", () => {
+    expect(
+      noticeForManifestFailure({
+        error: new Error("status 503"),
+        manual: true,
+        url: manifestUrl(),
+      })
+    ).toEqual({
+      detail: `Slip couldn't read ${manifestUrl()} (HTTP 503).`,
+      kind: "dialog",
+      message: "Couldn't check for updates",
+    });
+    expect(
+      noticeForManifestFailure({
+        error: new Error("connect ECONNREFUSED 140.82.112.3:443"),
+        manual: true,
+        url: manifestUrl(),
+      })
+    ).toEqual({
+      detail: `Slip couldn't read ${manifestUrl()} (network error).`,
+      kind: "dialog",
+      message: "Couldn't check for updates",
+    });
   });
 });
 
