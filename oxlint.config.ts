@@ -47,6 +47,7 @@ export default defineConfig({
       files: [
         "src/main/ax-context.ts",
         "src/main/capture.ts",
+        "src/main/pasteboard.ts",
         "src/main/front-context.ts",
         "src/shared/capture-hold.ts",
         "src/shared/capture-match.ts",

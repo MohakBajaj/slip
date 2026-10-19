@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Check
+        run: bun run check
+      - name: Test
+        # `bun run test` resolves the npm `bun` package shadowed by @bunli's
+        # peer dependency. Call the runtime's test runner directly.
+        run: bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts
+      - name: Build
+        run: bun run build

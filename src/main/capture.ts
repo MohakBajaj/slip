@@ -2,11 +2,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { clipboard, nativeImage, systemPreferences } from "electron";
+import { clipboard, systemPreferences } from "electron";
 import koffi from "koffi";
 
-import { clipChanged, clipDelta } from "../shared/capture-clip";
-import type { ClipSnap } from "../shared/capture-clip";
+import { planCopy, pollPasteboardChange } from "../shared/capture-clip";
+import type { ClipSnap, PasteSnap } from "../shared/capture-clip";
 import { createVoiceHold, HOLD_MS } from "../shared/capture-hold";
 import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
 import {
@@ -17,8 +17,11 @@ import {
 import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
 import type { CaptureState } from "../shared/types";
 import { startFrontContext } from "./front-context";
+import { createMacPasteboard } from "./pasteboard";
 
-const COPY_SETTLE_MS = 120;
+const COPY_POLL_MS = 20;
+const COPY_STABLE_MS = 40;
+const COPY_TIMEOUT_MS = 1000;
 const TRUST_POLL_MS = 2000;
 const FETCH_MS = 2000;
 const MAX_HTML_IMAGES = 8;
@@ -32,6 +35,11 @@ const kCGEventFlagsChanged = 12;
 const kCGKeyboardEventKeycode = 9;
 const kCGEventTapDisabledByTimeout = 0xff_ff_ff_fe;
 const kCGEventTapDisabledByUserInput = 0xff_ff_ff_ff;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 const kCGEventSourceStateCombinedSessionState = 1;
 const kCGAnnotatedSessionEventTap = 2;
 const kCGEventFlagMaskCommand = 0x00_10_00_00;
@@ -118,6 +126,7 @@ const install = (opts: {
     voiceMatcher.needsKeys() ||
     drawMatcher.needsKeys() ||
     voiceHold.needsKeys();
+  const pasteboard = createMacPasteboard();
   mkdirSync(opts.imageDir, { recursive: true });
   const cg = koffi.load(
     "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
@@ -252,111 +261,6 @@ const install = (opts: {
     return posted;
   };
 
-  const whitespace = /\s+/u;
-
-  const takeFileUrl = (
-    raw: string,
-    found: string[],
-    seen: Set<string>
-  ): void => {
-    for (const part of raw.split(whitespace)) {
-      const line = part.trim();
-      if (!line.startsWith("file://")) {
-        continue;
-      }
-      try {
-        const filePath = fileURLToPath(line);
-        const ext = path.extname(filePath).toLowerCase();
-        if (
-          seen.has(filePath) ||
-          !IMAGE_EXT.has(ext) ||
-          !existsSync(filePath)
-        ) {
-          continue;
-        }
-        seen.add(filePath);
-        found.push(filePath);
-      } catch {
-        // Pasteboard flavor is optional; text/image paths still run.
-      }
-    }
-  };
-
-  const clipboardFiles = (): string[] => {
-    const found: string[] = [];
-    const seen = new Set<string>();
-    for (const format of clipboard.availableFormats()) {
-      if (format !== "public.file-url" && format !== "text/uri-list") {
-        continue;
-      }
-      try {
-        const raw =
-          format === "public.file-url"
-            ? clipboard
-                .readBuffer(format)
-                .toString("utf-8")
-                .replaceAll("\0", "")
-            : clipboard.read(format);
-        takeFileUrl(raw, found, seen);
-      } catch {
-        // Pasteboard flavor is optional; text/image paths still run.
-      }
-    }
-    return found;
-  };
-
-  const readHtml = (): string => {
-    try {
-      const html = clipboard.readHTML();
-      if (html) {
-        return html;
-      }
-    } catch {
-      // HTML flavor is optional.
-    }
-    for (const format of ["text/html", "public.html"]) {
-      try {
-        if (!clipboard.availableFormats().includes(format)) {
-          continue;
-        }
-        const html =
-          format === "public.html"
-            ? clipboard.readBuffer(format).toString("utf-8")
-            : clipboard.read(format);
-        if (html) {
-          return html;
-        }
-      } catch {
-        // HTML flavor is optional.
-      }
-    }
-    return "";
-  };
-
-  const snapClip = (): ClipSnap => {
-    const image = clipboard.readImage();
-    return {
-      files: clipboardFiles(),
-      html: readHtml(),
-      imagePng: image.isEmpty() ? null : image.toPNG(),
-      text: clipboard.readText(),
-    };
-  };
-
-  const restoreClip = (snap: ClipSnap): void => {
-    if (snap.html || snap.imagePng) {
-      clipboard.write({
-        ...(snap.html ? { html: snap.html } : {}),
-        ...(snap.imagePng
-          ? { image: nativeImage.createFromBuffer(snap.imagePng) }
-          : {}),
-        text: snap.text,
-      });
-      return;
-    }
-    clipboard.writeText(snap.text);
-  };
-
   const sniffExt = (bytes: Buffer): string => {
     if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50) {
       return ".png";
@@ -461,14 +365,9 @@ const install = (opts: {
   };
 
   const grab = async (
-    before: ClipSnap,
-    after: ClipSnap,
+    clip: ClipSnap,
     context: ReturnType<typeof startFrontContext>
   ): Promise<void> => {
-    const delta = clipDelta(before, after);
-    if (!clipChanged(delta)) {
-      return;
-    }
     const paths: string[] = [];
     const seen: Buffer[] = [];
     const take = (bytes: Buffer, ext: string): void => {
@@ -483,26 +382,80 @@ const install = (opts: {
       writeFileSync(dest, bytes);
       paths.push(dest);
     };
-    if (delta.files.length > 0) {
-      for (const file of delta.files) {
-        const ext = path.extname(file).toLowerCase();
-        take(readFileSync(file), IMAGE_EXT.has(ext) ? ext : ".png");
+    let tookFile = false;
+    for (const file of clip.files) {
+      if (!existsSync(file)) {
+        continue;
       }
-    } else if (delta.imagePng) {
-      take(delta.imagePng, ".png");
+      const ext = path.extname(file).toLowerCase();
+      if (!IMAGE_EXT.has(ext)) {
+        continue;
+      }
+      take(readFileSync(file), ext);
+      tookFile = true;
     }
-    if (delta.html) {
-      const extras = await collectHtmlImages(delta.html);
+    if (!tookFile && clip.imagePng) {
+      take(clip.imagePng, ".png");
+    }
+    if (clip.html) {
+      const extras = await collectHtmlImages(clip.html);
       // First markup image is usually the same bitmap already taken.
       const skip = paths.length > 0 ? 1 : 0;
       for (const image of extras.slice(skip)) {
         take(image.bytes, image.ext);
       }
     }
-    if (paths.length === 0 && !delta.text) {
+    if (paths.length === 0 && !clip.text) {
       return;
     }
-    opts.onEvent({ context, images: paths, text: delta.text });
+    opts.onEvent({ context, images: paths, text: clip.text });
+  };
+
+  const finishCopy = async (
+    beforeCount: number,
+    before: PasteSnap,
+    context: ReturnType<typeof startFrontContext>
+  ): Promise<void> => {
+    let restored = false;
+    try {
+      const poll = await pollPasteboardChange({
+        before: beforeCount,
+        intervalMs: COPY_POLL_MS,
+        now: Date.now,
+        readCount: () => pasteboard.changeCount(),
+        settleMs: COPY_STABLE_MS,
+        sleep,
+        timeoutMs: COPY_TIMEOUT_MS,
+      });
+      if (!poll.changed) {
+        return;
+      }
+      const after = pasteboard.read();
+      const planned = planCopy(before, after, true);
+      if (planned.clip && planned.clip.imagePng === null) {
+        const image = clipboard.readImage();
+        if (!image.isEmpty()) {
+          planned.clip.imagePng = image.toPNG();
+        }
+      }
+      if (planned.restore) {
+        pasteboard.write(planned.restore);
+        restored = true;
+      }
+      if (planned.clip) {
+        await grab(planned.clip, context);
+      }
+    } catch {
+      if (!restored) {
+        try {
+          pasteboard.write(before);
+        } catch {
+          // The previous clipboard is already gone.
+        }
+      }
+    } finally {
+      grabbing = false;
+    }
   };
 
   const fire = (): void => {
@@ -510,9 +463,18 @@ const install = (opts: {
       return;
     }
     grabbing = true;
-    const before = snapClip();
-    const context = startFrontContext(opts.skip ?? ["Electron", "Slip"]);
+    let context: ReturnType<typeof startFrontContext>;
     try {
+      context = startFrontContext(opts.skip ?? ["Electron", "Slip"]);
+    } catch {
+      grabbing = false;
+      return;
+    }
+    let before: PasteSnap;
+    let beforeCount = 0;
+    try {
+      before = pasteboard.read();
+      beforeCount = pasteboard.changeCount();
       if (!synthesizeCopy()) {
         grabbing = false;
         return;
@@ -521,12 +483,7 @@ const install = (opts: {
       grabbing = false;
       return;
     }
-    setTimeout(() => {
-      const after = snapClip();
-      restoreClip(before);
-      grabbing = false;
-      void grab(before, after, context).catch(() => undefined);
-    }, COPY_SETTLE_MS);
+    void finishCopy(beforeCount, before, context);
   };
 
   const dropTap = (): void => {
