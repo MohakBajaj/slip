@@ -1,8 +1,8 @@
 export const PARAKEET_ID = "parakeet";
 export const APPLE_CLEANUP_ID = "apple";
 
-/** Fastest cleanup model that kept the note, with effort none. */
-export const DEFAULT_CLOUD_CLEANUP = "inception/mercury-2.5";
+/** Default cloud cleanup. Catalog effort none is a chat effort the gateway accepts. */
+export const DEFAULT_CLOUD_CLEANUP = "alibaba/qwen3.7-flash";
 
 /** Cheapest file transcription model on the gateway. */
 export const DEFAULT_CLOUD_TRANSCRIBE = "microsoft/mai-transcribe-2";

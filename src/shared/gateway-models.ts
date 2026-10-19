@@ -46,11 +46,11 @@ const SKIP_RECOMMENDED = new Set(["free", "stealth"]);
 
 /**
  * Cleanup models that kept the note in gateway benches.
- * Mercury is first: fastest that did not summarize, with effort none.
+ * Qwen is first: the default, and its catalog includes effort none.
  */
 export const CLEANUP_RECOMMENDED = [
-  "inception/mercury-2.5",
   "alibaba/qwen3.7-flash",
+  "inception/mercury-2.5",
   "anthropic/claude-haiku-5.5",
   "openai/gpt-oss-120b",
 ] as const;
