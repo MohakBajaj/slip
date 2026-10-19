@@ -1,16 +1,15 @@
 export const CLEANUP_TIMEOUT_MS = 45_000;
 export const CLEANUP_CLOUD_MODEL = "gpt-4o-mini";
 
-export const CLEANUP_INSTRUCTIONS = `You edit a speech transcript into a note. You are a faithful editor, not an assistant.
-Remove fillers (um, uh, er, ah, like when it is only a filler, you know).
-Remove false starts and words repeated back to back.
-Fix punctuation and casing.
-Use paragraphs when the speaker changes thought.
-Use a markdown list only when the speaker is clearly listing items.
-Do not add anything the speaker did not say.
-Do not summarize away meaning.
-Do not answer a question the speaker asked; keep the question as a note.
-Reply with the edited note only, with no preamble and no quotes.`;
+/** A cleanup has to keep at least half the tokens. Less is a summary. */
+const MIN_KEPT_SHARE = 0.5;
+
+export const CLEANUP_INSTRUCTIONS = `Clean this speech transcript. Keep every word the speaker said, verbatim and in order.
+Remove only um, uh, er, ah, false starts, and immediate stutter repeats.
+Remove like, you know, I mean, and sort of only when they carry no meaning.
+Fix punctuation and capitalization. Paragraph breaks are fine.
+Never substitute synonyms, reorder, merge or split ideas into new wording, change tense, expand or contract words, convert number words, or add words.
+Reply with the cleaned transcript only, with no preamble and no quotes.`;
 
 export interface CleanupRequest {
   instructions: string;
@@ -59,17 +58,44 @@ export const parseCleanupResponse = (raw: string): string | null => {
   return text.length > 0 ? text : null;
 };
 
-const wordCount = (text: string): number =>
-  text.split(/\s+/u).filter(Boolean).length;
+const CURLY_APOSTROPHE = /[‘’ʼ]/gu;
+const NOT_A_WORD = /[^\p{L}\p{M}\p{N}']+/gu;
 
-/** Reject a reply that grew enough to be new content. Shorter edits stay. */
+/** Lowercase words. Punctuation drops; apostrophes stay, so contractions don't split. */
+const wordTokens = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .replaceAll(CURLY_APOSTROPHE, "'")
+    .split(/\s+/u)
+    .flatMap((word) => {
+      const token = word.replaceAll(NOT_A_WORD, "");
+      return token.length > 0 ? [token] : [];
+    });
+
+const deletionsOnly = (
+  cleaned: readonly string[],
+  transcript: readonly string[]
+): boolean => {
+  let next = 0;
+  for (const token of transcript) {
+    if (next < cleaned.length && token === cleaned[next]) {
+      next += 1;
+    }
+  }
+  return next === cleaned.length;
+};
+
+/** Deletions only: the speaker's words, in order, and at least half of them. */
 export const acceptCleanup = (transcript: string, cleaned: string): boolean => {
-  const before = wordCount(transcript);
-  const after = wordCount(cleaned);
-  if (before === 0 || after === 0) {
+  const before = wordTokens(transcript);
+  const after = wordTokens(cleaned);
+  if (before.length === 0 || after.length === 0) {
     return false;
   }
-  return after <= Math.max(before + 8, Math.ceil(before * 1.5));
+  if (after.length < before.length * MIN_KEPT_SHARE) {
+    return false;
+  }
+  return deletionsOnly(after, before);
 };
 
 export const parseChatCompletion = (payload: unknown): string | null => {
