@@ -3,7 +3,13 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { createSlip, deleteSlips, mergeSlips, updateSlip } from "./vault";
+import {
+  createSlip,
+  deleteSlips,
+  listSlips,
+  mergeSlips,
+  updateSlip,
+} from "./vault";
 
 const vault = (): string => mkdtempSync(path.join(tmpdir(), "slip-"));
 
@@ -30,6 +36,22 @@ describe("attachments", () => {
   });
 });
 
+describe("voice", () => {
+  test("saves the transcript as text and keeps no recording", () => {
+    const root = vault();
+    const slip = createSlip(root, {
+      content: "Hello there.",
+      source: "voice",
+      transcript: "um hello there",
+    });
+    expect(slip.audio).toEqual([]);
+    const saved = listSlips(root).find((item) => item.id === slip.id);
+    expect(saved?.content).toBe("Hello there.\n");
+    expect(saved?.transcript).toBe("um hello there");
+    expect(saved?.source).toBe("voice");
+  });
+});
+
 describe("merge", () => {
   test("keeps images, recordings, and tags", () => {
     const root = vault();
@@ -52,7 +74,7 @@ describe("merge", () => {
     expect(result?.created.content).toBe("first thought");
     expect(result?.created.images).toHaveLength(1);
     expect(result?.created.audio).toHaveLength(1);
-    expect(result?.created.tags).toEqual(["alpha", "beta"]);
+    expect(result?.created.tags.toSorted()).toEqual(["alpha", "beta"]);
     expect(existsSync(result?.created.images[0] ?? "")).toBe(true);
     expect(existsSync(result?.created.audio[0] ?? "")).toBe(true);
     const sources = result?.slips.filter((slip) =>

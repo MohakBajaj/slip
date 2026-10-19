@@ -470,6 +470,17 @@ export const DetailWell = ({
       {slip.audio.map((file) => (
         <AudioClip file={file} key={file} />
       ))}
+      {slip.transcript.trim().length > 0 &&
+      slip.transcript.trim() !== slip.content.trim() ? (
+        <details className="px-2.5 pb-1">
+          <summary className="text-muted-foreground cursor-pointer text-[11px]">
+            Transcript
+          </summary>
+          <p className="text-muted-foreground mt-1 text-[12px] whitespace-pre-wrap">
+            {slip.transcript}
+          </p>
+        </details>
+      ) : null}
 
       <div className={cn("px-2.5 pb-1.5", blankMemo(slip.content) && "pt-2")}>
         <ImageStrip

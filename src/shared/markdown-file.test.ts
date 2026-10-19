@@ -13,4 +13,14 @@ test("audio accepts a path or a list", () => {
     "---\nid: aaaaaa\naudio:\n  - /a.webm\n  - /b.webm\n---\n\nhi\n"
   );
   expect(many?.audio).toEqual(["/a.webm", "/b.webm"]);
+  expect(one?.transcript).toBe("");
+});
+
+test("transcript is kept beside the note", () => {
+  const slip = parseSlip(
+    "2026-01-01-aaaaaa.md",
+    "---\nid: aaaaaa\ntranscript: um hello\n---\n\nHello.\n"
+  );
+  expect(slip?.content).toBe("Hello.\n");
+  expect(slip?.transcript).toBe("um hello");
 });

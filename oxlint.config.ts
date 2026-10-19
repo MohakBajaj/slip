@@ -53,6 +53,8 @@ export default defineConfig({
         "src/shared/capture-match.ts",
         "src/main/dock-icon.ts",
         "src/main/index.ts",
+        "src/main/transcribe.ts",
+        "src/main/cleanup-run.ts",
         "src/preload/index.ts",
       ],
       rules: electronFfi,

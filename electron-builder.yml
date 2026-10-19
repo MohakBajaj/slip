@@ -20,6 +20,11 @@ extraResources:
     to: tray
   - from: resources/dock
     to: dock
+  - from: resources/bin
+    to: bin
+    filter:
+      - parakeet-cli
+      - slip-cleanup
 electronLanguages:
   - en
 win:
@@ -38,7 +43,7 @@ mac:
   extendInfo:
     NSAutoFillHeuristicControllerEnabled: false
     NSDocumentsFolderUsageDescription: Slip keeps your notes as markdown in Documents.
-    NSMicrophoneUsageDescription: Slip records a voice note when you capture by speaking.
+    NSMicrophoneUsageDescription: Slip transcribes speech on this Mac when you capture by speaking.
   notarize: false
   extraFiles:
     - from: dist/cli/slip
