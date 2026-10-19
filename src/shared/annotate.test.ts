@@ -1,12 +1,20 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
+import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { drawShape, pageBounds, Store, themeOf } from "@quickdrawjs/core";
+
 import {
   appendAnnotatedImage,
+  blankExportScale,
+  cameraForFrame,
   displayToNative,
+  EXPORT_MARGIN,
   fitContain,
   fitFrame,
   flattenBitmap,
+  inkPlacement,
+  paintFlatten,
 } from "./annotate";
 import type { Rect, Size } from "./annotate";
 
@@ -218,6 +226,39 @@ test("fitContain letterboxes and keeps aspect ratio", () => {
   });
 });
 
+test("cameraForFrame matches the contain fit in Quickdraw camera space", () => {
+  const frame: Rect = { h: 50, w: 100, x: 10, y: 0 };
+  const cam = cameraForFrame({ h: 100, w: 200 }, frame);
+  expect(cam).toEqual({ x: -10, y: 0, z: 2 });
+  expect((frame.x + cam.x) * cam.z).toBe(0);
+  expect((frame.y + cam.y) * cam.z).toBe(0);
+});
+
+test("blank drawings stay within the 4096 side cap and retina does not grow them", () => {
+  expect(blankExportScale({ h: 10, w: 10 })).toBe(2);
+  const huge = { h: 10_000, w: 10_000 };
+  const scale = blankExportScale(huge);
+  const side = (huge.w + EXPORT_MARGIN * 2) * scale;
+  expect(side).toBeLessThanOrEqual(4096 + 1e-6);
+  expect(side).toBeGreaterThan(4096 - 1);
+});
+
+test("ink placement is native pixels and ignores device pixel ratio", () => {
+  const frame: Rect = { h: 60, w: 80, x: 10, y: 5 };
+  const exported: Rect = { h: 10, w: 20, x: 30, y: 25 };
+  const native: Size = { h: 120, w: 160 };
+  const placed = { h: 20, w: 40, x: 40, y: 40 };
+  expect(inkPlacement(frame, exported, native)).toEqual(placed);
+  expect(inkPlacement(frame, exported, native, 2)).toEqual(placed);
+  const capped = inkPlacement(
+    { h: 50, w: 100, x: 0, y: 0 },
+    { h: 50, w: 100, x: 0, y: 0 },
+    { h: 5000, w: 10_000 },
+    3
+  );
+  expect(capped).toEqual({ h: 4096, w: 8192, x: 0, y: 0 });
+});
+
 test("fitFrame refits a frozen frame without moving its world origin", () => {
   const frame: Rect = { h: 50, w: 100, x: 10, y: 0 };
   const placed = fitFrame({ h: 100, w: 200 }, frame);
@@ -322,5 +363,111 @@ test("flatten paints a display-space stroke onto native pixels", () => {
     writeFileSync("/opt/cursor/artifacts/annotate-flatten.png", png);
   } catch {
     // The pixel asserts above are the check. The file is only for the PR.
+  }
+});
+
+test("a Quickdraw snapshot export flattens onto native image pixels", async () => {
+  const native: Size = { h: 120, w: 160 };
+  const frame: Rect = { h: 60, w: 80, x: 0, y: 0 };
+  const shape = {
+    id: "stroke",
+    props: {
+      color: "red",
+      dash: "solid",
+      done: true,
+      pts: [0, 0, 0.5, 24, 0, 0.5],
+      size: "l",
+    },
+    rot: 0,
+    type: "draw",
+    typeName: "shape",
+    x: 30,
+    y: 40,
+    z: 1,
+  };
+  const store = new Store();
+  store.put(shape);
+  const snap = store.getSnapshot();
+  const fresh = new Store();
+  fresh.loadSnapshot(snap, "remote");
+  const loaded = fresh.get(shape.id);
+  if (!loaded || loaded.typeName !== "shape") {
+    throw new Error("snapshot dropped the stroke");
+  }
+  const exported = pageBounds(loaded);
+  const scale = native.w / frame.w;
+  const inkCanvas = createCanvas(
+    Math.max(1, Math.round(exported.w * scale)),
+    Math.max(1, Math.round(exported.h * scale))
+  );
+  const inkCtx = inkCanvas.getContext("2d");
+  inkCtx.setTransform(
+    scale,
+    0,
+    0,
+    scale,
+    -exported.x * scale,
+    -exported.y * scale
+  );
+  drawShape(inkCtx, loaded, {
+    store: fresh,
+    theme: themeOf("light"),
+    zoom: scale,
+  });
+
+  const plate = createCanvas(native.w, native.h);
+  const plateCtx = plate.getContext("2d");
+  const sky: [number, number, number, number] = [90, 150, 210, 255];
+  const ground: [number, number, number, number] = [70, 140, 80, 255];
+  for (let y = 0; y < native.h; y += 1) {
+    plateCtx.fillStyle =
+      y < native.h / 2 ? "rgb(90, 150, 210)" : "rgb(70, 140, 80)";
+    plateCtx.fillRect(0, y, native.w, 1);
+  }
+
+  const flat = createCanvas(native.w, native.h);
+  const flatCtx = flat.getContext("2d");
+  const bitmap = paintFlatten(
+    (slot, x, y, w, h) => {
+      flatCtx.drawImage(slot === "plate" ? plate : inkCanvas, x, y, w, h);
+    },
+    frame,
+    exported,
+    native,
+    2
+  );
+  expect(bitmap).toEqual(native);
+  expect(paintFlatten(() => undefined, frame, exported, native, 1)).toEqual(
+    bitmap
+  );
+
+  const png = flat.toBuffer("image/png");
+  const image = await loadImage(png);
+  const encoded = createCanvas(image.width, image.height);
+  const encodedCtx = encoded.getContext("2d");
+  encodedCtx.drawImage(image, 0, 0);
+  const at = (
+    ctx: ReturnType<typeof encoded.getContext>,
+    x: number,
+    y: number
+  ): [number, number, number, number] => {
+    const data = ctx.getImageData(x, y, 1, 1).data;
+    return [data[0] ?? 0, data[1] ?? 0, data[2] ?? 0, data[3] ?? 0];
+  };
+  expect(image.width).toBe(native.w);
+  expect(image.height).toBe(native.h);
+  expect(at(encodedCtx, 2, 2)).toEqual(sky);
+  expect(at(encodedCtx, 150, 110)).toEqual(ground);
+  const mark = at(encodedCtx, 84, 80);
+  expect(mark[0]).toBeGreaterThan(180);
+  expect(mark[1]).toBeLessThan(90);
+  expect(mark[2]).toBeLessThan(90);
+  expect(mark[3]).toBe(255);
+  expect(at(plateCtx, 84, 80)).toEqual(ground);
+  try {
+    mkdirSync("/opt/cursor/artifacts", { recursive: true });
+    writeFileSync("/opt/cursor/artifacts/quickdraw-flatten.png", png);
+  } catch {
+    // Pixel asserts above are the check.
   }
 });
