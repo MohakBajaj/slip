@@ -15,6 +15,7 @@ const api = {
     ipcRenderer.invoke("addImages", id, images) as Promise<Slip | null>,
   askMic: () => ipcRenderer.invoke("askMic") as Promise<boolean>,
   closeDraw: () => ipcRenderer.invoke("closeDraw"),
+  closeNote: () => ipcRenderer.invoke("closeNote"),
   closeVoice: () => ipcRenderer.invoke("closeVoice"),
   copyAtRef: (id: string) => ipcRenderer.invoke("copyAtRef", id),
   copyBundle: (text: string, paths: string[]) =>
@@ -89,6 +90,13 @@ const api = {
       ipcRenderer.removeListener("login-state", listener);
     };
   },
+  onNoteOpen: (fn: () => void) => {
+    const listener = () => fn();
+    ipcRenderer.on("note-open", listener);
+    return () => {
+      ipcRenderer.removeListener("note-open", listener);
+    };
+  },
   onPreview: (fn: (state: PreviewState) => void) => {
     const listener = (_: unknown, state: PreviewState) => fn(state);
     ipcRenderer.on("preview-state", listener);
@@ -136,6 +144,8 @@ const api = {
     ipcRenderer.invoke("popupMenu", items) as Promise<string | null>,
   restoreSlips: (slips: Slip[], drop: string[] = []) =>
     ipcRenderer.invoke("restoreSlips", slips, drop),
+  saveNote: (content: string) =>
+    ipcRenderer.invoke("saveNote", content) as Promise<Slip | null>,
   saveSettings: (settings: Settings) =>
     ipcRenderer.invoke("saveSettings", settings),
   setLogin: (on: boolean) =>

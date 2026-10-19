@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  assignCapture,
   defaultCapture,
   defaultDrawCapture,
+  defaultNoteCapture,
   defaultVoiceCapture,
   formatHold,
   sanitizeDrawCapture,
+  sanitizeNoteCapture,
   sanitizeVoiceCapture,
   unusedCapture,
 } from "./capture-bind";
@@ -62,5 +65,62 @@ describe("draw capture bind", () => {
       drawCapture: ["Mod+Shift", "Mod+Shift"],
     });
     expect(next.drawCapture).not.toEqual(next.capture);
+  });
+});
+
+describe("note capture bind", () => {
+  test("default note chord is the next free double modifier", () => {
+    expect(defaultNoteCapture()).toEqual(["Control", "Control"]);
+  });
+
+  test("note chord yields when it matches another", () => {
+    expect(
+      sanitizeNoteCapture(
+        ["Control", "Control"],
+        ["Shift", "Shift"],
+        ["Option", "Option"],
+        ["Control", "Control"]
+      )
+    ).toEqual(["Command", "Command"]);
+  });
+
+  test("settings keep four distinct chords", () => {
+    const next = sanitizeSettings({});
+    const chords = [
+      next.capture,
+      next.voiceCapture,
+      next.drawCapture,
+      next.noteCapture,
+    ].map((seq) => seq.join("|"));
+    expect(new Set(chords).size).toBe(4);
+    expect(next.noteCapture).toEqual(["Control", "Control"]);
+    const collided = sanitizeSettings({
+      capture: ["Control", "Control"],
+      noteCapture: ["Control", "Control"],
+    });
+    expect(collided.noteCapture).not.toEqual(collided.capture);
+    expect(collided.noteCapture).not.toEqual(collided.voiceCapture);
+    expect(collided.noteCapture).not.toEqual(collided.drawCapture);
+  });
+
+  test("editing one chord keeps the others distinct", () => {
+    const next = assignCapture(
+      {
+        capture: ["Shift", "Shift"],
+        drawCapture: ["Mod+Shift", "Mod+Shift"],
+        noteCapture: ["Control", "Control"],
+        voiceCapture: ["Option", "Option"],
+      },
+      "noteCapture",
+      ["Shift", "Shift"]
+    );
+    expect(next.noteCapture).toEqual(["Shift", "Shift"]);
+    const chords = [
+      next.capture,
+      next.voiceCapture,
+      next.drawCapture,
+      next.noteCapture,
+    ].map((seq) => seq.join("|"));
+    expect(new Set(chords).size).toBe(4);
   });
 });

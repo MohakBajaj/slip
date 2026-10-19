@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 
 import { FONTS, THEMES, TRAY_ICONS } from "../../../shared/appearance";
 import type { FontId, ThemeId, TrayIconId } from "../../../shared/appearance";
-import { sameCapture, unusedCapture } from "../../../shared/capture-bind";
+import { assignCapture } from "../../../shared/capture-bind";
+import type { CaptureField } from "../../../shared/capture-bind";
 import { ACCENTS, clampZoom, ZOOM_MAX, ZOOM_MIN } from "../../../shared/types";
 import type {
   Accent,
@@ -147,6 +148,14 @@ export const SettingsPanel = ({
   const pickTray = (trayIcon: TrayIconId): void => {
     onChange({ ...settings, trayIcon });
   };
+  const onChord =
+    (field: CaptureField) =>
+    (next: string[]): void => {
+      onChange({
+        ...settings,
+        ...assignCapture(settings, field, next),
+      });
+    };
 
   let loginDetail: string | undefined;
   if (login === "unavailable") {
@@ -299,54 +308,28 @@ export const SettingsPanel = ({
           <CaptureBind
             hint="Double-tap a modifier, or a shortcut that includes one"
             onBind={onBind}
-            onSequence={(capture) => {
-              onChange({
-                ...settings,
-                capture,
-                drawCapture: sameCapture(capture, settings.drawCapture)
-                  ? unusedCapture(capture, settings.voiceCapture)
-                  : settings.drawCapture,
-                voiceCapture: sameCapture(capture, settings.voiceCapture)
-                  ? unusedCapture(capture, settings.drawCapture)
-                  : settings.voiceCapture,
-              });
-            }}
+            onSequence={onChord("capture")}
             value={settings.capture}
+          />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Quick note</p>
+          <CaptureBind
+            hint="Floating note on this screen, without opening Slip"
+            onBind={onBind}
+            onSequence={onChord("noteCapture")}
+            value={settings.noteCapture}
           />
           <p className="text-muted-foreground px-0.5 text-[12px]">Voice</p>
           <CaptureBind
             hint="Hold to talk. Double-tap to latch the waveform."
             onBind={onBind}
-            onSequence={(voiceCapture) => {
-              onChange({
-                ...settings,
-                capture: sameCapture(voiceCapture, settings.capture)
-                  ? unusedCapture(voiceCapture, settings.drawCapture)
-                  : settings.capture,
-                drawCapture: sameCapture(voiceCapture, settings.drawCapture)
-                  ? unusedCapture(voiceCapture, settings.capture)
-                  : settings.drawCapture,
-                voiceCapture,
-              });
-            }}
+            onSequence={onChord("voiceCapture")}
             value={settings.voiceCapture}
           />
           <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
           <CaptureBind
             hint="Hold ⌘ and double-tap ⇧, or record your own"
             onBind={onBind}
-            onSequence={(drawCapture) => {
-              onChange({
-                ...settings,
-                capture: sameCapture(drawCapture, settings.capture)
-                  ? unusedCapture(drawCapture, settings.voiceCapture)
-                  : settings.capture,
-                drawCapture,
-                voiceCapture: sameCapture(drawCapture, settings.voiceCapture)
-                  ? unusedCapture(drawCapture, settings.capture)
-                  : settings.voiceCapture,
-              });
-            }}
+            onSequence={onChord("drawCapture")}
             presets={false}
             value={settings.drawCapture}
           />

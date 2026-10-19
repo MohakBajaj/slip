@@ -626,9 +626,10 @@ const App = () => {
   });
 
   const chordName = formatCapture(settings.capture);
+  const noteName = formatCapture(settings.noteCapture);
   const voiceName = formatHold(settings.voiceCapture);
   const drawName = formatCapture(settings.drawCapture);
-  let emptyCopy = `${chordName} a selection, ${voiceName} to speak, ${drawName} to draw, drop images, or type below.`;
+  let emptyCopy = `${chordName} a selection, ${noteName} for a note, ${voiceName} to speak, ${drawName} to draw, drop images, or type below.`;
   if (query) {
     emptyCopy = "No matches";
   }

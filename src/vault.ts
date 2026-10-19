@@ -19,6 +19,7 @@ import { audioExt, imageExt, MAX_AUDIO_BYTES } from "./shared/images";
 import type { ImagePayload } from "./shared/images";
 import { parseSlip, serializeSlip } from "./shared/markdown-file";
 import { mergeDraft } from "./shared/merge";
+import { NOTE_SOURCE, noteBody } from "./shared/quick-note";
 import type { Slip } from "./shared/types";
 import { SKILL_MD } from "./skill-template";
 
@@ -247,6 +248,22 @@ export const createSlip = (
   };
   writeSlip(root, slip);
   return slip;
+};
+
+export const saveNote = (
+  root: string,
+  raw: string,
+  section = ""
+): Slip | null => {
+  const content = noteBody(raw);
+  if (content === null) {
+    return null;
+  }
+  return createSlip(root, {
+    content,
+    section,
+    source: NOTE_SOURCE,
+  });
 };
 
 export const updateSlips = (

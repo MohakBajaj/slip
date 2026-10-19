@@ -34,9 +34,9 @@ updated: 2026-08-15T00:00:00.000Z
 
 The body is the note. First line is the title.
 
-\`source\` is the app (or \`cli\`). Captures from a browser also set \`url\`
-and \`page\`. Voice captures set \`audio\` to the recording path(s).
-Drawings land in \`images\`.
+\`source\` is the app, \`cli\`, or \`note\` for a quick note. Captures from a
+browser also set \`url\` and \`page\`. Voice captures set \`audio\` to the
+recording path(s). Drawings land in \`images\`.
 
 ## CLI
 

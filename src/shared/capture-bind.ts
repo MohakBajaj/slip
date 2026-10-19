@@ -79,6 +79,53 @@ export const defaultVoiceCapture = (): string[] =>
 
 export const defaultDrawCapture = (): string[] => ["Mod+Shift", "Mod+Shift"];
 
+export const defaultNoteCapture = (): string[] =>
+  unusedCapture(defaultCapture(), defaultVoiceCapture());
+
+export const CAPTURE_FIELDS = [
+  "capture",
+  "voiceCapture",
+  "drawCapture",
+  "noteCapture",
+] as const;
+
+export type CaptureField = (typeof CAPTURE_FIELDS)[number];
+
+export interface CaptureChords {
+  capture: string[];
+  drawCapture: string[];
+  noteCapture: string[];
+  voiceCapture: string[];
+}
+
+export const assignCapture = (
+  current: CaptureChords,
+  field: CaptureField,
+  next: string[]
+): CaptureChords => {
+  const chosen = [...next];
+  const out: CaptureChords = {
+    capture: field === "capture" ? chosen : [...current.capture],
+    drawCapture: field === "drawCapture" ? chosen : [...current.drawCapture],
+    noteCapture: field === "noteCapture" ? chosen : [...current.noteCapture],
+    voiceCapture: field === "voiceCapture" ? chosen : [...current.voiceCapture],
+  };
+  const placed: string[][] = [chosen];
+  for (const key of CAPTURE_FIELDS) {
+    if (key === field) {
+      continue;
+    }
+    if (placed.some((seq) => sameCapture(seq, out[key]))) {
+      const [first, ...rest] = placed;
+      if (first !== undefined) {
+        out[key] = unusedCapture(first, ...rest);
+      }
+    }
+    placed.push(out[key]);
+  }
+  return out;
+};
+
 export const sanitizeVoiceCapture = (
   raw: unknown,
   taken: string[]
@@ -92,9 +139,10 @@ export const sanitizeVoiceCapture = (
   return unusedCapture(taken);
 };
 
-export const sanitizeDrawCapture = (
+const sanitizeFreeCapture = (
   raw: unknown,
-  ...taken: string[][]
+  fallback: string[],
+  taken: string[][]
 ): string[] => {
   if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
     const seq = raw.filter((step) => step.length > 0 && step.length < 48);
@@ -105,12 +153,21 @@ export const sanitizeDrawCapture = (
       return seq;
     }
   }
-  const fallback = defaultDrawCapture();
   if (taken.every((other) => !sameCapture(fallback, other))) {
     return fallback;
   }
   return unusedCapture(taken[0] ?? defaultCapture(), ...taken.slice(1));
 };
+
+export const sanitizeDrawCapture = (
+  raw: unknown,
+  ...taken: string[][]
+): string[] => sanitizeFreeCapture(raw, defaultDrawCapture(), taken);
+
+export const sanitizeNoteCapture = (
+  raw: unknown,
+  ...taken: string[][]
+): string[] => sanitizeFreeCapture(raw, defaultNoteCapture(), taken);
 
 export const sanitizeCapture = (
   raw: unknown,

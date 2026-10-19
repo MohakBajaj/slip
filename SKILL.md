@@ -28,4 +28,4 @@ If Slip is not in Applications, use `Slip.app/Contents/Helpers/slip` from wherev
 
 Frontmatter holds `id`, `section`, `tags`, `pin`, `done`, `archived`, `source`, `url`, `page`, `images`, `audio`, `created`, `updated`. `images` and `audio` are path lists. Drawings land in `images`. The body is the note. First line is the title. `INDEX.md` is generated — do not edit it.
 
-`source` is the app (or `cli`). Browser captures also set `url` and `page`. Voice captures set `audio`.
+`source` is the app, `cli`, or `note` for a quick note. Browser captures also set `url` and `page`. Voice captures set `audio`.

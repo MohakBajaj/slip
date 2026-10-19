@@ -3,9 +3,11 @@ import { isFontId, isThemeId, isTrayIconId } from "./appearance";
 import {
   defaultCapture,
   defaultDrawCapture,
+  defaultNoteCapture,
   defaultVoiceCapture,
   sanitizeCapture,
   sanitizeDrawCapture,
+  sanitizeNoteCapture,
   sanitizeVoiceCapture,
 } from "./capture-bind";
 import type { Shortcuts } from "./shortcuts";
@@ -41,6 +43,7 @@ export interface Settings {
   dock: boolean;
   drawCapture: string[];
   font: FontId;
+  noteCapture: string[];
   notify: boolean;
   scheme: Scheme;
   shortcuts: Shortcuts;
@@ -84,6 +87,7 @@ export const defaultSettings = (): Settings => ({
   dock: true,
   drawCapture: defaultDrawCapture(),
   font: "geist",
+  noteCapture: defaultNoteCapture(),
   notify: false,
   scheme: "system",
   shortcuts: defaultShortcuts(),
@@ -129,6 +133,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     capture?: unknown;
     chord?: unknown;
     drawCapture?: unknown;
+    noteCapture?: unknown;
     voiceCapture?: unknown;
   };
   next.capture = sanitizeCapture(legacy.capture, legacy.chord);
@@ -137,6 +142,12 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     legacy.drawCapture,
     next.capture,
     next.voiceCapture
+  );
+  next.noteCapture = sanitizeNoteCapture(
+    legacy.noteCapture,
+    next.capture,
+    next.voiceCapture,
+    next.drawCapture
   );
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
@@ -168,6 +179,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,
+    noteCapture: next.noteCapture,
     notify: next.notify,
     scheme: next.scheme,
     shortcuts: next.shortcuts,

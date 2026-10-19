@@ -22,6 +22,10 @@ const page = async (): Promise<ReactElement> => {
     const { VoiceApp } = await import("./voice");
     return <VoiceApp />;
   }
+  if (hash === "#note") {
+    const { NoteApp } = await import("./note");
+    return <NoteApp />;
+  }
   const { default: App } = await import("./app");
   return <App />;
 };

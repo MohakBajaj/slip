@@ -41,6 +41,28 @@ const readNow = async (skip: string[]): Promise<FrontContext> => {
   return { page: extra.page, source: info.name, url: extra.url };
 };
 
+export const frontApp = async (): Promise<{
+  bundle: string;
+  name: string;
+}> => {
+  if (process.platform !== "darwin") {
+    return { bundle: "", name: "" };
+  }
+  try {
+    const info = await readLsapp();
+    return { bundle: info.bundle, name: info.name };
+  } catch {
+    return { bundle: "", name: "" };
+  }
+};
+
+export const activateBundle = (bundle: string): void => {
+  if (bundle.length === 0 || process.platform !== "darwin") {
+    return;
+  }
+  execFile("/usr/bin/open", ["-b", bundle], { timeout: 1500 }, () => undefined);
+};
+
 export const startFrontContext = (
   skip: string[]
 ): { ready: Promise<FrontContext>; rich: Promise<FrontContext> } => {
