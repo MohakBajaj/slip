@@ -21,6 +21,7 @@ import {
   applyUpdateScript,
   assessDownload,
   BUNDLE_ID,
+  BUNDLED_BINS,
   bundleAccepted,
   bundleFromExecutable,
   classifyReleaseUrl,
@@ -260,6 +261,18 @@ const acceptBundle = async (
   if (!bundleAccepted(stdout, { id: BUNDLE_ID, version: manifest.version })) {
     throw new Error(
       "The archive's bundle id or version did not match the manifest. Slip did not change."
+    );
+  }
+  const helpers = BUNDLED_BINS.every((name) => {
+    const helper = path.join(appPath, "Contents", "Resources", "bin", name);
+    return (
+      lstatSync(helper, { throwIfNoEntry: false })?.isFile() === true &&
+      contained(appPath, helper)
+    );
+  });
+  if (!helpers) {
+    throw new Error(
+      "The archive did not include parakeet-cli and slip-cleanup. Slip did not change."
     );
   }
 };

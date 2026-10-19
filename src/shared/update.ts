@@ -1,5 +1,6 @@
 import path from "node:path";
 
+export const BUNDLED_BINS = ["parakeet-cli", "slip-cleanup"] as const;
 export const BUNDLE_ID = "dev.mohak.slip";
 export const DEFAULT_MIN_MACOS = "12.0";
 export const MANIFEST_NAME = "latest.json";
@@ -406,6 +407,12 @@ if [[ ! -d "$src" ]]; then
   echo "missing $src"
   exit 1
 fi
+for bin in parakeet-cli slip-cleanup; do
+  if [[ ! -f "$src/Contents/Resources/bin/$bin" ]]; then
+    echo "refusing to replace $dest: missing $bin"
+    exit 1
+  fi
+done
 while kill -0 "$pid" 2>/dev/null; do
   sleep 0.2
 done
@@ -413,6 +420,13 @@ sleep 1
 stage="\${dest}.slip-new"
 rm -rf "$stage"
 ditto "$src" "$stage"
+for bin in parakeet-cli slip-cleanup; do
+  if [[ ! -f "$stage/Contents/Resources/bin/$bin" ]]; then
+    echo "staged app is missing $bin"
+    rm -rf "$stage"
+    exit 1
+  fi
+done
 xattr -dr com.apple.quarantine "$stage" || true
 removed=0
 for _ in 1 2 3 4 5 6 7 8 9 10; do

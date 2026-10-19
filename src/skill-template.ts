@@ -12,7 +12,7 @@ files.
 - \`YYYY-MM-DD-<6id>.md\` — a slip. State lives in frontmatter.
 - \`INDEX.md\` — generated list. Do not edit.
 - \`SKILL.md\` — this file.
-- \`attachments/<id>/\` — images, drawings, and voice notes for that slip.
+- \`attachments/<id>/\` — images and drawings for that slip. Older slips may still include a recording.
 
 ## Frontmatter
 
@@ -34,10 +34,12 @@ updated: 2026-08-15T00:00:00.000Z
 
 The body is the note. First line is the title.
 
-\`source\` is the app, \`cli\`, or \`note\` for a quick note. Captures from a
-browser also set \`url\` and \`page\`. Voice captures set \`audio\` to the
-recording path(s). Drawings land in \`images\`. Annotating an image
-adds a new png there and leaves the original file in place.
+\`source\` is the app, \`cli\`, \`note\` for a quick note, or \`voice\` for
+speech. Captures from a browser also set \`url\` and \`page\`. A voice
+slip's body is the cleaned note, and \`transcript\` is what was said.
+Older voice captures may set \`audio\` to a recording path. Drawings land
+in \`images\`. Annotating an image adds a new png there and leaves the
+original file in place.
 
 ## CLI
 

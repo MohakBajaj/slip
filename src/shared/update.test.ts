@@ -318,8 +318,14 @@ describe("notes and signing mode", () => {
     const script = applyUpdateScript();
     const quarantine = script.lastIndexOf("xattr -dr com.apple.quarantine");
     const open = script.lastIndexOf('open "$dest"');
+    const refuse = script.indexOf("refusing to replace");
+    const remove = script.indexOf('rm -rf "$dest"');
     expect(script).toContain('kill -0 "$pid"');
     expect(script).toContain("slip-update-");
+    expect(script).toContain("Contents/Resources/bin/$bin");
+    expect(script).toContain("parakeet-cli slip-cleanup");
+    expect(refuse).toBeGreaterThan(-1);
+    expect(remove).toBeGreaterThan(refuse);
     expect(quarantine).toBeGreaterThan(-1);
     expect(open).toBeGreaterThan(quarantine);
   });

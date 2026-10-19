@@ -32,6 +32,7 @@ export interface Slip {
   section: string;
   source: string;
   tags: string[];
+  transcript: string;
   updatedAt: string;
   url: string;
 }
@@ -41,6 +42,9 @@ export interface Settings {
   alwaysOnTop: boolean;
   capture: string[];
   checkUpdates: boolean;
+  cleanup: boolean;
+  cleanupModel: string;
+  cleanupUrl: string;
   dock: boolean;
   drawCapture: string[];
   font: FontId;
@@ -86,6 +90,9 @@ export const defaultSettings = (): Settings => ({
   alwaysOnTop: true,
   capture: defaultCapture(),
   checkUpdates: true,
+  cleanup: true,
+  cleanupModel: "",
+  cleanupUrl: "",
   dock: true,
   drawCapture: defaultDrawCapture(),
   font: "geist",
@@ -154,6 +161,14 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
   }
+  if (typeof next.cleanup !== "boolean") {
+    next.cleanup = true;
+  }
+  if (typeof next.cleanupModel !== "string") {
+    next.cleanupModel = "";
+  }
+  next.cleanupUrl =
+    typeof next.cleanupUrl === "string" ? next.cleanupUrl.trim() : "";
   if (typeof next.alwaysOnTop !== "boolean") {
     next.alwaysOnTop = true;
   }
@@ -182,6 +197,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
     checkUpdates: next.checkUpdates,
+    cleanup: next.cleanup,
+    cleanupModel: next.cleanupModel,
+    cleanupUrl: next.cleanupUrl,
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,

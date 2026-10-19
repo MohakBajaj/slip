@@ -25,3 +25,14 @@ jobs:
         run: bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts
       - name: Build
         run: bun run build
+      - name: Transcriber
+        run: sh scripts/fetch-parakeet.sh
+      - name: Cache speech model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/slip/redux-packed.gguf
+          key: redux-packed-574614b9a4d9
+      - name: Transcribe
+        run: sh scripts/transcribe-check.sh
+      - name: Cleanup helper
+        run: sh scripts/build-cleanup.sh && ./resources/bin/slip-cleanup --check

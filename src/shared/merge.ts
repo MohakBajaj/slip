@@ -19,6 +19,7 @@ export interface MergeDraft {
   pin: boolean;
   source: string;
   tags: string[];
+  transcript: string;
   url: string;
 }
 
@@ -72,6 +73,10 @@ export const mergeDraft = (items: Slip[]): MergeDraft => {
     pin: slips.some((slip) => slip.pin),
     source: shared ? (head?.source ?? "") : "",
     tags: [...new Set(slips.flatMap((slip) => slip.tags).filter(Boolean))],
+    transcript: slips
+      .map((slip) => slip.transcript.trim())
+      .filter(Boolean)
+      .join("\n\n"),
     url: shared ? (head?.url ?? "") : "",
   };
 };

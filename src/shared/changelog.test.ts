@@ -28,6 +28,7 @@ describe("changelog", () => {
     expect(unreleased).not.toBeNull();
     expect(unreleased).toContain("#2");
     expect(unreleased).toContain("#3");
+    expect(unreleased).toContain("#4");
     expect(unreleased).toContain("#5");
   });
 

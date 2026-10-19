@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Quick note. Control Control writes a note into the vault without raising Slip (#3).
 - Draw can annotate an image and save the drawing as a new PNG beside it (#5).
+- Spoken slips are transcribed on this Mac. The release includes `parakeet-cli` and `slip-cleanup`, and an update will not replace the app if either is missing. The speech model stays in Application Support (#4).
 - Check for Updates, in the Slip menu and every few hours. The app downloads its own GitHub release zip, checks the SHA-256 from `latest.json`, then replaces the running app.
 - `bun run release patch|minor|major` bumps the version from this file, commits, and tags. It does not push.
 

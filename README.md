@@ -1,6 +1,6 @@
 # Slip
 
-A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`. Hold **Option** to speak a note, or double-tap it to latch. **⌘⇧ ⌘⇧** opens a draw overlay.
+A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`. Hold **Option** to speak, and Slip transcribes it on this Mac. **⌘⇧ ⌘⇧** opens a draw overlay.
 
 No account, no sync, no telemetry. Agents read the folder.
 
@@ -12,13 +12,15 @@ The build is not notarized. Right-click **Slip** and choose Open the first time.
 
 Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing. **Check for Updates…** replaces the app in place. An ad-hoc signature changes every build, so macOS asks for Accessibility again after that kind of update.
 
+The first spoken slip downloads the speech model (about 200 MB) into Application Support. Nothing else leaves the machine. Transcription uses [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Spoken slips are cleaned up on device with Apple Intelligence when it is turned on: fillers and false starts come out, and the wording stays. The original transcript is kept on the slip. Settings can send that cleanup to an OpenAI-compatible endpoint instead. The API key is stored with the macOS keychain, not in the settings file.
+
 ## Capture
 
 Defaults, remappable in Settings:
 
 - **⇧ ⇧** — the current selection, including images in it, or a screenshot on the clipboard
 - **⌃ ⌃** — a quick note, without bringing Slip forward
-- **⌥** hold — speak a note; **⌥ ⌥** latches the recorder
+- **⌥** hold — speak; the text is saved. **⌥ ⌥** latches the recorder
 - **⌘⇧ ⌘⇧** — draw on a transparent overlay. Annotate draws on a slip image and saves a new png next to the original
 
 Drop images onto a slip. Merge selected slips from the command palette.
@@ -49,7 +51,7 @@ See [SKILL.md](SKILL.md) for the full command list.
 - `YYYY-MM-DD-<id>.md` — one slip. Never renamed or moved.
 - `INDEX.md` — generated
 - `SKILL.md` — how agents should use the vault
-- `attachments/<id>/` — images, drawings, and voice notes
+- `attachments/<id>/` — images and drawings. Older slips may still include a recording.
 
 ## Develop
 
@@ -59,6 +61,8 @@ bun run dev
 ```
 
 Grant Accessibility to Electron while developing.
+
+Voice needs the transcriber binary: `sh scripts/fetch-parakeet.sh`. On a Mac, `sh scripts/build-cleanup.sh` builds the Apple Intelligence helper.
 
 ## Release
 
@@ -70,7 +74,7 @@ git push origin HEAD
 git push origin vX.Y.Z
 ```
 
-`bun run release` bumps `package.json`, moves the `Unreleased` notes in [CHANGELOG.md](CHANGELOG.md) under that version, commits, and tags. You push. The tag runs `.github/workflows/release.yml` on `macos-latest`, which checks the tag against `package.json`, runs typecheck, check, and tests, builds the arm64 dmg and zip, and publishes a GitHub Release with `latest.json` and `SHA256SUMS`. The release notes are that version's changelog section. A pull request runs the same package and manifest steps and uploads artifacts. It does not publish.
+`bun run release` bumps `package.json`, moves the `Unreleased` notes in [CHANGELOG.md](CHANGELOG.md) under that version, commits, and tags. You push. The tag runs `.github/workflows/release.yml` on `macos-latest`, which checks the tag against `package.json`, runs typecheck, check, and tests, builds the arm64 dmg and zip, and publishes a GitHub Release with `latest.json` and `SHA256SUMS`. Packaging runs the same steps as `package:mac` before it signs: the CLI, `parakeet-cli`, and `slip-cleanup`. The zip must contain both helpers. The release notes are that version's changelog section. A pull request runs the same package and manifest steps and uploads artifacts. It does not publish. The updater copies the whole app, so those helpers come along, and it leaves the app in place if the download is missing either one. The speech model in Application Support is outside the app and is not touched.
 
 `bun run release:mac` is the local pack (dmg, zip, and `latest.json`) and does not upload. `bun run package:mac` writes the unpacked app only, at `dist/mac-arm64/Slip.app`.
 

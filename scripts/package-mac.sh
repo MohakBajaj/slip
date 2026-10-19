@@ -11,11 +11,19 @@ fi
 export PATH="${HOME}/.bun/bin:${PATH}"
 bun run build
 sh scripts/build-cli.sh
+sh scripts/fetch-parakeet.sh darwin-arm64
+sh scripts/build-cleanup.sh
 builder="./node_modules/.bin/electron-builder"
 env -u ELECTRON_RUN_AS_NODE -u CSC_LINK -u CSC_KEY_PASSWORD \
   CSC_IDENTITY_AUTO_DISCOVERY=false \
   "$builder" --mac dir --arm64 --publish never
 app="dist/mac-arm64/Slip.app"
+for bin in parakeet-cli slip-cleanup; do
+  if [[ ! -f "$app/Contents/Resources/bin/$bin" ]]; then
+    echo "package is missing Contents/Resources/bin/$bin" >&2
+    exit 1
+  fi
+done
 node scripts/sign-mac.mjs "$app"
 min="12.0"
 if read_min=$(/usr/bin/plutil -extract LSMinimumSystemVersion raw -o - "$app/Contents/Info.plist" 2>/dev/null); then
@@ -25,4 +33,12 @@ export SLIP_MIN_MACOS="$min"
 env -u ELECTRON_RUN_AS_NODE -u CSC_LINK -u CSC_KEY_PASSWORD \
   CSC_IDENTITY_AUTO_DISCOVERY=false \
   "$builder" --mac dmg zip --arm64 --prepackaged "$app" --publish never
+zip=$(echo dist/Slip-*-arm64-mac.zip)
+listing=$(/usr/bin/tar -tf "$zip")
+for bin in parakeet-cli slip-cleanup; do
+  if ! grep -F -q "Slip.app/Contents/Resources/bin/$bin" <<<"$listing"; then
+    echo "zip is missing $bin" >&2
+    exit 1
+  fi
+done
 bun scripts/make-manifest.ts

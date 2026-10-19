@@ -223,6 +223,7 @@ export const createSlip = (
     section?: string;
     source?: string;
     tags?: string[];
+    transcript?: string;
     url?: string;
   }
 ): Slip => {
@@ -244,6 +245,7 @@ export const createSlip = (
     section: input.section ?? "",
     source: input.source ?? "",
     tags: [...new Set((input.tags ?? []).filter(Boolean))],
+    transcript: input.transcript ?? "",
     updatedAt: createdAt,
     url: input.url ?? "",
   };
@@ -319,6 +321,7 @@ export const mergeSlips = (
     section: section ?? items[0]?.section ?? "",
     source: draft.source,
     tags: draft.tags,
+    transcript: draft.transcript,
     url: draft.url,
   });
   const slips = updateSlips(
