@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import FoundationModels
 
@@ -14,7 +15,7 @@ struct SlipCleanup {
             emit(["text": text])
         } catch {
             emit(["error": String(describing: error)])
-            Foundation.exit(1)
+            Darwin.exit(1)
         }
     }
 }
@@ -31,19 +32,16 @@ private func availability() -> [String: Any] {
     switch SystemLanguageModel.default.availability {
     case .available:
         return ["available": true]
+    case .unavailable(.appleIntelligenceNotEnabled):
+        return ["available": false, "reason": "appleIntelligenceNotEnabled"]
+    case .unavailable(.deviceNotEligible):
+        return ["available": false, "reason": "deviceNotEligible"]
+    case .unavailable(.modelNotReady):
+        return ["available": false, "reason": "modelNotReady"]
     case .unavailable(let reason):
-        let name: String
-        switch reason {
-        case .appleIntelligenceNotEnabled:
-            name = "appleIntelligenceNotEnabled"
-        case .deviceNotEligible:
-            name = "deviceNotEligible"
-        case .modelNotReady:
-            name = "modelNotReady"
-        @unknown default:
-            name = "unavailable"
-        }
-        return ["available": false, "reason": name]
+        return ["available": false, "reason": String(describing: reason)]
+    @unknown default:
+        return ["available": false, "reason": "unavailable"]
     }
 }
 

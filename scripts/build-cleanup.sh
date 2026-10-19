@@ -12,7 +12,7 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
 fi
 
 mkdir -p "$ROOT/resources/bin"
-xcrun swiftc -O -target arm64-apple-macos26.0 \
+xcrun swiftc -parse-as-library -O -target arm64-apple-macos26.0 \
   -o "$ROOT/resources/bin/slip-cleanup" \
   "$ROOT/helpers/cleanup.swift"
 chmod +x "$ROOT/resources/bin/slip-cleanup"
