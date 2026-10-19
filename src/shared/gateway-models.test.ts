@@ -109,7 +109,7 @@ test("reasoning is minimized and temperature is sent only when supported", () =>
   const haiku55 = findModel(models, "anthropic/claude-haiku-5.5");
   expect(minimumReasoning(qwen)).toEqual({ effort: "none" });
   expect(minimumReasoning(oss)).toEqual({ effort: "low" });
-  expect(minimumReasoning(mercury)).toEqual({ effort: "instant" });
+  expect(minimumReasoning(mercury)).toEqual({ effort: "none" });
   expect(minimumReasoning(haiku)).toEqual({ enabled: false });
   expect(minimumReasoning(haiku55)).toEqual({ effort: "none" });
   expect(minimumReasoning(undefined)).toBeUndefined();
@@ -124,6 +124,12 @@ test("reasoning is minimized and temperature is sent only when supported", () =>
   expect(qwenBody.temperature).toBe(0);
   expect(qwenBody.reasoning).toEqual({ effort: "none" });
   expect(qwenBody.stream).toBe(true);
+  expect(qwenBody.max_tokens).toBe(
+    Math.max(
+      256,
+      Math.ceil((request.instructions.length + request.prompt.length) / 4) * 2
+    )
+  );
   const haikuBody = chatCompletionBody({
     modelId: "anthropic/claude-haiku-5.5",
     record: haiku55,
@@ -132,6 +138,33 @@ test("reasoning is minimized and temperature is sent only when supported", () =>
   });
   expect(haikuBody.temperature).toBeUndefined();
   expect(haikuBody.reasoning).toEqual({ effort: "none" });
+});
+
+test("catalog instant effort is sent as none", () => {
+  const allowed = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+  const instant = {
+    id: "example/instant",
+    name: "Instant",
+    pricing: {},
+    reasoning: [{ type: "effort" as const, values: ["instant", "low"] }],
+    tags: [],
+    temperature: true,
+    type: "language",
+  };
+  expect(minimumReasoning(instant)).toEqual({ effort: "none" });
+  expect(
+    minimumReasoning({
+      ...instant,
+      reasoning: [{ type: "effort", values: ["turbo"] }],
+    })
+  ).toBeUndefined();
+  const models = parseGatewayModels(payload);
+  for (const model of models) {
+    const effort = minimumReasoning(model)?.effort;
+    if (effort !== undefined) {
+      expect(allowed).toContain(effort);
+    }
+  }
 });
 
 test("recommended skips free and stealth, then price sorts the rest", () => {

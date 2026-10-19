@@ -14,7 +14,7 @@ test("new installs stay on device until a gateway key is added", () => {
   expect(next.transcribeModel).toBe("microsoft/mai-transcribe-2");
   expect(next.cleanupRoute).toBe("device");
   expect(next.cleanupDevice).toBe("apple");
-  expect(next.cleanupModel).toBe("alibaba/qwen3.7-flash");
+  expect(next.cleanupModel).toBe("inception/mercury-2.5");
   expect(migrateSpeechSettings(next)).toEqual({
     cleanupDevice: next.cleanupDevice,
     cleanupModel: next.cleanupModel,
@@ -69,7 +69,7 @@ test("an explicit route is kept, and unknown device ids fall back", () => {
     transcribeRoute: "cloud",
   });
   expect(next.cleanupRoute).toBe("cloud");
-  expect(next.cleanupModel).toBe("alibaba/qwen3.7-flash");
+  expect(next.cleanupModel).toBe("inception/mercury-2.5");
   expect(next.cleanupDevice).toBe("apple");
   expect(next.transcribeRoute).toBe("cloud");
   expect(next.transcribeModel).toBe("openai/whisper-1");

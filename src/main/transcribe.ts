@@ -305,10 +305,15 @@ export const transcribeVoice = async (opts: {
       if (text !== null) {
         return text;
       }
+      console.error("slip transcription fell back: empty transcript");
     } catch (error) {
       if (aborted(error, opts.signal)) {
         throw new SpeechAbortedError();
       }
+      console.error(
+        "slip transcription fell back:",
+        error instanceof Error ? error.message : error
+      );
       if (!existsSync(opts.bin)) {
         throw error;
       }

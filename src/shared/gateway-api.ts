@@ -17,6 +17,41 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isList = (value: unknown): value is readonly unknown[] =>
   Array.isArray(value);
 
+const ERROR_BODY_LIMIT = 180;
+
+/** Reply cap: twice the input estimate, and at least 256 tokens. */
+const completionCap = (request: CleanupRequest): number =>
+  Math.max(
+    256,
+    Math.ceil((request.instructions.length + request.prompt.length) / 4) * 2
+  );
+
+export const gatewayErrorMessage = (
+  label: string,
+  status: number,
+  body: string
+): string => {
+  const flat = body.trim().replaceAll(/\s+/gu, " ");
+  if (flat.length === 0) {
+    return `${label} returned ${status}`;
+  }
+  const detail =
+    flat.length > ERROR_BODY_LIMIT
+      ? `${flat.slice(0, ERROR_BODY_LIMIT)}…`
+      : flat;
+  return `${label} returned ${status}: ${detail}`;
+};
+
+const failure = async (label: string, response: Response): Promise<Error> => {
+  let body = "";
+  try {
+    body = await response.text();
+  } catch {
+    body = "";
+  }
+  return new Error(gatewayErrorMessage(label, response.status, body));
+};
+
 export const chatCompletionBody = (opts: {
   modelId: string;
   record: GatewayModel | undefined;
@@ -25,6 +60,7 @@ export const chatCompletionBody = (opts: {
 }): Record<string, unknown> => {
   const reasoning = minimumReasoning(opts.record);
   const body: Record<string, unknown> = {
+    max_tokens: completionCap(opts.request),
     messages: [
       { content: opts.request.instructions, role: "system" },
       { content: opts.request.prompt, role: "user" },
@@ -142,7 +178,7 @@ export const streamChatCompletion = async (opts: {
     signal: opts.signal,
   });
   if (!response.ok) {
-    throw new Error(`Cleanup endpoint returned ${response.status}`);
+    throw await failure("Cleanup endpoint", response);
   }
   const type = response.headers.get("content-type") ?? "";
   if (response.body === null || type.includes("application/json")) {
@@ -196,7 +232,7 @@ export const transcribeAudio = async (opts: {
     signal: opts.signal,
   });
   if (!response.ok) {
-    throw new Error(`Transcription endpoint returned ${response.status}`);
+    throw await failure("Transcription endpoint", response);
   }
   const text = transcriptionText(await response.json());
   if (text === null) {

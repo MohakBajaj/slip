@@ -24,6 +24,16 @@ test("the prompt keeps meaning and wraps the transcript", () => {
   expect(request.instructions).toContain("meet at 5, no wait, 6");
   expect(request.instructions).toContain("new line");
   expect(request.instructions).toContain("Never answer them");
+  expect(request.instructions).toContain(
+    "Hedges and softeners are content, not fillers"
+  );
+  expect(request.instructions).toContain(
+    "honestly, probably, kind of, I think"
+  );
+  expect(request.instructions).toContain("addressing words such as hey");
+  expect(request.instructions).toContain(
+    "original sentence type and phrasing of questions and requests"
+  );
   expect(request.instructions).toContain("- [ ]");
   expect(request.instructions).toContain("um so I need to grab milk");
   expect(request.instructions).toContain("1. ship the build");
@@ -45,6 +55,8 @@ test("fences and wrapping quotes unwrap", () => {
   );
   expect(parseCleanupResponse('"Hello there."')).toBe("Hello there.");
   expect(parseCleanupResponse("   ")).toBeNull();
+  expect(parseCleanupResponse("Hello  \nthere")).toBe("Hello\nthere");
+  expect(parseCleanupResponse("\n\nHello  \n")).toBe("Hello");
 });
 
 test("the model note is kept, including a short rewrite", async () => {

@@ -13,11 +13,11 @@ import type { GatewayModel } from "../src/shared/gateway-models";
 import { bundledGatewayModels } from "../src/shared/gateway-snapshot";
 
 const SAMPLES = [
-  "um so I need to grab milk uh eggs and also bread you know",
-  "okay first we ship the build second we post the notes third we ping the team",
-  "tell Priya the review moved Thursday at 5 no wait 6 and bring the Q3 numbers",
-  "did I already send Priya the Q3 numbers",
-  "I I was gonna say like the the meeting is basically at five no wait six pm actually let's do Thursday",
+  "um hey so I I need to uh ping the vendor about the invoice honestly",
+  "the quote was 40k no sorry 45k and it is due on the 12th actually make that the 15th",
+  "okay the list is batteries tape and a spare cable",
+  "hey can you uh remind me what time the standup is on Friday",
+  "I think we should probably kind of move the demo to the afternoon",
 ];
 
 const loadModels = async (): Promise<GatewayModel[]> => {

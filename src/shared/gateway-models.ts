@@ -45,15 +45,14 @@ const WEBSOCKET_TAG = "websocket-transcription";
 const SKIP_RECOMMENDED = new Set(["free", "stealth"]);
 
 /**
- * Curated cheap, fast cleanup models that were on the public catalog.
- * Ordered with reasoning-off models ahead of ones that cannot disable it.
+ * Cleanup models that kept the note in gateway benches.
+ * Mercury is first: fastest that did not summarize, with effort none.
  */
 export const CLEANUP_RECOMMENDED = [
-  "alibaba/qwen3.7-flash",
   "inception/mercury-2.5",
-  "openai/gpt-oss-20b",
-  "google/gemini-2.5-flash-lite",
+  "alibaba/qwen3.7-flash",
   "anthropic/claude-haiku-5.5",
+  "openai/gpt-oss-120b",
 ] as const;
 
 /**
@@ -318,6 +317,16 @@ export const findModel = (
   id: string
 ): GatewayModel | undefined => models.find((model) => model.id === id);
 
+const CHAT_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
 const effortValues = (model: GatewayModel): string[] => {
   const effort = model.reasoning.find(
     (option): option is { type: "effort"; values: string[] } =>
@@ -326,23 +335,29 @@ const effortValues = (model: GatewayModel): string[] => {
   return effort?.values ?? [];
 };
 
-/** Smallest reasoning control the catalog says the model accepts. */
+/** Catalog "instant" is not a chat effort. The endpoint accepts "none". */
+const chatEfforts = (values: readonly string[]): string[] => {
+  const mapped = new Set(
+    values.map((value) => (value === "instant" ? "none" : value))
+  );
+  return CHAT_EFFORTS.filter((value) => mapped.has(value));
+};
+
+/** Smallest reasoning control the chat endpoint accepts. */
 export const minimumReasoning = (
   model: GatewayModel | undefined
 ): ReasoningRequest | undefined => {
   if (model === undefined || model.reasoning.length === 0) {
     return undefined;
   }
-  const values = effortValues(model);
-  if (values.includes("none")) {
+  const efforts = chatEfforts(effortValues(model));
+  if (efforts.includes("none")) {
     return { effort: "none" };
   }
   if (model.reasoning.some((option) => option.type === "toggle")) {
     return { enabled: false };
   }
-  const soft = ["minimal", "instant", "low"].find((value) =>
-    values.includes(value)
-  );
+  const [soft] = efforts;
   if (soft !== undefined) {
     return { effort: soft };
   }

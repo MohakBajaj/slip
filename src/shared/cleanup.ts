@@ -6,7 +6,7 @@ GOAL
 Keep the same meaning, voice, and language.
 
 REMOVE
-Fillers and tics: um, uh, like, you know, I mean, and basically when they are fillers. Stutters. False starts.
+Fillers and tics: um, uh, like, you know, I mean, and basically when they are fillers. Stutters. False starts. Hedges and softeners are content, not fillers: honestly, probably, kind of, I think.
 
 SELF-CORRECTIONS
 Keep the final version and drop the cue. "meet at 5, no wait, 6" becomes "meet at 6". Keep a meaningful "actually". If you are unsure which version was meant, keep both.
@@ -18,7 +18,7 @@ FORMAT
 Short notes stay one line. Paragraphs are at most 3 sentences. Three or more enumerated items, or first, second, and third, become a "-" or "1." list. Use "- [ ]" only for a clear task list. Plain Markdown.
 
 PRESERVE
-The speaker's words, order, tone, slang, and contractions. Do not substitute synonyms. Do not summarize. Questions are content. Never answer them.
+The speaker's words, order, tone, slang, and contractions. Keep greetings and addressing words such as hey. Do not substitute synonyms. Do not summarize. Keep the original sentence type and phrasing of questions and requests. "Hey, can you remind me...?" stays a question. Questions are content. Never answer them.
 
 OUTPUT
 Only the cleaned note. If nothing should be kept, output an empty string.
@@ -86,18 +86,27 @@ export const cleanupRequest = (
   prompt: cleanupPrompt(transcript, dictionary),
 });
 
+const tidyNote = (value: string): string =>
+  value
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/^\n+/u, "")
+    .trimEnd();
+
 export const parseCleanupResponse = (raw: string): string | null => {
   let text = raw.trim();
   const body = FENCE.exec(text)?.groups?.body;
   if (typeof body === "string" && body.length > 0) {
-    text = body.trim();
+    text = body;
   }
   if (
     (text.startsWith('"') && text.endsWith('"')) ||
     (text.startsWith("“") && text.endsWith("”"))
   ) {
-    text = text.slice(1, -1).trim();
+    text = text.slice(1, -1);
   }
+  text = tidyNote(text);
   return text.length > 0 ? text : null;
 };
 
@@ -152,10 +161,14 @@ export const settleCleanup = async (
           transcript: raw,
         };
       }
-    } catch {
+    } catch (error) {
       if (stopped()) {
         return rawOutcome(raw);
       }
+      console.error(
+        "slip cleanup fell back:",
+        error instanceof Error ? error.message : error
+      );
     }
     return await nextStep(index + 1);
   };

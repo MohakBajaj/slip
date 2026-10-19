@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import {
   bytesToBase64,
   chatDelta,
+  gatewayErrorMessage,
   parseChatCompletion,
   readChatStream,
   sseDelta,
@@ -27,6 +28,20 @@ test("chat completions and transcription payloads parse", () => {
   expect(transcriptionText({ text: "  " })).toBeNull();
   expect(transcriptionText(null)).toBeNull();
   expect(bytesToBase64(new Uint8Array([104, 105]))).toBe("aGk=");
+});
+
+test("gateway errors keep a truncated body", () => {
+  const detail = "Invalid option: expected one of none";
+  expect(gatewayErrorMessage("Cleanup endpoint", 400, `  ${detail}\n`)).toBe(
+    `Cleanup endpoint returned 400: ${detail}`
+  );
+  expect(gatewayErrorMessage("Transcription endpoint", 401, "")).toBe(
+    "Transcription endpoint returned 401"
+  );
+  const long = "x".repeat(200);
+  expect(gatewayErrorMessage("Cleanup endpoint", 400, long)).toBe(
+    `Cleanup endpoint returned 400: ${"x".repeat(180)}…`
+  );
 });
 
 test("a chat stream keeps answer text and skips reasoning", async () => {
