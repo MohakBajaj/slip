@@ -11,14 +11,36 @@ import path from "node:path";
 import { app, safeStorage } from "electron";
 
 import {
-  chatCompletionsUrl,
-  CLEANUP_CLOUD_MODEL,
   CLEANUP_TIMEOUT_MS,
-  parseChatCompletion,
+  cleanupRequest,
+  parseCleanupResponse,
   settleCleanup,
 } from "../shared/cleanup";
-import type { CleanupOutcome, CleanupRequest } from "../shared/cleanup";
+import type {
+  CleanupAsk,
+  CleanupOutcome,
+  CleanupRequest,
+} from "../shared/cleanup";
+import {
+  chatCompletionBody,
+  streamChatCompletion,
+} from "../shared/gateway-api";
+import type { MeasuredUsage } from "../shared/gateway-api";
+import { findModel } from "../shared/gateway-models";
+import type { GatewayModel } from "../shared/gateway-models";
+import { languageSpend } from "../shared/speech-cost";
+import type { SpeechStepCost } from "../shared/speech-cost";
+import {
+  APPLE_CLEANUP_ID,
+  localCleanups,
+  parseAppleCleanupStatus,
+} from "../shared/speech-engines";
+import type {
+  AppleCleanupStatus,
+  CleanupRoute,
+} from "../shared/speech-engines";
 
+/** Same file as the old cleanup key, so an existing key still loads. */
 const keyFile = (): string => path.join(app.getPath("userData"), "cleanup-key");
 
 export const cleanupKeySet = (): boolean => existsSync(keyFile());
@@ -113,58 +135,138 @@ const runHelper = (
     child.stdin.end(JSON.stringify(request));
   });
 
-const runCloud = async (
-  url: string,
-  model: string,
+const runCloud = (
   key: string,
+  modelId: string,
+  models: readonly GatewayModel[],
   request: CleanupRequest,
   signal: AbortSignal
-): Promise<string> => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (key.length > 0) {
-    headers.Authorization = `Bearer ${key}`;
-  }
-  const response = await fetch(chatCompletionsUrl(url), {
-    body: JSON.stringify({
-      messages: [
-        { content: request.instructions, role: "system" },
-        { content: request.prompt, role: "user" },
-      ],
-      model: model.trim() || CLEANUP_CLOUD_MODEL,
-      temperature: 0,
+): Promise<{ text: string; usage: MeasuredUsage }> =>
+  streamChatCompletion({
+    apiKey: key,
+    body: chatCompletionBody({
+      modelId,
+      record: findModel(models, modelId),
+      request,
+      stream: true,
     }),
-    headers,
-    method: "POST",
     signal,
   });
-  if (!response.ok) {
-    throw new Error(`Cleanup endpoint returned ${response.status}`);
-  }
-  const text = parseChatCompletion(await response.json());
-  if (text === null) {
-    throw new Error("Cleanup endpoint returned nothing");
-  }
-  return text;
+
+const appleLabel = (): string =>
+  localCleanups.find((engine) => engine.id === APPLE_CLEANUP_ID)?.label ??
+  "Apple Intelligence";
+
+export const appleCleanupStatus = (bin: string): Promise<AppleCleanupStatus> =>
+  new Promise((resolve) => {
+    const done = (status: AppleCleanupStatus): void => {
+      resolve(status);
+    };
+    if (!existsSync(bin)) {
+      done({ available: false, reason: "missing" });
+      return;
+    }
+    const child = spawn(bin, ["--check"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let settled = false;
+    const finish = (status: AppleCleanupStatus): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      done(status);
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish({ available: false, reason: "unavailable" });
+    }, 8000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      out += chunk.toString("utf-8");
+    });
+    child.on("error", () => {
+      finish({ available: false, reason: "missing" });
+    });
+    child.on("close", () => {
+      finish(parseAppleCleanupStatus(out));
+    });
+  });
+
+const rawNote = (transcript: string): CleanupOutcome => {
+  const raw = transcript.trim();
+  return { body: raw, cleaned: false, transcript: raw };
 };
 
-export const cleanTranscript = (
+export const cleanTranscript = async (
   transcript: string,
   opts: {
     bin: string;
     key: string;
     model: string;
+    models: readonly GatewayModel[];
+    route: CleanupRoute;
     signal?: AbortSignal;
-    url: string;
   }
-): Promise<CleanupOutcome> =>
-  settleCleanup(
+): Promise<{ cost: SpeechStepCost | null; outcome: CleanupOutcome }> => {
+  if (opts.route === "off") {
+    return { cost: null, outcome: rawNote(transcript) };
+  }
+  const cloud = opts.route === "cloud" && opts.key.trim().length > 0;
+  let cloudUsage: MeasuredUsage | undefined;
+  let winner = -1;
+  const noteWin =
+    (index: number, ask: CleanupAsk): CleanupAsk =>
+    async (request, signal) => {
+      const text = await ask(request, signal);
+      if (parseCleanupResponse(text) !== null) {
+        winner = index;
+      }
+      return text;
+    };
+  const device: CleanupAsk = (request, signal) =>
+    runHelper(opts.bin, request, signal);
+  const steps: CleanupAsk[] = [];
+  if (cloud) {
+    steps.push(
+      noteWin(0, async (request, signal) => {
+        const result = await runCloud(
+          opts.key,
+          opts.model,
+          opts.models,
+          request,
+          signal
+        );
+        cloudUsage = result.usage;
+        return result.text;
+      })
+    );
+  }
+  steps.push(noteWin(steps.length, device));
+  const outcome = await settleCleanup(
     transcript,
-    (request, signal) =>
-      opts.url.trim().length > 0
-        ? runCloud(opts.url, opts.model, opts.key, request, signal)
-        : runHelper(opts.bin, request, signal),
+    steps,
     CLEANUP_TIMEOUT_MS,
     opts.signal
   );
+  if (winner < 0) {
+    return { cost: null, outcome };
+  }
+  if (cloud && winner === 0) {
+    const request = cleanupRequest(outcome.transcript);
+    return {
+      cost: {
+        cost: languageSpend({
+          completionText: outcome.body,
+          pricing: findModel(opts.models, opts.model)?.pricing,
+          promptText: `${request.instructions}\n${request.prompt}`,
+          usage: cloudUsage ?? {},
+        }),
+        model: opts.model,
+      },
+      outcome,
+    };
+  }
+  return { cost: { cost: 0, model: appleLabel() }, outcome };
+};

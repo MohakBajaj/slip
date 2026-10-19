@@ -8,6 +8,8 @@ import { pipeline } from "node:stream/promises";
 
 import { app } from "electron";
 
+import { mergeUsage, transcribeAudio } from "../shared/gateway-api";
+import type { MeasuredUsage } from "../shared/gateway-api";
 import {
   encodeWavPcm16,
   isSilentPcm,
@@ -22,6 +24,16 @@ import {
   wavPcm16,
 } from "../shared/speech";
 import type { SpeechModelState, VoiceStatus } from "../shared/speech";
+import { PARAKEET_ID } from "../shared/speech-engines";
+import type { TranscribeRoute } from "../shared/speech-engines";
+
+export interface VoiceTranscript {
+  model: string;
+  onDevice: boolean;
+  seconds: number;
+  text: string;
+  usage: MeasuredUsage;
+}
 
 export const TRANSCRIBE_TIMEOUT_MS = 120_000;
 
@@ -261,4 +273,81 @@ export const transcribeCapture = async (opts: {
   } finally {
     await rm(wavPath, { force: true });
   }
+};
+
+const aborted = (error: unknown, signal: AbortSignal): boolean =>
+  signal.aborted || (error instanceof Error && error.name === "AbortError");
+
+export const transcribeVoice = async (opts: {
+  bin: string;
+  key: string;
+  model: string;
+  modelDir: string;
+  onStatus: (status: VoiceStatus) => void;
+  route: TranscribeRoute;
+  signal: AbortSignal;
+  tempDir: string;
+  wav: Uint8Array;
+}): Promise<VoiceTranscript | null> => {
+  const decoded = wavPcm16(opts.wav);
+  if (decoded === null || decoded.rate !== SPEECH_RATE) {
+    throw new Error("Could not read the recording");
+  }
+  if (isSilentPcm(decoded.samples)) {
+    return null;
+  }
+  const seconds = decoded.samples.length / decoded.rate;
+  if (opts.route === "cloud" && opts.key.trim().length > 0) {
+    opts.onStatus({
+      error: "",
+      phase: "transcribing",
+      received: 0,
+      total: 0,
+    });
+    try {
+      const spoken = await transcribeAudio({
+        apiKey: opts.key,
+        audio: opts.wav,
+        mediaType: "audio/wav",
+        model: opts.model,
+        signal: opts.signal,
+      });
+      const text = transcriptToSlip(spoken.text);
+      if (text !== null) {
+        return {
+          model: opts.model,
+          onDevice: false,
+          seconds,
+          text,
+          usage: mergeUsage({ seconds }, spoken.usage),
+        };
+      }
+      console.error("slip transcription fell back: empty transcript");
+    } catch (error) {
+      if (aborted(error, opts.signal)) {
+        throw new SpeechAbortedError();
+      }
+      console.error(
+        "slip transcription fell back:",
+        error instanceof Error ? error.message : error
+      );
+      if (!existsSync(opts.bin)) {
+        throw error;
+      }
+    }
+    if (!existsSync(opts.bin)) {
+      throw new Error("Transcription endpoint returned nothing");
+    }
+  }
+  const text = await transcribeCapture(opts);
+  if (text === null) {
+    return null;
+  }
+  return {
+    model: opts.route === "device" ? opts.model : PARAKEET_ID,
+    onDevice: true,
+    seconds,
+    text,
+    usage: { seconds },
+  };
 };

@@ -217,6 +217,7 @@ export const createSlip = (
   input: {
     audio?: string | ImagePayload | (string | ImagePayload)[];
     content: string;
+    cost?: Slip["cost"];
     images?: (string | ImagePayload)[];
     page?: string;
     pin?: boolean;
@@ -235,6 +236,7 @@ export const createSlip = (
     archived: false,
     audio,
     content: input.content,
+    ...(input.cost ? { cost: input.cost } : {}),
     createdAt,
     done: false,
     filename: filenameFor(createdAt, id),

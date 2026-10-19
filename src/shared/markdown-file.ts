@@ -1,6 +1,43 @@
 import matter from "gray-matter";
 
+import { slipSpeechCost } from "./speech-cost";
+import type { SpeechStepCost } from "./speech-cost";
 import type { Slip } from "./types";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const asStep = (value: unknown): SpeechStepCost | null => {
+  if (
+    !isRecord(value) ||
+    typeof value.model !== "string" ||
+    value.model.length === 0
+  ) {
+    return null;
+  }
+  const cost = typeof value.cost === "number" ? value.cost : Number(value.cost);
+  if (!Number.isFinite(cost)) {
+    return null;
+  }
+  return { cost, model: value.model };
+};
+
+const asSpeechCost = (
+  value: unknown
+): ReturnType<typeof slipSpeechCost> | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const transcription = asStep(value.transcription);
+  const cleanup = asStep(value.cleanup);
+  if (transcription === null && cleanup === null) {
+    return null;
+  }
+  return slipSpeechCost({
+    ...(cleanup === null ? {} : { cleanup }),
+    ...(transcription === null ? {} : { transcription }),
+  });
+};
 
 const asString = (value: unknown, fallback: string): string =>
   typeof value === "string" && value.length > 0 ? value : fallback;
@@ -20,6 +57,7 @@ export const serializeSlip = (slip: Slip): string =>
   matter.stringify(slip.content.replace(leadingNewlines, ""), {
     archived: slip.archived,
     ...(slip.audio.length > 0 ? { audio: slip.audio } : {}),
+    ...(slip.cost ? { cost: slip.cost } : {}),
     created: slip.createdAt,
     done: slip.done,
     id: slip.id,
@@ -40,10 +78,12 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
     const data = parsed.data as Record<string, unknown>;
     const id = asString(data.id, filename.replace(markdownExt, "").slice(-6));
     const created = asString(data.created, new Date().toISOString());
+    const cost = asSpeechCost(data.cost);
     return {
       archived: Boolean(data.archived),
       audio: asPaths(data.audio),
       content: asString(parsed.content, "").replace(leadingNewlines, ""),
+      ...(cost ? { cost } : {}),
       createdAt: created,
       done: Boolean(data.done),
       filename,
