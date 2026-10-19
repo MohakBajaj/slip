@@ -12,6 +12,7 @@ import {
 } from "./capture-bind";
 import type { Shortcuts } from "./shortcuts";
 import { defaultShortcuts, sanitizeShortcuts } from "./shortcuts";
+import type { SlipSpeechCost } from "./speech-cost";
 import { migrateSpeechSettings } from "./speech-engines";
 import type { CleanupRoute, TranscribeRoute } from "./speech-engines";
 
@@ -24,6 +25,7 @@ export interface Slip {
   archived: boolean;
   audio: string[];
   content: string;
+  cost?: SlipSpeechCost;
   createdAt: string;
   done: boolean;
   filename: string;

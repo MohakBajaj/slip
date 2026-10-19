@@ -47,7 +47,7 @@ for (const id of ids) {
   const started = performance.now();
   try {
     // oxlint-disable-next-line eslint/no-await-in-loop -- one call at a time, so the timings stay readable
-    const text = await transcribeAudio({
+    const { text } = await transcribeAudio({
       apiKey: key,
       audio,
       mediaType: "audio/wav",

@@ -36,7 +36,19 @@ test("the prompt keeps meaning and wraps the transcript", () => {
   );
   expect(request.instructions).toContain("- [ ]");
   expect(request.instructions).toContain("um so I need to grab milk");
-  expect(request.instructions).toContain("1. ship the build");
+  expect(request.instructions).toContain("1. Ship the build");
+  expect(request.instructions).toContain(
+    "Never replace a word with a different word"
+  );
+  expect(request.instructions).toContain('Do not change "we are" to "we\'re"');
+  expect(request.instructions).toContain("I think that's about it");
+  expect(request.instructions).toContain('Write "etcetera" as "etc."');
+  expect(request.instructions).toContain("shopping list");
+  expect(request.instructions).toContain("I need to pack");
+  expect(request.instructions).toContain("- Apples");
+  expect(request.instructions).toContain(
+    "Okay, so hello people, what's up? How are you doing today?"
+  );
   expect(request.instructions).toContain(
     "Tell Priya the review moved Thursday at 6"
   );

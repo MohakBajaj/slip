@@ -36,6 +36,7 @@ import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { bundleHtml } from "../shared/clipboard-html";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
+import { findModel } from "../shared/gateway-models";
 import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
@@ -44,6 +45,9 @@ import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
 import { VOICE_SOURCE } from "../shared/speech";
 import type { VoiceStatus } from "../shared/speech";
+import { slipSpeechCost, transcriptionSpend } from "../shared/speech-cost";
+import type { SpeechStepCost } from "../shared/speech-cost";
+import { localTranscribers } from "../shared/speech-engines";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
@@ -84,6 +88,7 @@ import {
   refreshGatewayModels,
 } from "./gateway-catalog";
 import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
+import type { VoiceTranscript } from "./transcribe";
 import { startUpdater } from "./updater";
 
 const ACCESS =
@@ -1470,6 +1475,27 @@ const boot = async (): Promise<void> => {
     rebuildTray();
     return result;
   });
+  const voiceSlipCost = (
+    spoken: VoiceTranscript,
+    cleanup: SpeechStepCost | null
+  ) => {
+    const label =
+      localTranscribers.find((engine) => engine.id === spoken.model)?.label ??
+      spoken.model;
+    return slipSpeechCost({
+      ...(cleanup ? { cleanup } : {}),
+      transcription: spoken.onDevice
+        ? { cost: 0, model: label }
+        : {
+            cost: transcriptionSpend({
+              pricing: findModel(gatewayModels(), spoken.model)?.pricing,
+              seconds: spoken.seconds,
+              usage: spoken.usage,
+            }),
+            model: spoken.model,
+          },
+    });
+  };
   ipcMain.handle("createVoiceSlip", async (event, wav: unknown) => {
     const bytes = asBytes(wav);
     if (bytes === undefined) {
@@ -1490,7 +1516,7 @@ const boot = async (): Promise<void> => {
       return { error: "", slip: null };
     }
     try {
-      const text = await transcribeVoice({
+      const spoken = await transcribeVoice({
         bin: bundledBin("parakeet-cli"),
         key: readCleanupKey(),
         model:
@@ -1504,14 +1530,15 @@ const boot = async (): Promise<void> => {
         tempDir: app.getPath("temp"),
         wav: bytes,
       });
-      if (text === null || job.signal.aborted) {
+      if (spoken === null || job.signal.aborted) {
         hideVoice();
         return { error: "", slip: null };
       }
-      let body = text;
+      let body = spoken.text;
+      let cleanupCost: SpeechStepCost | null = null;
       if (settings.cleanupRoute !== "off") {
         tell({ error: "", phase: "cleaning", received: 0, total: 0 });
-        const outcome = await cleanTranscript(text, {
+        const cleaned = await cleanTranscript(spoken.text, {
           bin: bundledBin("slip-cleanup"),
           key: readCleanupKey(),
           model:
@@ -1525,16 +1552,18 @@ const boot = async (): Promise<void> => {
         if (job.signal.aborted) {
           return { error: "", slip: null };
         }
-        const { body: cleanedBody } = outcome;
-        body = cleanedBody;
+        const { cost, outcome } = cleaned;
+        ({ body } = outcome);
+        cleanupCost = cost;
       }
       ensureVault(vaultRoot());
       const slip = createSlip(vaultRoot(), {
         content: body,
+        cost: voiceSlipCost(spoken, cleanupCost),
         page: ctx.page,
         section: currentSection,
         source: VOICE_SOURCE,
-        transcript: text,
+        transcript: spoken.text,
         url: ctx.url,
       });
       if (settings.notify && Notification.isSupported()) {

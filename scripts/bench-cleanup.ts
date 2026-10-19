@@ -18,6 +18,8 @@ const SAMPLES = [
   "okay the list is batteries tape and a spare cable",
   "hey can you uh remind me what time the standup is on Friday",
   "I think we should probably kind of move the demo to the afternoon",
+  "Okay, so hello people, what's up? How are you doing today? So we got Zen, Microsoft Edge, Chrome, Termius, MongoDB, WhatsApp, Teams, Figma, Cloudflare, Settings, Flip in the house with us today. I think we are all going to have fun, and here's our shopping list for the day. It's apples, bananas, mangoes, chocolates, etcetera, etcetera. I think that's about it.",
+  "for the trip I need to pack my passport the charger and the blue jacket",
 ];
 
 const loadModels = async (): Promise<GatewayModel[]> => {
@@ -55,7 +57,7 @@ for (const id of ids) {
     let first = 0;
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- one call at a time, so the timings stay readable
-      const output = await streamChatCompletion({
+      const { text: output } = await streamChatCompletion({
         apiKey: key,
         body: chatCompletionBody({
           modelId: id,

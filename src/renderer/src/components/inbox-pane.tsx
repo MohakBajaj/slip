@@ -30,6 +30,7 @@ import { titleOf } from "../../../shared/format";
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { groupedRows, whenLabel } from "../../../shared/logic";
 import { sourceWhere } from "../../../shared/source";
+import { costTip, formatUsd } from "../../../shared/speech-cost";
 import type { Slip } from "../../../shared/types";
 
 interface BulkActions {
@@ -215,6 +216,11 @@ const SlipRow = ({
         <span className="text-muted-foreground block truncate text-[10px] tabular-nums">
           {whenLabel(slip.createdAt)}
           {from ? ` · ${from}` : ""}
+          {slip.cost ? (
+            <span title={costTip(slip.cost)}>
+              {` · ${formatUsd(slip.cost.total)}`}
+            </span>
+          ) : null}
           {slip.tags.length ? ` · ${slip.tags.join(" ")}` : ""}
         </span>
       </span>

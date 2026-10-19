@@ -8,7 +8,8 @@ import { pipeline } from "node:stream/promises";
 
 import { app } from "electron";
 
-import { transcribeAudio } from "../shared/gateway-api";
+import { mergeUsage, transcribeAudio } from "../shared/gateway-api";
+import type { MeasuredUsage } from "../shared/gateway-api";
 import {
   encodeWavPcm16,
   isSilentPcm,
@@ -23,7 +24,16 @@ import {
   wavPcm16,
 } from "../shared/speech";
 import type { SpeechModelState, VoiceStatus } from "../shared/speech";
+import { PARAKEET_ID } from "../shared/speech-engines";
 import type { TranscribeRoute } from "../shared/speech-engines";
+
+export interface VoiceTranscript {
+  model: string;
+  onDevice: boolean;
+  seconds: number;
+  text: string;
+  usage: MeasuredUsage;
+}
 
 export const TRANSCRIBE_TIMEOUT_MS = 120_000;
 
@@ -278,7 +288,7 @@ export const transcribeVoice = async (opts: {
   signal: AbortSignal;
   tempDir: string;
   wav: Uint8Array;
-}): Promise<string | null> => {
+}): Promise<VoiceTranscript | null> => {
   const decoded = wavPcm16(opts.wav);
   if (decoded === null || decoded.rate !== SPEECH_RATE) {
     throw new Error("Could not read the recording");
@@ -286,6 +296,7 @@ export const transcribeVoice = async (opts: {
   if (isSilentPcm(decoded.samples)) {
     return null;
   }
+  const seconds = decoded.samples.length / decoded.rate;
   if (opts.route === "cloud" && opts.key.trim().length > 0) {
     opts.onStatus({
       error: "",
@@ -301,9 +312,15 @@ export const transcribeVoice = async (opts: {
         model: opts.model,
         signal: opts.signal,
       });
-      const text = transcriptToSlip(spoken);
+      const text = transcriptToSlip(spoken.text);
       if (text !== null) {
-        return text;
+        return {
+          model: opts.model,
+          onDevice: false,
+          seconds,
+          text,
+          usage: mergeUsage({ seconds }, spoken.usage),
+        };
       }
       console.error("slip transcription fell back: empty transcript");
     } catch (error) {
@@ -322,5 +339,15 @@ export const transcribeVoice = async (opts: {
       throw new Error("Transcription endpoint returned nothing");
     }
   }
-  return await transcribeCapture(opts);
+  const text = await transcribeCapture(opts);
+  if (text === null) {
+    return null;
+  }
+  return {
+    model: opts.route === "device" ? opts.model : PARAKEET_ID,
+    onDevice: true,
+    seconds,
+    text,
+    usage: { seconds },
+  };
 };

@@ -6,19 +6,23 @@ GOAL
 Keep the same meaning, voice, and language.
 
 REMOVE
-Fillers and tics: um, uh, like, you know, I mean, and basically when they are fillers. Stutters. False starts. Hedges and softeners are content, not fillers: honestly, probably, kind of, I think.
+Only delete fillers and repeated stutters. Fillers are um, uh, okay so, so at the start of a sentence, and like, you know, I mean, or basically when they are fillers. A repeated stutter is the same word twice, such as "I I" or "the the". Delete nothing else.
 
 SELF-CORRECTIONS
 Keep the final version and drop the cue. "meet at 5, no wait, 6" becomes "meet at 6". Keep a meaningful "actually". If you are unsure which version was meant, keep both.
 
 FIX
-Punctuation, casing, and grammar. Clear speech-recognition errors. Dictionary spellings. Spoken punctuation and layout commands such as "new line" and "comma". Numbers, dates, and times in standard form.
+Punctuation and casing. Clear speech-recognition errors. Dictionary spellings. Spoken punctuation and layout commands such as "new line" and "comma". Numbers, dates, and times in standard form. Write "etcetera" as "etc.".
 
 FORMAT
-Short notes stay one line. Paragraphs are at most 3 sentences. Three or more enumerated items, or first, second, and third, become a "-" or "1." list. Use "- [ ]" only for a clear task list. Plain Markdown.
+Plain Markdown. Break a paragraph on a topic shift. Put a blank line between paragraphs and around lists. At most 3 sentences per paragraph. No exclamation marks unless the speaker is clearly emphatic.
+When the speaker announces a list (a cue such as "here's our list", "shopping list", "things to", "I need to pack", or "three things", or a colon-like intro) and then gives 3 or more items, output a heading line ending in ":" and then "- " bullets, one item per line, first letter capitalized, no trailing punctuation.
+When the speaker enumerates 3 or more parallel items as its own list, not as objects in the middle of a longer sentence, use those same "- " bullets. Ordinal cues (first, second, third, or one, two, three) become a "1." numbered list.
+An enumeration that is the object of a longer sentence stays inline.
+Use "- [ ]" only for a clear task list.
 
 PRESERVE
-The speaker's words, order, tone, slang, and contractions. Keep greetings and addressing words such as hey. Do not substitute synonyms. Do not summarize. Keep the original sentence type and phrasing of questions and requests. "Hey, can you remind me...?" stays a question. Questions are content. Never answer them.
+Never replace a word with a different word. Never drop a sentence or clause that carries meaning. Greetings, small talk, and sign-offs such as "I think that's about it" are content. Do not change "we are" to "we're" or the reverse. Keep contractions as spoken. Hedges and softeners are content, not fillers: honestly, probably, kind of, I think. Keep greetings and addressing words such as hey and people. Keep the original sentence type and phrasing of questions and requests. "Hey, can you remind me...?" stays a question. "hello people, what's up? How are you doing today?" stays those questions. Questions are content. Never answer them.
 
 OUTPUT
 Only the cleaned note. If nothing should be kept, output an empty string.
@@ -27,17 +31,18 @@ Example
 <transcript>
 um so I need to grab milk uh eggs and also bread you know
 </transcript>
-- milk
-- eggs
-- bread
+I need to grab:
+- Milk
+- Eggs
+- Bread
 
 Example
 <transcript>
 okay first we ship the build second we post the notes third we ping the team
 </transcript>
-1. ship the build
-2. post the notes
-3. ping the team
+1. Ship the build
+2. Post the notes
+3. Ping the team
 
 Example
 <transcript>
@@ -49,7 +54,24 @@ Example
 <transcript>
 did I already send Priya the Q3 numbers
 </transcript>
-Did I already send Priya the Q3 numbers?`;
+Did I already send Priya the Q3 numbers?
+
+Example
+<transcript>
+Okay, so hello people, what's up? How are you doing today? So we got Zen, Microsoft Edge, Chrome, Termius, MongoDB, WhatsApp, Teams, Figma, Cloudflare, Settings, Flip in the house with us today. I think we are all going to have fun, and here's our shopping list for the day. It's apples, bananas, mangoes, chocolates, etcetera, etcetera. I think that's about it.
+</transcript>
+Hello people, what's up? How are you doing today?
+
+We got Zen, Microsoft Edge, Chrome, Termius, MongoDB, WhatsApp, Teams, Figma, Cloudflare, Settings and Flip in the house with us today. I think we are all going to have fun.
+
+Here's our shopping list for the day:
+- Apples
+- Bananas
+- Mangoes
+- Chocolates
+- etc.
+
+I think that's about it.`;
 
 export interface CleanupRequest {
   instructions: string;

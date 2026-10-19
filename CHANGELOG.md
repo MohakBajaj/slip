@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A voice slip shows its transcription plus cleanup cost beside the time, and keeps that cost in frontmatter.
 - Cloud cleanup asks for effort `none` instead of the catalog value `instant`, and the default cleanup model is inception/mercury-2.5.
 - Stylesheet build, clipboard capture, and macOS CI (#2).
 - Remote capture images time out, stay under a byte cap, and do not follow redirects onto private hosts (#2).

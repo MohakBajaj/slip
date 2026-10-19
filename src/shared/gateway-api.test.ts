@@ -4,6 +4,7 @@ import {
   bytesToBase64,
   chatDelta,
   gatewayErrorMessage,
+  measureUsage,
   parseChatCompletion,
   readChatStream,
   sseDelta,
@@ -56,13 +57,64 @@ test("a chat stream keeps answer text and skips reasoning", async () => {
           'data: {"choices":[{"delta":{"reasoning":"x","content":"!"}}]}\n'
         )
       );
+      controller.enqueue(
+        encoder.encode(
+          'data: {"id":"gen_abc","usage":{"prompt_tokens":3,"completion_tokens":2},"choices":[]}\n'
+        )
+      );
       controller.enqueue(encoder.encode("data: [DONE]\n"));
       controller.close();
     },
   });
   const parts: string[] = [];
-  expect(await readChatStream(stream, (chunk) => parts.push(chunk))).toBe(
-    "Hi!"
-  );
+  const result = await readChatStream(stream, (chunk) => parts.push(chunk));
+  expect(result.text).toBe("Hi!");
+  expect(result.usage).toEqual({
+    completionTokens: 2,
+    generationId: "gen_abc",
+    promptTokens: 3,
+  });
   expect(parts).toEqual(["Hi", "!"]);
+});
+
+test("usage reads chat tokens, generation cost, and transcription duration", () => {
+  expect(
+    measureUsage({
+      id: "gen_01",
+      usage: { completion_tokens: 28, prompt_tokens: 15 },
+    })
+  ).toEqual({
+    completionTokens: 28,
+    generationId: "gen_01",
+    promptTokens: 15,
+  });
+  expect(
+    measureUsage({
+      data: {
+        id: "gen_01",
+        tokens_completion: 50,
+        tokens_prompt: 100,
+        total_cost: 0.00123,
+      },
+    }).cost
+  ).toBe(0.00123);
+  expect(
+    measureUsage({
+      durationInSeconds: 12.5,
+      providerMetadata: { gateway: { totalCost: 0.004 } },
+      text: "hello",
+      usage: {
+        input_token_details: { audio_tokens: 300 },
+        input_tokens: 300,
+        output_tokens: 4,
+        type: "tokens",
+      },
+    })
+  ).toEqual({
+    audioTokens: 300,
+    completionTokens: 4,
+    cost: 0.004,
+    promptTokens: 300,
+    seconds: 12.5,
+  });
 });
