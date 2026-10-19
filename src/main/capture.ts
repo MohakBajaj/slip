@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { clipboard, systemPreferences } from "electron";
 import koffi from "koffi";
 
+import { defaultNoteCapture } from "../shared/capture-bind";
 import { planCopy, pollPasteboardChange } from "../shared/capture-clip";
 import type { ClipSnap, PasteSnap } from "../shared/capture-clip";
 import { createVoiceHold, HOLD_MS } from "../shared/capture-hold";
@@ -56,6 +57,7 @@ export interface CaptureEvent {
 
 export interface CaptureHandle {
   setDrawSequence: (seq: string[]) => void;
+  setNoteSequence: (seq: string[]) => void;
   setSequence: (seq: string[]) => void;
   setVoiceSequence: (seq: string[]) => void;
   stop: () => void;
@@ -66,6 +68,7 @@ const trusted = (): boolean =>
 
 const idle: CaptureHandle = {
   setDrawSequence: () => undefined,
+  setNoteSequence: () => undefined,
   setSequence: () => undefined,
   setVoiceSequence: () => undefined,
   stop: () => undefined,
@@ -74,8 +77,10 @@ const idle: CaptureHandle = {
 export const startCapture = (opts: {
   drawSequence?: string[];
   imageDir: string;
+  noteSequence?: string[];
   onDraw: () => void;
   onEvent: (event: CaptureEvent) => void;
+  onNote: () => void;
   onState: (state: CaptureState) => void;
   onVoice: () => void;
   onVoiceCancel: () => void;
@@ -102,7 +107,9 @@ const install = (opts: {
   imageDir: string;
   onEvent: (event: CaptureEvent) => void;
   drawSequence?: string[];
+  noteSequence?: string[];
   onDraw: () => void;
+  onNote: () => void;
   onState: (state: CaptureState) => void;
   onVoice: () => void;
   onVoiceCancel: () => void;
@@ -119,6 +126,9 @@ const install = (opts: {
   const drawMatcher = createCaptureMatcher(
     opts.drawSequence ?? ["Mod+Shift", "Mod+Shift"]
   );
+  const noteMatcher = createCaptureMatcher(
+    opts.noteSequence ?? defaultNoteCapture()
+  );
   const voiceHold = createVoiceHold(opts.voiceSequence ?? ["Option", "Option"]);
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   let holdLive = false;
@@ -126,6 +136,7 @@ const install = (opts: {
     matcher.needsKeys() ||
     voiceMatcher.needsKeys() ||
     drawMatcher.needsKeys() ||
+    noteMatcher.needsKeys() ||
     voiceHold.needsKeys();
   const pasteboard = createMacPasteboard();
   mkdirSync(opts.imageDir, { recursive: true });
@@ -537,13 +548,16 @@ const install = (opts: {
           const textHit = matcher.push(input);
           const voiceHit = holdLive ? false : voiceMatcher.push(input);
           const drawHit = drawMatcher.push(input);
+          const noteHit = noteMatcher.push(input);
           if (textHit) {
             voiceMatcher.reset();
             drawMatcher.reset();
+            noteMatcher.reset();
             fire();
           } else if (voiceHit) {
             matcher.reset();
             drawMatcher.reset();
+            noteMatcher.reset();
             try {
               opts.onVoice();
             } catch {
@@ -552,8 +566,18 @@ const install = (opts: {
           } else if (drawHit) {
             matcher.reset();
             voiceMatcher.reset();
+            noteMatcher.reset();
             try {
               opts.onDraw();
+            } catch {
+              // Overlay must not kill the tap.
+            }
+          } else if (noteHit) {
+            matcher.reset();
+            voiceMatcher.reset();
+            drawMatcher.reset();
+            try {
+              opts.onNote();
             } catch {
               // Overlay must not kill the tap.
             }
@@ -613,6 +637,7 @@ const install = (opts: {
       matcher.needsKeys() ||
       voiceMatcher.needsKeys() ||
       drawMatcher.needsKeys() ||
+      noteMatcher.needsKeys() ||
       voiceHold.needsKeys();
     if (listenKeys === prevKeys) {
       return;
@@ -638,12 +663,18 @@ const install = (opts: {
     syncListenKeys();
   };
 
+  const setNoteSequence = (seq: string[]): void => {
+    noteMatcher.setSequence(seq);
+    syncListenKeys();
+  };
+
   systemPreferences.isTrustedAccessibilityClient(true);
   syncTrust();
   const poll = setInterval(syncTrust, TRUST_POLL_MS);
 
   return {
     setDrawSequence,
+    setNoteSequence,
     setSequence,
     setVoiceSequence,
     stop: () => {

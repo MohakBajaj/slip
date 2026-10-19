@@ -58,6 +58,7 @@ import {
   mergeSlips,
   resolveAttachment,
   restoreSlips,
+  saveNote,
   updateSlip,
   updateSlips,
   watchVault,
@@ -66,7 +67,7 @@ import { installSkill, skillStatus } from "./agent-skill";
 import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
 import { applyDockIcon } from "./dock-icon";
-import { startFrontContext } from "./front-context";
+import { activateBundle, frontApp, startFrontContext } from "./front-context";
 
 const ACCESS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
@@ -161,6 +162,16 @@ let preview: PreviewState | null = null;
 let voiceCtx: ReturnType<typeof startFrontContext> | null = null;
 let voiceWin: BrowserWindow | null = null;
 let drawWin: BrowserWindow | null = null;
+let noteWin: BrowserWindow | null = null;
+let noteReady = false;
+let noteOpen = false;
+let noteAnnounce = false;
+let noteGen = 0;
+let noteBlurHold = 0;
+let noteBlurTimer: ReturnType<typeof setTimeout> | null = null;
+let noteBundle = "";
+let noteRestore: BrowserWindow | null = null;
+let suppressActivate = 0;
 let tray: Tray | null = null;
 let captureCtl: CaptureHandle | null = null;
 let stopWatch: (() => void) | null = null;
@@ -217,6 +228,7 @@ const paintWindows = (): void => {
   previewWin?.setBackgroundColor(hex);
   voiceWin?.setBackgroundColor(hex);
   drawWin?.setBackgroundColor(hex);
+  noteWin?.setBackgroundColor(hex);
 };
 
 const tellSettings = (): void => {
@@ -224,6 +236,7 @@ const tellSettings = (): void => {
   previewWin?.webContents.send("settings-changed", settings);
   voiceWin?.webContents.send("settings-changed", settings);
   drawWin?.webContents.send("settings-changed", settings);
+  noteWin?.webContents.send("settings-changed", settings);
 };
 
 const TRAY_GUID = "9f2e4c1a-7b83-4d6e-a510-c8d3f1b6e294";
@@ -453,6 +466,7 @@ const trayTemplate = (): MenuItemConstructorOptions[] => {
     { type: "separator" },
     { click: () => showWindow(), label: "Open Slip" },
     { click: () => composeSlip(), label: "New Slip" },
+    { click: () => showNote(), label: "Quick Note" },
     { click: () => showVoice(), label: "Voice Slip" },
     { click: () => showDraw(), label: "Draw" },
     {
@@ -506,12 +520,12 @@ const rebuildTray = (): void => {
   const { open } = trayShown(listSlips(vaultRoot()));
   const chord = formatCapture(settings.capture);
   tray.setTitle(open > 0 ? String(open) : "");
+  const noteChord = formatCapture(settings.noteCapture);
   const voiceChord = formatHold(settings.voiceCapture);
   const drawChord = formatCapture(settings.drawCapture);
+  const hint = `${chord} to capture — ${noteChord} for a note — ${voiceChord} to speak — ${drawChord} to draw`;
   tray.setToolTip(
-    open > 0
-      ? `Slip — ${open} open — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
-      : `Slip — ${chord} to capture — ${voiceChord} to speak — ${drawChord} to draw`
+    open > 0 ? `Slip — ${open} open — ${hint}` : `Slip — ${hint}`
   );
 };
 
@@ -711,8 +725,10 @@ const bootCapture = (): void => {
     captureCtl = startCapture({
       drawSequence: settings.drawCapture,
       imageDir: path.join(vaultRoot(), "attachments", "inbox"),
+      noteSequence: settings.noteCapture,
       onDraw: showDraw,
       onEvent: ingest,
+      onNote: showNote,
       onState: setCapture,
       onVoice: () => {
         showVoice("tap");
@@ -1034,6 +1050,210 @@ const showDraw = (attach = false): void => {
   loadHashPage(drawWin, "draw");
 };
 
+const NOTE_W = 520;
+const NOTE_H = 148;
+
+const holdActivate = (): void => {
+  suppressActivate = Date.now() + 700;
+};
+
+const ownFront = (name: string): boolean =>
+  name.length === 0 ||
+  name === "Electron" ||
+  name === "Slip" ||
+  name === app.getName();
+
+const placeNote = (target: BrowserWindow): void => {
+  const area = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint()
+  ).workArea;
+  target.setSize(NOTE_W, NOTE_H);
+  target.setPosition(
+    Math.round(area.x + (area.width - NOTE_W) / 2),
+    Math.round(area.y + Math.max(48, area.height * 0.18))
+  );
+};
+
+const tellNote = (): void => {
+  const target = noteWin;
+  if (!target || target.isDestroyed()) {
+    return;
+  }
+  const sendOpen = (): void => {
+    if (target.isDestroyed()) {
+      return;
+    }
+    target.webContents.send("note-open");
+  };
+  if (target.webContents.isLoading()) {
+    target.webContents.once("did-finish-load", sendOpen);
+    return;
+  }
+  sendOpen();
+};
+
+const clearNoteBlur = (): void => {
+  if (noteBlurTimer === null) {
+    return;
+  }
+  clearTimeout(noteBlurTimer);
+  noteBlurTimer = null;
+};
+
+const dismissNote = (): void => {
+  const restore = noteRestore;
+  const bundle = noteBundle;
+  const wasOpen = noteOpen;
+  noteGen += 1;
+  noteOpen = false;
+  noteAnnounce = false;
+  noteBundle = "";
+  noteRestore = null;
+  noteBlurHold = 0;
+  clearNoteBlur();
+  holdActivate();
+  if (noteWin && !noteWin.isDestroyed() && noteWin.isVisible()) {
+    noteWin.hide();
+  }
+  if (!wasOpen) {
+    return;
+  }
+  if (restore && !restore.isDestroyed() && restore.isVisible()) {
+    restore.focus();
+    return;
+  }
+  if (bundle.length > 0) {
+    activateBundle(bundle);
+    return;
+  }
+  if (process.platform === "darwin" && !visibleWindows()) {
+    app.hide();
+  }
+};
+
+const presentNote = (): void => {
+  if (!noteWin || noteWin.isDestroyed() || !noteReady || !noteOpen) {
+    return;
+  }
+  placeNote(noteWin);
+  noteBlurHold = Date.now() + 300;
+  const fresh = noteAnnounce;
+  noteAnnounce = false;
+  noteWin.show();
+  noteWin.focus();
+  if (fresh) {
+    tellNote();
+  }
+};
+
+const onNoteBlur = (): void => {
+  if (!noteOpen) {
+    return;
+  }
+  const wait = noteBlurHold - Date.now();
+  if (wait <= 0) {
+    dismissNote();
+    return;
+  }
+  // Show/focus can blur once. Dismiss only if focus never comes back.
+  clearNoteBlur();
+  noteBlurTimer = setTimeout(() => {
+    noteBlurTimer = null;
+    if (!noteOpen) {
+      return;
+    }
+    if (noteWin && !noteWin.isDestroyed() && noteWin.isFocused()) {
+      return;
+    }
+    dismissNote();
+  }, wait + 20);
+};
+
+const createNoteWindow = (): BrowserWindow => {
+  const target = new BrowserWindow({
+    alwaysOnTop: true,
+    backgroundColor: windowHex(),
+    closable: false,
+    focusable: true,
+    frame: false,
+    fullscreenable: false,
+    hasShadow: true,
+    height: NOTE_H,
+    hiddenInMissionControl: true,
+    maximizable: false,
+    minimizable: false,
+    resizable: false,
+    roundedCorners: true,
+    show: false,
+    skipTaskbar: true,
+    title: "Quick Note",
+    webPreferences: {
+      backgroundThrottling: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "../preload/index.js"),
+      sandbox: true,
+      spellcheck: false,
+      webgl: false,
+    },
+    width: NOTE_W,
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+  });
+  pinWorkspace(target);
+  target.on("blur", onNoteBlur);
+  target.on("ready-to-show", () => {
+    noteReady = true;
+    if (noteOpen) {
+      presentNote();
+    }
+  });
+  target.on("closed", () => {
+    if (noteWin === target) {
+      noteWin = null;
+      noteReady = false;
+      noteOpen = false;
+    }
+  });
+  loadHashPage(target, "note");
+  return target;
+};
+
+const ensureNote = (): void => {
+  if (noteWin && !noteWin.isDestroyed()) {
+    return;
+  }
+  noteReady = false;
+  noteWin = createNoteWindow();
+};
+
+const openNote = (): void => {
+  ensureNote();
+  if (noteOpen) {
+    presentNote();
+    return;
+  }
+  const gen = noteGen + 1;
+  noteGen = gen;
+  const focused = BrowserWindow.getFocusedWindow();
+  noteRestore =
+    focused !== null && focused !== noteWin && !focused.isDestroyed()
+      ? focused
+      : null;
+  holdActivate();
+  void frontApp().then((front) => {
+    if (gen !== noteGen) {
+      return;
+    }
+    noteBundle = ownFront(front.name) ? "" : front.bundle;
+    noteOpen = true;
+    noteAnnounce = true;
+    presentNote();
+  });
+};
+
+const showNote = (): void => {
+  setTimeout(openNote, 0);
+};
+
 const boot = async (): Promise<void> => {
   await app.whenReady();
   session.defaultSession.setSpellCheckerEnabled(false);
@@ -1129,7 +1349,8 @@ const boot = async (): Promise<void> => {
     const captureChanged =
       !sameCapture(settings.capture, prev.capture) ||
       !sameCapture(settings.voiceCapture, prev.voiceCapture) ||
-      !sameCapture(settings.drawCapture, prev.drawCapture);
+      !sameCapture(settings.drawCapture, prev.drawCapture) ||
+      !sameCapture(settings.noteCapture, prev.noteCapture);
     const vaultChanged = settings.vaultPath !== prev.vaultPath;
     if (settings.dock !== prev.dock) {
       applyDock(settings.dock);
@@ -1164,6 +1385,7 @@ const boot = async (): Promise<void> => {
         captureCtl.setSequence(settings.capture);
         captureCtl.setVoiceSequence(settings.voiceCapture);
         captureCtl.setDrawSequence(settings.drawCapture);
+        captureCtl.setNoteSequence(settings.noteCapture);
       } else {
         bootCapture();
       }
@@ -1233,6 +1455,24 @@ const boot = async (): Promise<void> => {
   });
   ipcMain.handle("closeVoice", () => {
     hideVoice();
+  });
+  ipcMain.handle("closeNote", () => {
+    dismissNote();
+  });
+  ipcMain.handle("saveNote", (_e, content: unknown) => {
+    const slip =
+      typeof content === "string"
+        ? saveNote(vaultRoot(), content, currentSection)
+        : null;
+    if (slip) {
+      if (settings.notify && Notification.isSupported()) {
+        new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
+      }
+      send("slips-changed");
+      rebuildTray();
+    }
+    dismissNote();
+    return slip;
   });
   ipcMain.handle("closeDraw", () => {
     hideDraw();
@@ -1488,6 +1728,10 @@ const boot = async (): Promise<void> => {
             label: "New Slip",
           },
           {
+            click: () => showNote(),
+            label: "Quick Note",
+          },
+          {
             click: () => showVoice(),
             label: "Voice Slip",
           },
@@ -1534,11 +1778,17 @@ const boot = async (): Promise<void> => {
 
   bootWatch();
   bootCapture();
+  ensureNote();
   if (!loginItem().wasOpenedAtLogin) {
     createWindow();
   }
 
-  app.on("activate", () => showWindow());
+  app.on("activate", () => {
+    if (noteOpen || Date.now() < suppressActivate) {
+      return;
+    }
+    showWindow();
+  });
 };
 
 app.setName("Slip");
@@ -1548,6 +1798,8 @@ boot().catch(() => {
 });
 
 app.on("before-quit", () => {
+  noteOpen = false;
+  noteGen += 1;
   captureCtl?.stop();
   stopWatch?.();
   hideVoice();

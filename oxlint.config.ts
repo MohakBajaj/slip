@@ -74,6 +74,7 @@ export default defineConfig({
         "src/renderer/src/lib/drop-images.ts",
         "src/renderer/src/preview.tsx",
         "src/renderer/src/draw.tsx",
+        "src/renderer/src/note.tsx",
         "src/renderer/src/voice.tsx",
       ],
       rules: {

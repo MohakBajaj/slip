@@ -17,6 +17,7 @@ Grant **Accessibility** the first time you capture, and **Microphone** the first
 Defaults, remappable in Settings:
 
 - **⇧ ⇧** — the current selection, including images in it, or a screenshot on the clipboard
+- **⌃ ⌃** — a quick note, without bringing Slip forward
 - **⌥** hold — speak a note; **⌥ ⌥** latches the recorder
 - **⌘⇧ ⌘⇧** — draw on a transparent overlay
 
