@@ -17,8 +17,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import "@quickdrawjs/core/quickdraw.css";
 
@@ -164,6 +165,8 @@ const Chip = ({
   />
 );
 
+const TIP_GAP = 6;
+
 const Tip = ({
   children,
   hint,
@@ -174,21 +177,61 @@ const Tip = ({
   hint: string;
   label: string;
   side?: "down" | "up";
-}) => (
-  <span className="group relative inline-flex">
-    {children}
+}) => {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const tip = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    const host = anchor.current;
+    const node = tip.current;
+    if (!open || host === null || node === null) {
+      return;
+    }
+    const box = host.getBoundingClientRect();
+    const size = node.getBoundingClientRect();
+    const pad = 4;
+    const left = Math.min(
+      Math.max(box.left + (box.width - size.width) / 2, pad),
+      window.innerWidth - size.width - pad
+    );
+    const below = box.bottom + TIP_GAP;
+    const above = box.top - size.height - TIP_GAP;
+    const top = side === "up" ? above : below;
+    node.style.left = `${left}px`;
+    node.style.top = `${Math.min(
+      Math.max(top, pad),
+      window.innerHeight - size.height - pad
+    )}px`;
+  }, [open, side]);
+
+  return (
     <span
-      className={cn(
-        "pointer-events-none absolute left-1/2 z-30 hidden -translate-x-1/2 items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] leading-none whitespace-nowrap group-hover:flex",
-        "bg-foreground text-background",
-        side === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"
-      )}
+      className="inline-flex"
+      onMouseEnter={() => {
+        setOpen(true);
+      }}
+      onMouseLeave={() => {
+        setOpen(false);
+      }}
+      ref={anchor}
     >
-      {label}
-      <kbd className="font-medium opacity-55">{hint}</kbd>
+      {children}
+      {open
+        ? createPortal(
+            <span
+              className="bg-foreground text-background pointer-events-none fixed z-50 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] leading-none whitespace-nowrap"
+              ref={tip}
+            >
+              {label}
+              <kbd className="font-medium opacity-55">{hint}</kbd>
+            </span>,
+            document.body
+          )
+        : null}
     </span>
-  </span>
-);
+  );
+};
 
 const toolActive = (tool: ToolId, geo: GeoId, id: SlipTool): boolean => {
   if (id === "pen") {
@@ -878,7 +921,10 @@ export const DrawApp = () => {
             {flash || (plate === null ? "Slip Draw" : "Annotate")}
           </p>
         </div>
-        <div className="flex min-w-0 flex-1 justify-center overflow-x-auto">
+        <div
+          className="flex min-w-0 flex-1 overflow-x-auto"
+          style={{ justifyContent: "safe center" }}
+        >
           <div className="bg-card/92 no-drag flex items-center gap-0.5 rounded-xl px-1 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
             {TOOLS.map((item) => (
               <Tip hint={item.hint} key={item.id} label={item.label}>
