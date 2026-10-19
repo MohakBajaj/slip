@@ -26,6 +26,6 @@ If Slip is not in Applications, use `Slip.app/Contents/Helpers/slip` from wherev
 
 ## Files
 
-Frontmatter holds `id`, `section`, `tags`, `pin`, `done`, `archived`, `source`, `url`, `page`, `images`, `audio`, `created`, `updated`. `images` and `audio` are path lists. Drawings land in `images`. The body is the note. First line is the title. `INDEX.md` is generated — do not edit it.
+Frontmatter holds `id`, `section`, `tags`, `pin`, `done`, `archived`, `source`, `url`, `page`, `images`, `audio`, `created`, `updated`. `images` and `audio` are path lists. Drawings land in `images`. Annotating an image adds a new png there and leaves the original file in place. The body is the note. First line is the title. `INDEX.md` is generated — do not edit it.
 
 `source` is the app, `cli`, or `note` for a quick note. Browser captures also set `url` and `page`. Voice captures set `audio`.

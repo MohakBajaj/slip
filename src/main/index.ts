@@ -30,6 +30,7 @@ import {
 } from "electron";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
+import type { DrawTarget } from "../shared/annotate";
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
@@ -978,6 +979,7 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
 };
 
 let drawAttach = false;
+let drawTarget: DrawTarget | null = null;
 
 const hideDraw = (): void => {
   if (drawWin && !drawWin.isDestroyed()) {
@@ -985,16 +987,46 @@ const hideDraw = (): void => {
   }
   drawWin = null;
   drawAttach = false;
+  drawTarget = null;
 };
 
 const tellDrawMode = (): void => {
   drawWin?.webContents.send("draw-mode", drawAttach ? "attach" : "slip");
 };
 
-const showDraw = (attach = false): void => {
+const tellDrawTarget = (): void => {
+  drawWin?.webContents.send("draw-target", drawTarget);
+};
+
+const parseDrawOpen = (
+  raw: unknown
+): { attach: boolean; target: DrawTarget | null } => {
+  if (raw === "attach") {
+    return { attach: true, target: null };
+  }
+  if (typeof raw !== "object" || raw === null) {
+    return { attach: false, target: null };
+  }
+  const rec = raw as { imagePath?: unknown; mode?: unknown; slipId?: unknown };
+  const attach = rec.mode === "attach";
+  const slipId = typeof rec.slipId === "string" ? rec.slipId : "";
+  const imagePath = typeof rec.imagePath === "string" ? rec.imagePath : "";
+  if (slipId.length === 0 || imagePath.length === 0) {
+    return { attach, target: null };
+  }
+  const slip = listSlips(vaultRoot()).find((item) => item.id === slipId);
+  if (!slip?.images.includes(imagePath)) {
+    return { attach, target: null };
+  }
+  return { attach, target: { imagePath, slipId } };
+};
+
+const showDraw = (attach = false, target: DrawTarget | null = null): void => {
   drawAttach = attach;
+  drawTarget = target;
   if (drawWin && !drawWin.isDestroyed()) {
     tellDrawMode();
+    tellDrawTarget();
     tellSettings();
     drawWin.show();
     drawWin.focus();
@@ -1044,9 +1076,13 @@ const showDraw = (attach = false): void => {
   drawWin.on("closed", () => {
     drawWin = null;
     drawAttach = false;
+    drawTarget = null;
     applyDock(settings.dock);
   });
-  drawWin.webContents.once("did-finish-load", tellDrawMode);
+  drawWin.webContents.once("did-finish-load", () => {
+    tellDrawMode();
+    tellDrawTarget();
+  });
   loadHashPage(drawWin, "draw");
 };
 
@@ -1478,7 +1514,33 @@ const boot = async (): Promise<void> => {
     hideDraw();
   });
   ipcMain.handle("openDraw", (_e, mode: unknown) => {
-    showDraw(mode === "attach");
+    const open = parseDrawOpen(mode);
+    showDraw(open.attach, open.target);
+  });
+  ipcMain.handle("drawSession", () => ({
+    mode: drawAttach ? "attach" : "slip",
+    target: drawTarget,
+  }));
+  ipcMain.handle("readAttachment", (_e, filePath: unknown) => {
+    if (typeof filePath !== "string") {
+      return null;
+    }
+    const allowed = resolveAttachment(vaultRoot(), filePath);
+    if (!allowed) {
+      return null;
+    }
+    return new Uint8Array(readFileSync(allowed));
+  });
+  ipcMain.handle("clipboardImage", () => {
+    const image = clipboard.readImage();
+    if (image.isEmpty()) {
+      return null;
+    }
+    const png = image.toPNG();
+    if (png.byteLength === 0) {
+      return null;
+    }
+    return { bytes: new Uint8Array(png), name: "clipboard.png" };
   });
   ipcMain.handle("copyImage", (_e, bytes: unknown) => {
     const image = asBytes(bytes);

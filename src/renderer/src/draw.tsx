@@ -20,8 +20,17 @@ import type { ButtonHTMLAttributes, PointerEvent, ReactNode } from "react";
 import darkIcon from "@/assets/dock-dark.png";
 import lightIcon from "@/assets/dock-light.png";
 import { Button } from "@/components/ui/button";
+import { filesFromClipboard, useFileDrop } from "@/lib/drop-images";
 import { cn } from "@/lib/utils";
 
+import {
+  fitContain,
+  fitFrame,
+  flattenBitmap,
+  nativeScale,
+} from "../../shared/annotate";
+import type { DrawTarget, Rect, Size } from "../../shared/annotate";
+import { attachmentType } from "../../shared/images";
 import { defaultSettings } from "../../shared/types";
 import type { Settings } from "../../shared/types";
 
@@ -753,6 +762,76 @@ const MarkSvg = ({ mark }: { mark: Mark }) => {
   );
 };
 
+interface Plate {
+  frame: Rect;
+  slipId: string;
+  url: string;
+}
+
+const canvasBytes = async (
+  canvas: HTMLCanvasElement
+): Promise<Uint8Array | null> => {
+  // oxlint-disable-next-line promise/avoid-new -- toBlob is callback-only
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+  canvas.width = 0;
+  canvas.height = 0;
+  if (!blob) {
+    return null;
+  }
+  return new Uint8Array(await blob.arrayBuffer());
+};
+
+const flattenPlate = async (
+  marks: Mark[],
+  img: HTMLImageElement,
+  frame: Rect,
+  dpr: number
+): Promise<Uint8Array | null> => {
+  if (marks.length === 0 || frame.w <= 0 || frame.h <= 0) {
+    return null;
+  }
+  const bitmap = flattenBitmap(
+    { h: img.naturalHeight, w: img.naturalWidth },
+    dpr
+  );
+  if (bitmap.w === 0 || bitmap.h === 0) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.w;
+  canvas.height = bitmap.h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(img, 0, 0, bitmap.w, bitmap.h);
+  const scale = nativeScale(frame, bitmap);
+  ctx.translate(-frame.x * scale.x, -frame.y * scale.y);
+  ctx.scale(scale.x, scale.y);
+  for (const mark of marks) {
+    paint(ctx, mark);
+  }
+  return await canvasBytes(canvas);
+};
+
+const loadImage = (url: string): Promise<HTMLImageElement | null> =>
+  // oxlint-disable-next-line promise/avoid-new -- Image has no promise API
+  new Promise((resolve) => {
+    const img = new Image();
+    const finish = (loaded: HTMLImageElement | null): void => {
+      resolve(loaded);
+    };
+    img.addEventListener("load", () => {
+      finish(img);
+    });
+    img.addEventListener("error", () => {
+      finish(null);
+    });
+    img.src = url;
+  });
+
 const inkPad = (mark: Mark): number => {
   if (mark.kind === "pen") {
     return penWidth(mark.size) / 2 + 2;
@@ -814,16 +893,7 @@ const toPng = async (
   for (const mark of marks) {
     paint(ctx, mark);
   }
-  // oxlint-disable-next-line promise/avoid-new -- toBlob is callback-only
-  const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, "image/png");
-  });
-  canvas.width = 0;
-  canvas.height = 0;
-  if (!blob) {
-    return null;
-  }
-  return new Uint8Array(await blob.arrayBuffer());
+  return await canvasBytes(canvas);
 };
 
 const CHIP =
@@ -892,6 +962,11 @@ export const DrawApp = () => {
   const [space, setSpace] = useState(false);
   const [hover, setHover] = useState<Handle | null>(null);
   const [flash, setFlash] = useState("");
+  const [plate, setPlate] = useState<Plate | null>(null);
+  const [offer, setOffer] = useState<{ label: string; url: string } | null>(
+    null
+  );
+  const [viewport, setViewport] = useState<Size>({ h: 0, w: 0 });
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -914,6 +989,15 @@ export const DrawApp = () => {
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
   const spaceRef = useRef(space);
+  const plateImgRef = useRef<HTMLImageElement | null>(null);
+  const plateUrlRef = useRef("");
+  const frameRef = useRef<Rect>({ h: 0, w: 0, x: 0, y: 0 });
+  const slipIdRef = useRef("");
+  const userViewRef = useRef(false);
+  const viewportRef = useRef<Size>({ h: 0, w: 0 });
+  const offerRef = useRef(offer);
+  const targetKeyRef = useRef("");
+  const offeredRef = useRef(false);
 
   marksRef.current = marks;
   toolRef.current = tool;
@@ -923,25 +1007,254 @@ export const DrawApp = () => {
   panRef.current = pan;
   zoomRef.current = zoom;
   spaceRef.current = space;
+  offerRef.current = offer;
 
   const dark =
     settings.scheme === "dark" || (settings.scheme === "system" && systemDark);
   const color = swatchHex(colorId, dark);
 
-  useEffect(() => {
-    window.slip
-      .load()
-      .then((data) => {
-        setSettings(data.settings);
+  const placePlate = (
+    img: HTMLImageElement,
+    url: string,
+    slipId: string
+  ): void => {
+    const previous = plateUrlRef.current;
+    if (previous.startsWith("blob:") && previous !== url) {
+      URL.revokeObjectURL(previous);
+    }
+    plateImgRef.current = img;
+    plateUrlRef.current = url;
+    slipIdRef.current = slipId;
+    userViewRef.current = false;
+    const frame = fitContain(viewportRef.current, {
+      h: img.naturalHeight,
+      w: img.naturalWidth,
+    });
+    frameRef.current = frame;
+    setPlate({ frame, slipId, url });
+    setMarks([]);
+    undoRef.current = [];
+    redoRef.current = [];
+    setSelected(null);
+    setLive(null);
+    setTextDraft(null);
+    setPan([0, 0]);
+    setZoom(1);
+  };
+
+  const stageUrl = (url: string, label: string): void => {
+    setOffer((prev) => {
+      if (prev !== null && prev.url.startsWith("blob:") && prev.url !== url) {
+        URL.revokeObjectURL(prev.url);
+      }
+      return { label, url };
+    });
+  };
+
+  const drop = useFileDrop((files) => {
+    const [file] = files;
+    if (file === undefined) {
+      return;
+    }
+    const label = file.name.length > 0 ? file.name : "Dropped image";
+    stageUrl(URL.createObjectURL(file), label);
+  });
+
+  const dismissOffer = (): void => {
+    setOffer((prev) => {
+      if (prev !== null && prev.url.startsWith("blob:")) {
+        URL.revokeObjectURL(prev.url);
+      }
+      return null;
+    });
+  };
+
+  const acceptOffer = (): void => {
+    const url = offer?.url;
+    if (url === undefined) {
+      return;
+    }
+    setOffer(null);
+    loadImage(url)
+      .then((img) => {
+        if (!img) {
+          if (url.startsWith("blob:")) {
+            URL.revokeObjectURL(url);
+          }
+          setFlash("Couldn't read image");
+          return;
+        }
+        placePlate(img, url, slipIdRef.current);
       })
       .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    let gone = false;
+    const openTarget = (target: DrawTarget): void => {
+      const key = `${target.slipId}:${target.imagePath}`;
+      if (key === targetKeyRef.current) {
+        return;
+      }
+      targetKeyRef.current = key;
+      const run = async (): Promise<void> => {
+        const bytes = await window.slip.readAttachment(target.imagePath);
+        if (gone || targetKeyRef.current !== key) {
+          return;
+        }
+        if (bytes === null) {
+          setFlash("Couldn't read image");
+          return;
+        }
+        const copy = Uint8Array.from(bytes);
+        const url = URL.createObjectURL(
+          new Blob([copy], { type: attachmentType(target.imagePath) })
+        );
+        const img = await loadImage(url);
+        if (gone || targetKeyRef.current !== key) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        if (img === null) {
+          URL.revokeObjectURL(url);
+          setFlash("Couldn't read image");
+          return;
+        }
+        placePlate(img, url, target.slipId);
+      };
+      run().catch(() => undefined);
+    };
+    const boot = async (): Promise<void> => {
+      const data = await window.slip.load();
+      if (gone) {
+        return;
+      }
+      setSettings(data.settings);
+      const session = await window.slip.drawSession();
+      if (gone) {
+        return;
+      }
+      setAttach(session.mode === "attach");
+      if (session.target) {
+        openTarget(session.target);
+        return;
+      }
+      if (offeredRef.current) {
+        return;
+      }
+      offeredRef.current = true;
+      const image = await window.slip.clipboardImage();
+      if (gone || image === null || targetKeyRef.current.length > 0) {
+        return;
+      }
+      const copy = Uint8Array.from(image.bytes);
+      stageUrl(
+        URL.createObjectURL(new Blob([copy], { type: "image/png" })),
+        "Clipboard image"
+      );
+    };
+    boot().catch(() => undefined);
     const offMode = window.slip.onDrawMode((mode) => {
       setAttach(mode === "attach");
     });
+    const offTarget = window.slip.onDrawTarget((target) => {
+      if (!target) {
+        return;
+      }
+      dismissOffer();
+      openTarget(target);
+    });
     const offSettings = window.slip.onSettings(setSettings);
     return () => {
+      gone = true;
+      targetKeyRef.current = "";
       offMode();
+      offTarget();
       offSettings();
+    };
+  }, []);
+
+  useEffect(() => {
+    const node = svgRef.current;
+    if (!node) {
+      return () => undefined;
+    }
+    const readBox = (): void => {
+      const box = node.getBoundingClientRect();
+      const next = { h: box.height, w: box.width };
+      const prev = viewportRef.current;
+      if (prev.w === next.w && prev.h === next.h) {
+        return;
+      }
+      viewportRef.current = next;
+      setViewport(next);
+    };
+    readBox();
+    const obs = new ResizeObserver(readBox);
+    obs.observe(node);
+    return () => {
+      obs.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (userViewRef.current || viewport.w <= 0 || viewport.h <= 0) {
+      return;
+    }
+    const img = plateImgRef.current;
+    if (!img) {
+      return;
+    }
+    let frame = frameRef.current;
+    if (frame.w <= 0 || frame.h <= 0) {
+      frame = fitContain(viewport, {
+        h: img.naturalHeight,
+        w: img.naturalWidth,
+      });
+      frameRef.current = frame;
+      setPlate((cur) => (cur === null ? cur : { ...cur, frame }));
+      setZoom(1);
+      setPan([0, 0]);
+      return;
+    }
+    const placed = fitFrame(viewport, frame);
+    setZoom(placed.zoom);
+    setPan(placed.pan);
+  }, [plate?.url, viewport]);
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent): void => {
+      if (event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      const [file] = filesFromClipboard(event.clipboardData);
+      if (file !== undefined) {
+        event.preventDefault();
+        stageUrl(URL.createObjectURL(file), file.name || "Pasted image");
+        return;
+      }
+      const text = event.clipboardData?.getData("text") ?? "";
+      if (text.length > 0) {
+        return;
+      }
+      event.preventDefault();
+      window.slip
+        .clipboardImage()
+        .then((image) => {
+          if (image === null) {
+            return;
+          }
+          const copy = Uint8Array.from(image.bytes);
+          stageUrl(
+            URL.createObjectURL(new Blob([copy], { type: "image/png" })),
+            "Pasted image"
+          );
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("paste", onPaste);
     };
   }, []);
 
@@ -1061,13 +1374,22 @@ export const DrawApp = () => {
     apply([...marksRef.current, mark]);
   };
 
-  const exportPng = useCallback(
-    (): Promise<Uint8Array | null> => toPng(marksRef.current, paper()),
-    []
-  );
+  const exportPng = useCallback((): Promise<Uint8Array | null> => {
+    const img = plateImgRef.current;
+    if (img && plateUrlRef.current.length > 0) {
+      return flattenPlate(
+        marksRef.current,
+        img,
+        frameRef.current,
+        window.devicePixelRatio || 1
+      );
+    }
+    return toPng(marksRef.current, paper());
+  }, []);
 
   const zoomAtScreen = useCallback(
     (nextZoom: number, sx: number, sy: number): void => {
+      userViewRef.current = true;
       const next = zoomToward(
         zoomRef.current,
         panRef.current,
@@ -1094,7 +1416,19 @@ export const DrawApp = () => {
   );
 
   const resetZoom = useCallback((): void => {
-    const box = svgRef.current?.getBoundingClientRect();
+    const node = svgRef.current;
+    if (plateImgRef.current && node && frameRef.current.w > 0) {
+      userViewRef.current = false;
+      const box = node.getBoundingClientRect();
+      const placed = fitFrame(
+        { h: box.height, w: box.width },
+        frameRef.current
+      );
+      setZoom(placed.zoom);
+      setPan(placed.pan);
+      return;
+    }
+    const box = node?.getBoundingClientRect();
     zoomAtScreen(1, (box?.width ?? 0) / 2, (box?.height ?? 0) / 2);
   }, [zoomAtScreen]);
 
@@ -1118,12 +1452,28 @@ export const DrawApp = () => {
       return;
     }
     busyRef.current = true;
-    const bytes = await exportPng();
-    if (!bytes) {
+    try {
+      const bytes = await exportPng();
+      if (!bytes) {
+        return;
+      }
+      const id = slipIdRef.current;
+      if (id.length > 0) {
+        const saved = await window.slip.addImages(id, [
+          { bytes, name: "annotated.png" },
+        ]);
+        if (saved) {
+          await window.slip.closeDraw();
+        }
+        return;
+      }
+      await window.slip.createDrawSlip({
+        bytes,
+        name: plateUrlRef.current.length > 0 ? "annotated.png" : "drawing.png",
+      });
+    } finally {
       busyRef.current = false;
-      return;
     }
-    await window.slip.createDrawSlip({ bytes, name: "drawing.png" });
   }, [exportPng]);
 
   useEffect(() => {
@@ -1135,6 +1485,14 @@ export const DrawApp = () => {
         event.preventDefault();
         if (textDraftRef.current) {
           setTextDraft(null);
+          return;
+        }
+        if (offerRef.current) {
+          const { url } = offerRef.current;
+          if (url.startsWith("blob:")) {
+            URL.revokeObjectURL(url);
+          }
+          setOffer(null);
           return;
         }
         if (selected !== null && selected.length > 0) {
@@ -1391,6 +1749,7 @@ export const DrawApp = () => {
       data-accent={settings.accent}
       data-font={settings.font}
       data-theme={settings.theme}
+      {...drop.props}
     >
       <header className="drag flex h-9.5 shrink-0 items-center gap-2 pr-2.5">
         <div className="flex min-w-28 shrink-0 items-center gap-1.5 pl-20">
@@ -1401,7 +1760,7 @@ export const DrawApp = () => {
             src={dark ? darkIcon : lightIcon}
           />
           <p className="truncate text-[13px] font-medium">
-            {flash || "Slip Draw"}
+            {flash || (plate === null ? "Slip Draw" : "Annotate")}
           </p>
         </div>
         <div className="flex min-w-0 flex-1 justify-center">
@@ -1539,7 +1898,7 @@ export const DrawApp = () => {
               }}
               size="xs"
             >
-              {attach ? "Add" : "Slip"}
+              {attach || (plate?.slipId.length ?? 0) > 0 ? "Add" : "Slip"}
               <kbd className="text-[10px] font-medium opacity-70">⌘↵</kbd>
             </Button>
           </div>
@@ -1703,6 +2062,7 @@ export const DrawApp = () => {
             }
             const drag = dragRef.current;
             if (drag?.kind === "pan") {
+              userViewRef.current = true;
               const screen = xyOf(event);
               setPan([
                 drag.pan[0] + screen[0] - drag.at[0],
@@ -1861,6 +2221,16 @@ export const DrawApp = () => {
           style={{ cursor }}
         >
           <g transform={`translate(${pan[0]} ${pan[1]}) scale(${zoom})`}>
+            {plate !== null && plate.frame.w > 0 ? (
+              <image
+                height={plate.frame.h}
+                href={plate.url}
+                preserveAspectRatio="none"
+                width={plate.frame.w}
+                x={plate.frame.x}
+                y={plate.frame.y}
+              />
+            ) : null}
             {marks
               .filter((mark) => mark.id !== textDraft?.id)
               .map((mark) => (
@@ -2003,6 +2373,37 @@ export const DrawApp = () => {
             value={textDraft.text}
           />
         ) : null}
+        {offer === null ? null : (
+          <div className="bg-card/92 no-drag absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl px-2 py-1 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
+            <img
+              alt=""
+              className="size-7 rounded object-contain"
+              src={offer.url}
+            />
+            <p className="text-[12px]">
+              {plate === null
+                ? "Draw on this image?"
+                : "Draw on this image instead?"}
+            </p>
+            <Button
+              className="press"
+              onClick={acceptOffer}
+              size="xs"
+              type="button"
+            >
+              Use
+            </Button>
+            <Button
+              className="press"
+              onClick={dismissOffer}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              Not now
+            </Button>
+          </div>
+        )}
         <div className="bg-card/92 no-drag absolute bottom-3 left-3 z-10 flex items-center gap-0.5 rounded-lg px-0.5 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
           <Tip hint="−" label="Zoom out" side="up">
             <Chip
