@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  addImages,
   createSlip,
   deleteSlips,
   listSlips,
@@ -23,6 +30,24 @@ describe("attachments", () => {
     updateSlip(root, slip.id, { archived: true });
     deleteSlips(root, [slip.id]);
     expect(existsSync(path.join(root, "attachments", slip.id))).toBe(false);
+  });
+
+  test("annotation appends a png and keeps the original file", () => {
+    const root = vault();
+    const img = path.join(root, "shot.png");
+    writeFileSync(img, "original-bytes");
+    const slip = createSlip(root, { content: "x", images: [img] });
+    const original = slip.images[0] ?? "";
+    expect(readFileSync(original, "utf8")).toBe("original-bytes");
+    const annotated = path.join(root, "annotated.png");
+    writeFileSync(annotated, "annotated-bytes");
+    const next = addImages(root, slip.id, [annotated]);
+    expect(next?.images).toHaveLength(2);
+    expect(next?.images[0]).toBe(original);
+    expect(readFileSync(original, "utf8")).toBe("original-bytes");
+    expect(readFileSync(next?.images[1] ?? "", "utf8")).toBe("annotated-bytes");
+    expect(existsSync(img)).toBe(true);
+    expect(next?.images[0]).not.toBe(next?.images[1]);
   });
 
   test("inbox capture is moved not copied", () => {

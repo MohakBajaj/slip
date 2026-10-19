@@ -491,6 +491,11 @@ export const DetailWell = ({
           onAdd={() => {
             picker.current?.click();
           }}
+          onAnnotate={(key) => {
+            window.slip
+              .openDraw({ imagePath: key, slipId: slip.id })
+              .catch(() => undefined);
+          }}
           onOpen={(key) => {
             const at = slip.images.indexOf(key);
             window.slip
@@ -613,6 +618,25 @@ export const DetailWell = ({
             }}
           />
         </ButtonGroup>
+        {slip.images.length > 0 ? (
+          <Button
+            className="press"
+            onClick={() => {
+              const [imagePath] = slip.images;
+              if (imagePath === undefined) {
+                return;
+              }
+              window.slip
+                .openDraw({ imagePath, slipId: slip.id })
+                .catch(() => undefined);
+            }}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            Annotate
+          </Button>
+        ) : null}
         <CopyGroup slip={slip} />
       </footer>
     </section>

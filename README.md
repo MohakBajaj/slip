@@ -21,7 +21,7 @@ Defaults, remappable in Settings:
 - **⇧ ⇧** — the current selection, including images in it, or a screenshot on the clipboard
 - **⌃ ⌃** — a quick note, without bringing Slip forward
 - **⌥** hold — speak; the text is saved. **⌥ ⌥** latches the recorder
-- **⌘⇧ ⌘⇧** — draw on a transparent overlay
+- **⌘⇧ ⌘⇧** — draw on a transparent overlay. Annotate draws on a slip image and saves a new png next to the original
 
 Drop images onto a slip. Merge selected slips from the command palette.
 

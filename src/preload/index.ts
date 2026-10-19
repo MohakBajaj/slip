@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+import type { DrawSession, DrawTarget } from "../shared/annotate";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import type { VoiceStatus } from "../shared/speech";
@@ -16,6 +17,11 @@ const api = {
     ipcRenderer.invoke("addImages", id, images) as Promise<Slip | null>,
   askMic: () => ipcRenderer.invoke("askMic") as Promise<boolean>,
   cleanupKeySet: () => ipcRenderer.invoke("cleanupKeySet") as Promise<boolean>,
+  clipboardImage: () =>
+    ipcRenderer.invoke("clipboardImage") as Promise<{
+      bytes: Uint8Array;
+      name: string;
+    } | null>,
   closeDraw: () => ipcRenderer.invoke("closeDraw"),
   closeNote: () => ipcRenderer.invoke("closeNote"),
   closeVoice: () => ipcRenderer.invoke("closeVoice"),
@@ -39,6 +45,7 @@ const api = {
     }>,
   deleteSlips: (ids: string[]) =>
     ipcRenderer.invoke("deleteSlips", ids) as Promise<Slip[]>,
+  drawSession: () => ipcRenderer.invoke("drawSession") as Promise<DrawSession>,
   installSkill: () =>
     ipcRenderer.invoke("installSkill") as Promise<SkillStatus>,
   load: () =>
@@ -82,6 +89,13 @@ const api = {
     ipcRenderer.on("draw-mode", listener);
     return () => {
       ipcRenderer.removeListener("draw-mode", listener);
+    };
+  },
+  onDrawTarget: (fn: (target: DrawTarget | null) => void) => {
+    const listener = (_: unknown, target: DrawTarget | null) => fn(target);
+    ipcRenderer.on("draw-target", listener);
+    return () => {
+      ipcRenderer.removeListener("draw-target", listener);
     };
   },
   onLoginState: (fn: (state: LoginState) => void) => {
@@ -143,7 +157,12 @@ const api = {
     };
   },
   openAccess: () => ipcRenderer.invoke("openAccess"),
-  openDraw: (mode?: "attach" | "slip") => ipcRenderer.invoke("openDraw", mode),
+  openDraw: (
+    mode?:
+      | "attach"
+      | "slip"
+      | { imagePath: string; mode?: "attach" | "slip"; slipId: string }
+  ) => ipcRenderer.invoke("openDraw", mode),
   openMic: () => ipcRenderer.invoke("openMic"),
   openPreview: (slipId: string, index: number) =>
     ipcRenderer.invoke("openPreview", slipId, index),
@@ -152,6 +171,11 @@ const api = {
   pickVault: () => ipcRenderer.invoke("pickVault") as Promise<string | null>,
   popupMenu: (items: MenuEntry[]) =>
     ipcRenderer.invoke("popupMenu", items) as Promise<string | null>,
+  readAttachment: (filePath: string) =>
+    ipcRenderer.invoke(
+      "readAttachment",
+      filePath
+    ) as Promise<Uint8Array | null>,
   restoreSlips: (slips: Slip[], drop: string[] = []) =>
     ipcRenderer.invoke("restoreSlips", slips, drop),
   saveNote: (content: string) =>

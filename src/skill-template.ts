@@ -38,7 +38,8 @@ The body is the note. First line is the title.
 speech. Captures from a browser also set \`url\` and \`page\`. A voice
 slip's body is the cleaned note, and \`transcript\` is what was said.
 Older voice captures may set \`audio\` to a recording path. Drawings land
-in \`images\`.
+in \`images\`. Annotating an image adds a new png there and leaves the
+original file in place.
 
 ## CLI
 
