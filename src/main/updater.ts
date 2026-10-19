@@ -30,9 +30,9 @@ import {
   describeInstallTarget,
   manifestUrl,
   MAX_ZIP_BYTES,
+  noticeForManifestFailure,
   parseManifest,
   PRODUCT_APP,
-  releasePage,
   safeSwapPath,
   zipEntryAllowed,
 } from "../shared/update";
@@ -385,12 +385,25 @@ const checkOnce = async (input: {
   try {
     manifest = await fetchManifest();
     osVersion = await macOSVersion();
-  } catch {
-    await finish(
-      input.manual,
-      "Couldn't check for updates",
-      `Slip couldn't read ${releasePage()}.`
-    );
+  } catch (error) {
+    const notice = noticeForManifestFailure({
+      error,
+      manual: input.manual,
+      url: manifestUrl(),
+    });
+    if (notice.kind === "current") {
+      await finish(
+        input.manual,
+        "Slip is up to date",
+        `You're running ${app.getVersion()}.`
+      );
+      return;
+    }
+    if (notice.kind === "silent") {
+      console.error(notice.log);
+      return;
+    }
+    await tell(notice.message, notice.detail);
     return;
   }
   const decision = decideUpdate({

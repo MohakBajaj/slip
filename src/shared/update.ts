@@ -228,6 +228,64 @@ export const buildManifest = (input: {
   return parsed.manifest;
 };
 
+const HTTP_STATUS = /^status (?<code>\d{3})$/u;
+const TRANSPORT_CODES = [
+  "EAI_AGAIN",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "ETIMEDOUT",
+] as const;
+
+export type ManifestCheckNotice =
+  | { kind: "current" }
+  | { kind: "silent"; log: string }
+  | { detail: string; kind: "dialog"; message: string };
+
+const isTransportFailure = (message: string): boolean =>
+  message === "timeout" ||
+  message === "socket hang up" ||
+  TRANSPORT_CODES.some((code) => message.includes(code));
+
+// A 404 is a latest release that predates the updater and has no latest.json.
+const manifestFailureDetail = (url: string, error: unknown): string | null => {
+  const message = error instanceof Error ? error.message : "network error";
+  const status = HTTP_STATUS.exec(message)?.groups?.code;
+  if (status === "404") {
+    return null;
+  }
+  if (status !== undefined) {
+    return `Slip couldn't read ${url} (HTTP ${status}).`;
+  }
+  if (message.length === 0 || isTransportFailure(message)) {
+    return `Slip couldn't read ${url} (network error).`;
+  }
+  return `Slip couldn't read ${url} (${message}).`;
+};
+
+export const noticeForManifestFailure = (input: {
+  error: unknown;
+  manual: boolean;
+  url: string;
+}): ManifestCheckNotice => {
+  const detail = manifestFailureDetail(input.url, input.error);
+  if (detail === null) {
+    return { kind: "current" };
+  }
+  if (!input.manual) {
+    return { kind: "silent", log: detail };
+  }
+  return {
+    detail,
+    kind: "dialog",
+    message: "Couldn't check for updates",
+  };
+};
+
 export const decideUpdate = (input: {
   autoCheck: boolean;
   busy: boolean;
