@@ -35,6 +35,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # Zip has no config key in electron-builder 26. The dmg block sets its own
+  # name, so this only forces the arm64 suffix into the zip.
+  artifactName: Slip-${version}-${arch}-mac.${ext}
   category: public.app-category.productivity
   icon: build/icon.png
   identity: null
@@ -68,8 +71,6 @@ dmg:
       y: 188
       type: link
       path: /Applications
-zip:
-  artifactName: Slip-${version}-${arch}-mac.${ext}
 linux:
   target:
     - AppImage
