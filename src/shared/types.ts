@@ -12,6 +12,8 @@ import {
 } from "./capture-bind";
 import type { Shortcuts } from "./shortcuts";
 import { defaultShortcuts, sanitizeShortcuts } from "./shortcuts";
+import { migrateSpeechSettings } from "./speech-engines";
+import type { CleanupRoute, TranscribeRoute } from "./speech-engines";
 
 export type CaptureState = "off" | "live" | "denied" | "failed";
 export type LoginState = "unknown" | "on" | "off" | "unavailable";
@@ -42,9 +44,9 @@ export interface Settings {
   alwaysOnTop: boolean;
   capture: string[];
   checkUpdates: boolean;
-  cleanup: boolean;
+  cleanupDevice: string;
   cleanupModel: string;
-  cleanupUrl: string;
+  cleanupRoute: CleanupRoute;
   dock: boolean;
   drawCapture: string[];
   font: FontId;
@@ -54,6 +56,9 @@ export interface Settings {
   shortcuts: Shortcuts;
   showDone: boolean;
   theme: ThemeId;
+  transcribeDevice: string;
+  transcribeModel: string;
+  transcribeRoute: TranscribeRoute;
   trayIcon: TrayIconId;
   vaultPath: string;
   voiceCapture: string[];
@@ -85,28 +90,34 @@ export const settingsFile = (): string => {
     : `${home}/Library/Application Support/slip/settings.json`;
 };
 
-export const defaultSettings = (): Settings => ({
-  accent: "amber",
-  alwaysOnTop: true,
-  capture: defaultCapture(),
-  checkUpdates: true,
-  cleanup: true,
-  cleanupModel: "",
-  cleanupUrl: "",
-  dock: true,
-  drawCapture: defaultDrawCapture(),
-  font: "geist",
-  noteCapture: defaultNoteCapture(),
-  notify: false,
-  scheme: "system",
-  shortcuts: defaultShortcuts(),
-  showDone: true,
-  theme: "paper",
-  trayIcon: "slip",
-  vaultPath: defaultVaultPath(),
-  voiceCapture: defaultVoiceCapture(),
-  zoom: 1,
-});
+export const defaultSettings = (): Settings => {
+  const speech = migrateSpeechSettings({});
+  return {
+    accent: "amber",
+    alwaysOnTop: true,
+    capture: defaultCapture(),
+    checkUpdates: true,
+    cleanupDevice: speech.cleanupDevice,
+    cleanupModel: speech.cleanupModel,
+    cleanupRoute: speech.cleanupRoute,
+    dock: true,
+    drawCapture: defaultDrawCapture(),
+    font: "geist",
+    noteCapture: defaultNoteCapture(),
+    notify: false,
+    scheme: "system",
+    shortcuts: defaultShortcuts(),
+    showDone: true,
+    theme: "paper",
+    transcribeDevice: speech.transcribeDevice,
+    transcribeModel: speech.transcribeModel,
+    transcribeRoute: speech.transcribeRoute,
+    trayIcon: "slip",
+    vaultPath: defaultVaultPath(),
+    voiceCapture: defaultVoiceCapture(),
+    zoom: 1,
+  };
+};
 
 export const ZOOM_MIN = 0.8;
 export const ZOOM_MAX = 1.5;
@@ -161,14 +172,13 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
   }
-  if (typeof next.cleanup !== "boolean") {
-    next.cleanup = true;
-  }
-  if (typeof next.cleanupModel !== "string") {
-    next.cleanupModel = "";
-  }
-  next.cleanupUrl =
-    typeof next.cleanupUrl === "string" ? next.cleanupUrl.trim() : "";
+  const speech = migrateSpeechSettings(input);
+  next.cleanupDevice = speech.cleanupDevice;
+  next.cleanupModel = speech.cleanupModel;
+  next.cleanupRoute = speech.cleanupRoute;
+  next.transcribeDevice = speech.transcribeDevice;
+  next.transcribeModel = speech.transcribeModel;
+  next.transcribeRoute = speech.transcribeRoute;
   if (typeof next.alwaysOnTop !== "boolean") {
     next.alwaysOnTop = true;
   }
@@ -197,9 +207,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     alwaysOnTop: next.alwaysOnTop,
     capture: next.capture,
     checkUpdates: next.checkUpdates,
-    cleanup: next.cleanup,
+    cleanupDevice: next.cleanupDevice,
     cleanupModel: next.cleanupModel,
-    cleanupUrl: next.cleanupUrl,
+    cleanupRoute: next.cleanupRoute,
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,
@@ -209,6 +219,9 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     shortcuts: next.shortcuts,
     showDone: next.showDone,
     theme: next.theme,
+    transcribeDevice: next.transcribeDevice,
+    transcribeModel: next.transcribeModel,
+    transcribeRoute: next.transcribeRoute,
     trayIcon: next.trayIcon,
     vaultPath: next.vaultPath,
     voiceCapture: next.voiceCapture,

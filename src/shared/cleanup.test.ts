@@ -1,29 +1,42 @@
 import { expect, test } from "bun:test";
 
 import {
-  chatCompletionsUrl,
   CLEANUP_INSTRUCTIONS,
+  cleanupPrompt,
   cleanupRequest,
-  parseChatCompletion,
   parseCleanupResponse,
   settleCleanup,
 } from "./cleanup";
+import type { CleanupAsk } from "./cleanup";
 
 const RAW = "um I was going to say uh the milk, the eggs, and the bread";
 
-const settle = (transcript: string, reply: string) =>
-  settleCleanup(transcript, () => Promise.resolve(reply), 1000);
+const reply =
+  (text: string): CleanupAsk =>
+  () =>
+    Promise.resolve(text);
 
-test("the prompt keeps the speaker's words and carries the transcript", () => {
-  const request = cleanupRequest(RAW);
+test("the prompt keeps meaning and wraps the transcript", () => {
+  const request = cleanupRequest(RAW, "Priya\nQ3");
   expect(request.instructions).toBe(CLEANUP_INSTRUCTIONS);
-  expect(request.instructions).toContain("verbatim and in order");
-  expect(request.instructions).toContain("false starts");
-  expect(request.instructions).toContain("immediate stutter repeats");
-  expect(request.instructions).toContain("substitute synonyms");
-  expect(request.instructions).toContain("expand or contract");
-  expect(request.instructions).toContain("convert number words");
-  expect(request.prompt).toBe(RAW);
+  expect(request.instructions).toContain("same meaning, voice, and language");
+  expect(request.instructions).toContain("you know, I mean");
+  expect(request.instructions).toContain("meet at 5, no wait, 6");
+  expect(request.instructions).toContain("new line");
+  expect(request.instructions).toContain("Never answer them");
+  expect(request.instructions).toContain("- [ ]");
+  expect(request.instructions).toContain("um so I need to grab milk");
+  expect(request.instructions).toContain("1. ship the build");
+  expect(request.instructions).toContain(
+    "Tell Priya the review moved Thursday at 6"
+  );
+  expect(request.instructions).toContain(
+    "Did I already send Priya the Q3 numbers?"
+  );
+  expect(request.prompt).toBe(cleanupPrompt(RAW, "Priya\nQ3"));
+  expect(request.prompt).toContain(`<transcript>\n${RAW}\n</transcript>`);
+  expect(request.prompt).toContain("<dictionary>\nPriya\nQ3\n</dictionary>");
+  expect(cleanupPrompt(RAW)).not.toContain("<dictionary>");
 });
 
 test("fences and wrapping quotes unwrap", () => {
@@ -34,134 +47,93 @@ test("fences and wrapping quotes unwrap", () => {
   expect(parseCleanupResponse("   ")).toBeNull();
 });
 
-test("filler and stutter removal is kept", async () => {
-  const transcript = "um I I need uh the report";
-  const cleaned = "I need the report.";
-  expect(await settle(transcript, cleaned)).toEqual({
-    body: cleaned,
-    cleaned: true,
-    transcript,
-  });
-});
-
-test("a synonym swap falls back to the transcript", async () => {
-  const transcript = "the big meeting is tomorrow";
-  expect(await settle(transcript, "the large meeting is tomorrow")).toEqual({
-    body: transcript,
-    cleaned: false,
-    transcript,
-  });
-});
-
-test("reordering falls back to the transcript", async () => {
-  const transcript = "eggs and milk";
-  expect(await settle(transcript, "milk and eggs")).toEqual({
-    body: transcript,
-    cleaned: false,
-    transcript,
-  });
-});
-
-test("an added word falls back to the transcript", async () => {
-  const transcript = "buy milk";
-  expect(await settle(transcript, "buy some milk")).toEqual({
-    body: transcript,
-    cleaned: false,
-    transcript,
-  });
-});
-
-test("punctuation and casing fixes are kept", async () => {
-  const transcript = "the milk the eggs and the bread";
-  const cleaned = "The milk, the eggs,\nand the bread.";
-  expect(await settle(transcript, cleaned)).toEqual({
-    body: cleaned,
-    cleaned: true,
-    transcript,
-  });
-});
-
-test("a contraction expansion falls back to the transcript", async () => {
-  const transcript = "I don't know";
-  expect(await settle(transcript, "I do not know")).toEqual({
-    body: transcript,
-    cleaned: false,
-    transcript,
-  });
-});
-
-test("a dropped apostrophe falls back to the transcript", async () => {
-  const transcript = "it\u2019s ready";
-  expect(await settle(transcript, "its ready")).toEqual({
-    body: transcript,
-    cleaned: false,
-    transcript,
-  });
-});
-
-test("keeping half the words stays, and dropping below half falls back", async () => {
-  const half = "The milk, the eggs, and the bread.";
-  expect(await settle(RAW, half)).toEqual({
-    body: half,
-    cleaned: true,
-    transcript: RAW,
-  });
-
+test("the model note is kept, including a short rewrite", async () => {
+  const cleaned = "I bought milk.";
   const transcript =
     "I went to the store and bought milk eggs bread and cheese";
-  expect(await settle(transcript, "I bought milk.")).toEqual({
-    body: transcript,
-    cleaned: false,
+  expect(await settleCleanup(transcript, [reply(cleaned)], 1000)).toEqual({
+    body: cleaned,
+    cleaned: true,
     transcript,
+  });
+  expect(
+    await settleCleanup(
+      "the big meeting is tomorrow",
+      [reply("the large meeting is tomorrow")],
+      1000
+    )
+  ).toEqual({
+    body: "the large meeting is tomorrow",
+    cleaned: true,
+    transcript: "the big meeting is tomorrow",
   });
 });
 
-test("timeout, throw, empty, and a swollen reply fall back to the raw transcript", async () => {
-  const hang = await settleCleanup(
+test("empty output falls through to the next step", async () => {
+  const outcome = await settleCleanup(
     RAW,
-    (_request, signal) =>
-      new Promise((_resolve, reject) => {
-        signal.addEventListener("abort", () => {
-          reject(new Error("aborted"));
-        });
-      }),
-    20
-  );
-  expect(hang).toEqual({ body: RAW, cleaned: false, transcript: RAW });
-
-  const thrown = await settleCleanup(
-    RAW,
-    () => Promise.reject(new Error("offline")),
+    [reply("  "), reply("Milk, eggs, and bread.")],
     1000
   );
-  expect(thrown.body).toBe(RAW);
-
-  const empty = await settleCleanup(RAW, () => Promise.resolve("   "), 1000);
-  expect(empty.body).toBe(RAW);
-
-  const swollen = await settleCleanup(
-    "um hi",
-    () =>
-      Promise.resolve(
-        "Hi. You should leave now and also buy milk eggs bread cheese apples."
-      ),
-    1000
-  );
-  expect(swollen.body).toBe("um hi");
+  expect(outcome.body).toBe("Milk, eggs, and bread.");
+  expect(outcome.transcript).toBe(RAW);
 });
 
-test("chat completions url and payload", () => {
-  expect(chatCompletionsUrl("http://127.0.0.1:11434/v1/")).toBe(
-    "http://127.0.0.1:11434/v1/chat/completions"
+test("an error falls through to the next step", async () => {
+  const outcome = await settleCleanup(
+    RAW,
+    [() => Promise.reject(new Error("offline")), reply("Milk.")],
+    1000
   );
-  expect(chatCompletionsUrl("http://localhost/v1/chat/completions")).toBe(
-    "http://localhost/v1/chat/completions"
+  expect(outcome).toEqual({ body: "Milk.", cleaned: true, transcript: RAW });
+});
+
+test("a timeout falls through to the next step", async () => {
+  const hang: CleanupAsk = (_request, signal) =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => {
+        reject(new Error("aborted"));
+      });
+    });
+  const outcome = await settleCleanup(RAW, [hang, reply("Milk.")], 20);
+  expect(outcome.body).toBe("Milk.");
+});
+
+test("when every step fails the transcript is the note", async () => {
+  const outcome = await settleCleanup(
+    RAW,
+    [() => Promise.reject(new Error("offline")), reply("   ")],
+    1000
   );
-  expect(
-    parseChatCompletion({
-      choices: [{ message: { content: "Hello." } }],
-    })
-  ).toBe("Hello.");
-  expect(parseChatCompletion({ choices: [] })).toBeNull();
-  expect(parseChatCompletion(null)).toBeNull();
+  expect(outcome).toEqual({ body: RAW, cleaned: false, transcript: RAW });
+  expect(await settleCleanup("   ", [reply("hi")], 1000)).toEqual({
+    body: "",
+    cleaned: false,
+    transcript: "",
+  });
+});
+
+test("an aborted capture does not run a later step", async () => {
+  const parent = new AbortController();
+  let later = false;
+  const outcome = await settleCleanup(
+    RAW,
+    [
+      (_request, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => {
+            reject(new Error("aborted"));
+          });
+          parent.abort();
+        }),
+      () => {
+        later = true;
+        return Promise.resolve("nope");
+      },
+    ],
+    1000,
+    parent.signal
+  );
+  expect(later).toBe(false);
+  expect(outcome.body).toBe(RAW);
 });

@@ -12,7 +12,7 @@ The build is not notarized. Right-click **Slip** and choose Open the first time.
 
 Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing. **Check for Updates…** replaces the app in place. An ad-hoc signature changes every build, so macOS asks for Accessibility again after that kind of update.
 
-The first spoken slip downloads the speech model (about 200 MB) into Application Support. Nothing else leaves the machine. Transcription uses [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Spoken slips are cleaned up on device with Apple Intelligence when it is turned on: fillers and false starts come out, and the wording stays. The original transcript is kept on the slip. Settings can send that cleanup to an OpenAI-compatible endpoint instead. The API key is stored with the macOS keychain, not in the settings file.
+The first spoken slip downloads the speech model (about 200 MB) into Application Support. Transcription defaults to [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Cleanup defaults to Apple Intelligence on this Mac: fillers and false starts come out, and the wording stays. The original transcript is kept on the slip. Settings can send transcription, cleanup, or both to a cloud model through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). The gateway key is stored with the macOS keychain, not in the settings file. If a cloud transcription fails, Slip uses Parakeet. If a cloud cleanup fails, Slip uses Apple Intelligence, then the raw transcript.
 
 ## Capture
 
@@ -63,6 +63,8 @@ bun run dev
 Grant Accessibility to Electron while developing.
 
 Voice needs the transcriber binary: `sh scripts/fetch-parakeet.sh`. On a Mac, `sh scripts/build-cleanup.sh` builds the Apple Intelligence helper.
+
+`AI_GATEWAY_API_KEY=... bun scripts/bench-cleanup.ts` times cleanup models. `AI_GATEWAY_API_KEY=... bun scripts/bench-transcribe.ts <file.wav>` does the same for transcription.
 
 ## Release
 

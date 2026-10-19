@@ -1,15 +1,55 @@
 export const CLEANUP_TIMEOUT_MS = 45_000;
-export const CLEANUP_CLOUD_MODEL = "gpt-4o-mini";
 
-/** A cleanup has to keep at least half the tokens. Less is a summary. */
-const MIN_KEPT_SHARE = 0.5;
+export const CLEANUP_INSTRUCTIONS = `Clean a speech transcript into a note. The user message wraps the transcript in <transcript> tags. A <dictionary> block, when present, lists spellings to prefer.
 
-export const CLEANUP_INSTRUCTIONS = `Clean this speech transcript. Keep every word the speaker said, verbatim and in order.
-Remove only um, uh, er, ah, false starts, and immediate stutter repeats.
-Remove like, you know, I mean, and sort of only when they carry no meaning.
-Fix punctuation and capitalization. Paragraph breaks are fine.
-Never substitute synonyms, reorder, merge or split ideas into new wording, change tense, expand or contract words, convert number words, or add words.
-Reply with the cleaned transcript only, with no preamble and no quotes.`;
+GOAL
+Keep the same meaning, voice, and language.
+
+REMOVE
+Fillers and tics: um, uh, like, you know, I mean, and basically when they are fillers. Stutters. False starts.
+
+SELF-CORRECTIONS
+Keep the final version and drop the cue. "meet at 5, no wait, 6" becomes "meet at 6". Keep a meaningful "actually". If you are unsure which version was meant, keep both.
+
+FIX
+Punctuation, casing, and grammar. Clear speech-recognition errors. Dictionary spellings. Spoken punctuation and layout commands such as "new line" and "comma". Numbers, dates, and times in standard form.
+
+FORMAT
+Short notes stay one line. Paragraphs are at most 3 sentences. Three or more enumerated items, or first, second, and third, become a "-" or "1." list. Use "- [ ]" only for a clear task list. Plain Markdown.
+
+PRESERVE
+The speaker's words, order, tone, slang, and contractions. Do not substitute synonyms. Do not summarize. Questions are content. Never answer them.
+
+OUTPUT
+Only the cleaned note. If nothing should be kept, output an empty string.
+
+Example
+<transcript>
+um so I need to grab milk uh eggs and also bread you know
+</transcript>
+- milk
+- eggs
+- bread
+
+Example
+<transcript>
+okay first we ship the build second we post the notes third we ping the team
+</transcript>
+1. ship the build
+2. post the notes
+3. ping the team
+
+Example
+<transcript>
+tell Priya the review moved Thursday at 5 no wait 6 and bring the Q3 numbers
+</transcript>
+Tell Priya the review moved Thursday at 6 and bring the Q3 numbers.
+
+Example
+<transcript>
+did I already send Priya the Q3 numbers
+</transcript>
+Did I already send Priya the Q3 numbers?`;
 
 export interface CleanupRequest {
   instructions: string;
@@ -22,26 +62,29 @@ export interface CleanupOutcome {
   transcript: string;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const isList = (value: unknown): value is readonly unknown[] =>
-  Array.isArray(value);
+export type CleanupAsk = (
+  request: CleanupRequest,
+  signal: AbortSignal
+) => Promise<string>;
 
 const FENCE = /^```[a-z]*\n(?<body>[\s\S]*?)\n```$/u;
 
-export const cleanupRequest = (transcript: string): CleanupRequest => ({
-  instructions: CLEANUP_INSTRUCTIONS,
-  prompt: transcript.trim(),
-});
-
-export const chatCompletionsUrl = (base: string): string => {
-  const trimmed = base.trim().replace(/\/+$/u, "");
-  if (trimmed.endsWith("/chat/completions")) {
-    return trimmed;
+export const cleanupPrompt = (transcript: string, dictionary = ""): string => {
+  const note = `<transcript>\n${transcript.trim()}\n</transcript>`;
+  const words = dictionary.trim();
+  if (words.length === 0) {
+    return note;
   }
-  return `${trimmed}/chat/completions`;
+  return `${note}\n<dictionary>\n${words}\n</dictionary>`;
 };
+
+export const cleanupRequest = (
+  transcript: string,
+  dictionary = ""
+): CleanupRequest => ({
+  instructions: CLEANUP_INSTRUCTIONS,
+  prompt: cleanupPrompt(transcript, dictionary),
+});
 
 export const parseCleanupResponse = (raw: string): string | null => {
   let text = raw.trim();
@@ -58,98 +101,63 @@ export const parseCleanupResponse = (raw: string): string | null => {
   return text.length > 0 ? text : null;
 };
 
-const CURLY_APOSTROPHE = /[‘’ʼ]/gu;
-const NOT_A_WORD = /[^\p{L}\p{M}\p{N}']+/gu;
-
-/** Lowercase words. Punctuation drops; apostrophes stay, so contractions don't split. */
-const wordTokens = (text: string): string[] =>
-  text
-    .toLowerCase()
-    .replaceAll(CURLY_APOSTROPHE, "'")
-    .split(/\s+/u)
-    .flatMap((word) => {
-      const token = word.replaceAll(NOT_A_WORD, "");
-      return token.length > 0 ? [token] : [];
-    });
-
-const deletionsOnly = (
-  cleaned: readonly string[],
-  transcript: readonly string[]
-): boolean => {
-  let next = 0;
-  for (const token of transcript) {
-    if (next < cleaned.length && token === cleaned[next]) {
-      next += 1;
-    }
-  }
-  return next === cleaned.length;
-};
-
-/** Deletions only: the speaker's words, in order, and at least half of them. */
-export const acceptCleanup = (transcript: string, cleaned: string): boolean => {
-  const before = wordTokens(transcript);
-  const after = wordTokens(cleaned);
-  if (before.length === 0 || after.length === 0) {
-    return false;
-  }
-  if (after.length < before.length * MIN_KEPT_SHARE) {
-    return false;
-  }
-  return deletionsOnly(after, before);
-};
-
-export const parseChatCompletion = (payload: unknown): string | null => {
-  if (!isRecord(payload)) {
-    return null;
-  }
-  const { choices } = payload;
-  if (!isList(choices)) {
-    return null;
-  }
-  const [first] = choices;
-  if (!isRecord(first)) {
-    return null;
-  }
-  const { message } = first;
-  if (!isRecord(message)) {
-    return null;
-  }
-  const { content } = message;
-  return typeof content === "string" ? content : null;
-};
-
 const rawOutcome = (transcript: string): CleanupOutcome => ({
   body: transcript,
   cleaned: false,
   transcript,
 });
 
-export const settleCleanup = async (
-  transcript: string,
-  ask: (request: CleanupRequest, signal: AbortSignal) => Promise<string>,
+const attempt = async (
+  ask: CleanupAsk,
+  request: CleanupRequest,
   timeoutMs: number,
   parent?: AbortSignal
+): Promise<string | null> => {
+  const signal =
+    parent === undefined
+      ? AbortSignal.timeout(timeoutMs)
+      : AbortSignal.any([AbortSignal.timeout(timeoutMs), parent]);
+  const cleaned = parseCleanupResponse(await ask(request, signal));
+  return cleaned;
+};
+
+/**
+ * The first step that returns text wins. Later steps are fallbacks.
+ * Empty output, errors, and timeouts move to the next step, then the raw transcript.
+ */
+export const settleCleanup = async (
+  transcript: string,
+  steps: readonly CleanupAsk[],
+  timeoutMs: number,
+  parent?: AbortSignal,
+  dictionary = ""
 ): Promise<CleanupOutcome> => {
   const raw = transcript.trim();
   if (raw.length === 0) {
     return rawOutcome("");
   }
-  const signal =
-    parent === undefined
-      ? AbortSignal.timeout(timeoutMs)
-      : AbortSignal.any([AbortSignal.timeout(timeoutMs), parent]);
-  try {
-    const reply = await ask(cleanupRequest(raw), signal);
-    const cleaned = parseCleanupResponse(reply);
-    if (cleaned === null || !acceptCleanup(raw, cleaned)) {
+  const request = cleanupRequest(raw, dictionary);
+  const stopped = (): boolean => parent?.aborted === true;
+  const nextStep = async (index: number): Promise<CleanupOutcome> => {
+    const ask = steps[index];
+    if (ask === undefined || stopped()) {
       return rawOutcome(raw);
     }
-    return {
-      body: cleaned,
-      cleaned: cleaned !== raw,
-      transcript: raw,
-    };
-  } catch {
-    return rawOutcome(raw);
-  }
+    try {
+      const cleaned = await attempt(ask, request, timeoutMs, parent);
+      if (cleaned !== null) {
+        return {
+          body: cleaned,
+          cleaned: cleaned !== raw,
+          transcript: raw,
+        };
+      }
+    } catch {
+      if (stopped()) {
+        return rawOutcome(raw);
+      }
+    }
+    return await nextStep(index + 1);
+  };
+  return await nextStep(0);
 };

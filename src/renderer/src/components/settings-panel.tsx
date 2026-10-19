@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -25,6 +24,7 @@ import { CaptureBind } from "./capture-bind";
 import { DockLook } from "./dock-look";
 import { SettingsKeys } from "./settings-keys";
 import { SettingsRow } from "./settings-row";
+import { SpeechSettings } from "./speech-settings";
 import { TrayGlyph } from "./tray-glyph";
 
 const schemes = ["system", "light", "dark"] as const;
@@ -112,114 +112,6 @@ const FontRow = ({
     </span>
   </button>
 );
-
-const CleanupEndpoint = ({
-  onChange,
-  settings,
-}: {
-  onChange: (next: Settings) => void;
-  settings: Settings;
-}) => {
-  const [url, setUrl] = useState(settings.cleanupUrl);
-  const [model, setModel] = useState(settings.cleanupModel);
-  const [keyDraft, setKeyDraft] = useState("");
-  const [keySet, setKeySet] = useState(false);
-
-  useEffect(() => {
-    setUrl(settings.cleanupUrl);
-  }, [settings.cleanupUrl]);
-  useEffect(() => {
-    setModel(settings.cleanupModel);
-  }, [settings.cleanupModel]);
-  useEffect(() => {
-    window.slip
-      .cleanupKeySet()
-      .then(setKeySet)
-      .catch(() => undefined);
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
-      <p className="text-muted-foreground text-[11px]">
-        Blank uses Apple Intelligence. The key stays in the keychain.
-      </p>
-      <Input
-        aria-label="Cleanup endpoint"
-        className="h-7 text-[12px]"
-        onBlur={() => {
-          const next = url.trim();
-          if (next !== settings.cleanupUrl) {
-            onChange({ ...settings, cleanupUrl: next });
-          }
-        }}
-        onChange={(event) => {
-          setUrl(event.target.value);
-        }}
-        placeholder="https://api.openai.com/v1"
-        value={url}
-      />
-      <Input
-        aria-label="Cleanup model"
-        className="h-7 text-[12px]"
-        onBlur={() => {
-          const next = model.trim();
-          if (next !== settings.cleanupModel) {
-            onChange({ ...settings, cleanupModel: next });
-          }
-        }}
-        onChange={(event) => {
-          setModel(event.target.value);
-        }}
-        placeholder="gpt-4o-mini"
-        value={model}
-      />
-      <div className="flex gap-1">
-        <Input
-          aria-label="Cleanup API key"
-          className="h-7 text-[12px]"
-          onBlur={() => {
-            if (keyDraft.length === 0) {
-              return;
-            }
-            window.slip
-              .setCleanupKey(keyDraft)
-              .then((saved) => {
-                if (saved) {
-                  setKeySet(true);
-                  setKeyDraft("");
-                }
-              })
-              .catch(() => undefined);
-          }}
-          onChange={(event) => {
-            setKeyDraft(event.target.value);
-          }}
-          placeholder={keySet ? "Key saved" : "API key"}
-          type="password"
-          value={keyDraft}
-        />
-        {keySet ? (
-          <Button
-            className="press"
-            onClick={() => {
-              window.slip
-                .setCleanupKey("")
-                .then(() => {
-                  setKeySet(false);
-                  setKeyDraft("");
-                })
-                .catch(() => undefined);
-            }}
-            size="xs"
-            variant="ghost"
-          >
-            Forget
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-};
 
 export const SettingsPanel = ({
   dark,
@@ -435,20 +327,7 @@ export const SettingsPanel = ({
             value={settings.voiceCapture}
           />
           <Card>
-            <SettingsRow
-              detail="Fillers and false starts, when a model is available"
-              label="Clean up speech"
-            >
-              <Switch
-                aria-label="Clean up speech"
-                checked={settings.cleanup}
-                onCheckedChange={(cleanup) =>
-                  onChange({ ...settings, cleanup })
-                }
-                size="sm"
-              />
-            </SettingsRow>
-            <CleanupEndpoint onChange={onChange} settings={settings} />
+            <SpeechSettings onChange={onChange} settings={settings} />
           </Card>
           <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
           <CaptureBind

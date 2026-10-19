@@ -10,15 +10,25 @@ import path from "node:path";
 
 import { app, safeStorage } from "electron";
 
-import {
-  chatCompletionsUrl,
-  CLEANUP_CLOUD_MODEL,
-  CLEANUP_TIMEOUT_MS,
-  parseChatCompletion,
-  settleCleanup,
+import { CLEANUP_TIMEOUT_MS, settleCleanup } from "../shared/cleanup";
+import type {
+  CleanupAsk,
+  CleanupOutcome,
+  CleanupRequest,
 } from "../shared/cleanup";
-import type { CleanupOutcome, CleanupRequest } from "../shared/cleanup";
+import {
+  chatCompletionBody,
+  streamChatCompletion,
+} from "../shared/gateway-api";
+import { findModel } from "../shared/gateway-models";
+import type { GatewayModel } from "../shared/gateway-models";
+import { parseAppleCleanupStatus } from "../shared/speech-engines";
+import type {
+  AppleCleanupStatus,
+  CleanupRoute,
+} from "../shared/speech-engines";
 
+/** Same file as the old cleanup key, so an existing key still loads. */
 const keyFile = (): string => path.join(app.getPath("userData"), "cleanup-key");
 
 export const cleanupKeySet = (): boolean => existsSync(keyFile());
@@ -113,40 +123,64 @@ const runHelper = (
     child.stdin.end(JSON.stringify(request));
   });
 
-const runCloud = async (
-  url: string,
-  model: string,
+const runCloud = (
   key: string,
+  modelId: string,
+  models: readonly GatewayModel[],
   request: CleanupRequest,
   signal: AbortSignal
-): Promise<string> => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (key.length > 0) {
-    headers.Authorization = `Bearer ${key}`;
-  }
-  const response = await fetch(chatCompletionsUrl(url), {
-    body: JSON.stringify({
-      messages: [
-        { content: request.instructions, role: "system" },
-        { content: request.prompt, role: "user" },
-      ],
-      model: model.trim() || CLEANUP_CLOUD_MODEL,
-      temperature: 0,
+): Promise<string> =>
+  streamChatCompletion({
+    apiKey: key,
+    body: chatCompletionBody({
+      modelId,
+      record: findModel(models, modelId),
+      request,
+      stream: true,
     }),
-    headers,
-    method: "POST",
     signal,
   });
-  if (!response.ok) {
-    throw new Error(`Cleanup endpoint returned ${response.status}`);
-  }
-  const text = parseChatCompletion(await response.json());
-  if (text === null) {
-    throw new Error("Cleanup endpoint returned nothing");
-  }
-  return text;
+
+export const appleCleanupStatus = (bin: string): Promise<AppleCleanupStatus> =>
+  new Promise((resolve) => {
+    const done = (status: AppleCleanupStatus): void => {
+      resolve(status);
+    };
+    if (!existsSync(bin)) {
+      done({ available: false, reason: "missing" });
+      return;
+    }
+    const child = spawn(bin, ["--check"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let settled = false;
+    const finish = (status: AppleCleanupStatus): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      done(status);
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish({ available: false, reason: "unavailable" });
+    }, 8000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      out += chunk.toString("utf-8");
+    });
+    child.on("error", () => {
+      finish({ available: false, reason: "missing" });
+    });
+    child.on("close", () => {
+      finish(parseAppleCleanupStatus(out));
+    });
+  });
+
+const rawNote = (transcript: string): CleanupOutcome => {
+  const raw = transcript.trim();
+  return { body: raw, cleaned: false, transcript: raw };
 };
 
 export const cleanTranscript = (
@@ -155,16 +189,22 @@ export const cleanTranscript = (
     bin: string;
     key: string;
     model: string;
+    models: readonly GatewayModel[];
+    route: CleanupRoute;
     signal?: AbortSignal;
-    url: string;
   }
-): Promise<CleanupOutcome> =>
-  settleCleanup(
-    transcript,
-    (request, signal) =>
-      opts.url.trim().length > 0
-        ? runCloud(opts.url, opts.model, opts.key, request, signal)
-        : runHelper(opts.bin, request, signal),
-    CLEANUP_TIMEOUT_MS,
-    opts.signal
-  );
+): Promise<CleanupOutcome> => {
+  if (opts.route === "off") {
+    return Promise.resolve(rawNote(transcript));
+  }
+  const device: CleanupAsk = (request, signal) =>
+    runHelper(opts.bin, request, signal);
+  const steps: CleanupAsk[] = [];
+  if (opts.route === "cloud" && opts.key.trim().length > 0) {
+    steps.push((request, signal) =>
+      runCloud(opts.key, opts.model, opts.models, request, signal)
+    );
+  }
+  steps.push(device);
+  return settleCleanup(transcript, steps, CLEANUP_TIMEOUT_MS, opts.signal);
+};

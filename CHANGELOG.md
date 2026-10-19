@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Transcription and cleanup each choose on-device or cloud. Cloud models come from Vercel AI Gateway, with one key stored in the keychain. A failed cloud transcription falls back to Parakeet. A failed cloud cleanup falls back to Apple Intelligence, then the raw transcript.
 - Quick note. Control Control writes a note into the vault without raising Slip (#3).
 - Draw can annotate an image and save the drawing as a new PNG beside it (#5).
 - Spoken slips are transcribed on this Mac. The release includes `parakeet-cli` and `slip-cleanup`, and an update will not replace the app if either is missing. The speech model stays in Application Support (#4).

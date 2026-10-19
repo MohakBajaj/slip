@@ -70,6 +70,7 @@ import { installSkill, skillStatus } from "./agent-skill";
 import type { CaptureEvent, CaptureHandle } from "./capture";
 import { startCapture } from "./capture";
 import {
+  appleCleanupStatus,
   cleanTranscript,
   cleanupKeySet,
   readCleanupKey,
@@ -78,10 +79,11 @@ import {
 import { applyDockIcon } from "./dock-icon";
 import { activateBundle, frontApp, startFrontContext } from "./front-context";
 import {
-  bundledBin,
-  SpeechAbortedError,
-  transcribeCapture,
-} from "./transcribe";
+  gatewayModels,
+  primeGatewayModels,
+  refreshGatewayModels,
+} from "./gateway-catalog";
+import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
 import { startUpdater } from "./updater";
 
 const ACCESS =
@@ -1309,6 +1311,8 @@ const showNote = (): void => {
 
 const boot = async (): Promise<void> => {
   await app.whenReady();
+  primeGatewayModels();
+  void refreshGatewayModels();
   session.defaultSession.setSpellCheckerEnabled(false);
   const voiceMic = (
     wc: WebContents | null,
@@ -1486,10 +1490,16 @@ const boot = async (): Promise<void> => {
       return { error: "", slip: null };
     }
     try {
-      const text = await transcribeCapture({
+      const text = await transcribeVoice({
         bin: bundledBin("parakeet-cli"),
+        key: readCleanupKey(),
+        model:
+          settings.transcribeRoute === "cloud"
+            ? settings.transcribeModel
+            : settings.transcribeDevice,
         modelDir: path.join(app.getPath("userData"), "models"),
         onStatus: tell,
+        route: settings.transcribeRoute,
         signal: job.signal,
         tempDir: app.getPath("temp"),
         wav: bytes,
@@ -1499,14 +1509,18 @@ const boot = async (): Promise<void> => {
         return { error: "", slip: null };
       }
       let body = text;
-      if (settings.cleanup) {
+      if (settings.cleanupRoute !== "off") {
         tell({ error: "", phase: "cleaning", received: 0, total: 0 });
         const outcome = await cleanTranscript(text, {
           bin: bundledBin("slip-cleanup"),
           key: readCleanupKey(),
-          model: settings.cleanupModel,
+          model:
+            settings.cleanupRoute === "cloud"
+              ? settings.cleanupModel
+              : settings.cleanupDevice,
+          models: gatewayModels(),
+          route: settings.cleanupRoute,
           signal: job.signal,
-          url: settings.cleanupUrl,
         });
         if (job.signal.aborted) {
           return { error: "", slip: null };
@@ -1551,6 +1565,10 @@ const boot = async (): Promise<void> => {
     return writeCleanupKey(key);
   });
   ipcMain.handle("cleanupKeySet", () => cleanupKeySet());
+  ipcMain.handle("appleCleanupStatus", () =>
+    appleCleanupStatus(bundledBin("slip-cleanup"))
+  );
+  ipcMain.handle("gatewayCatalog", () => refreshGatewayModels());
   ipcMain.handle("voiceReady", () => {
     voiceReady = true;
     flushVoice();
