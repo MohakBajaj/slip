@@ -453,6 +453,22 @@ pid="$1"
 src="$2"
 dest="$3"
 workdir="$4"
+aside="\${dest}.slip-old"
+stage="\${dest}.slip-new"
+if [[ ! -d "$dest" && -d "$stage" ]]; then
+  mv "$stage" "$dest"
+  rm -rf "$aside"
+  xattr -dr com.apple.quarantine "$dest" || true
+  open "$dest" || echo "open failed"
+  if [[ -d "$workdir" ]]; then
+    rm -rf "$workdir"
+  fi
+  rm -f "$0"
+  exit 0
+fi
+if [[ ! -d "$dest" && -d "$aside" ]]; then
+  mv "$aside" "$dest"
+fi
 case "$src" in
   "$workdir"/*) ;;
   *) echo "source is outside the work directory"; exit 1 ;;
@@ -475,7 +491,6 @@ while kill -0 "$pid" 2>/dev/null; do
   sleep 0.2
 done
 sleep 1
-stage="\${dest}.slip-new"
 rm -rf "$stage"
 ditto "$src" "$stage"
 for bin in parakeet-cli slip-cleanup; do
@@ -486,23 +501,13 @@ for bin in parakeet-cli slip-cleanup; do
   fi
 done
 xattr -dr com.apple.quarantine "$stage" || true
-removed=0
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if rm -rf "$dest"; then
-    removed=1
-    break
-  fi
-  sleep 0.5
-done
-if [[ "$removed" != 1 ]]; then
-  echo "could not remove $dest"
-  open "$stage" || true
-  exit 1
-fi
+rm -rf "$aside"
+mv "$dest" "$aside"
 if ! mv "$stage" "$dest"; then
   ditto "$stage" "$dest"
   rm -rf "$stage"
 fi
+rm -rf "$aside"
 xattr -dr com.apple.quarantine "$dest" || true
 open "$dest" || echo "open failed"
 rm -rf "$workdir"

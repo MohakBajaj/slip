@@ -66,15 +66,16 @@ const writeIndex = (root: string, slips: Slip[]): void => {
   writeIfChanged(path.join(root, "INDEX.md"), renderIndex(slips));
 };
 
-const writeSlipFile = (root: string, slip: Slip): void => {
+const writeSlipFile = (root: string, slip: Slip): boolean => {
   if (!SLIP_ID.test(slip.id)) {
-    return;
+    return false;
   }
   const file = slipPath(root, slip.filename);
   if (file === null) {
-    return;
+    return false;
   }
   writeFileSync(file, serializeSlip(slip));
+  return true;
 };
 
 const applyPatch = (current: Slip, patch: Partial<Slip>): Slip => ({
@@ -158,7 +159,7 @@ export const ensureVault = (root: string): void => {
   writeIfChanged(path.join(root, "SKILL.md"), SKILL_MD);
   const index = path.join(root, "INDEX.md");
   if (!existsSync(index)) {
-    writeFileSync(index, "# Slip index\n");
+    writeIfChanged(index, renderIndex(readSlips(root)));
   }
 };
 
@@ -333,14 +334,13 @@ export const updateSlips = (
 ): Slip[] => {
   ensureVault(root);
   const want = new Set(ids);
-  const slips = readSlips(root).map((slip) =>
-    want.has(slip.id) ? applyPatch(slip, patch) : slip
-  );
-  for (const slip of slips) {
-    if (want.has(slip.id)) {
-      writeSlipFile(root, slip);
+  const slips = readSlips(root).map((slip) => {
+    if (!want.has(slip.id)) {
+      return slip;
     }
-  }
+    const patched = applyPatch(slip, patch);
+    return writeSlipFile(root, patched) ? patched : slip;
+  });
   writeIndex(root, slips);
   return slips;
 };

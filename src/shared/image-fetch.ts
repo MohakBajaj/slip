@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
 const blocked = new BlockList();
@@ -13,8 +14,13 @@ blocked.addAddress("::1", "ipv6");
 blocked.addSubnet("fc00::", 7, "ipv6");
 blocked.addSubnet("fe80::", 10, "ipv6");
 
+export type HostLookup = (
+  hostname: string
+) => Promise<readonly { address: string; family: number }[]>;
+
 export interface FetchPublicOptions {
   fetchImpl?: typeof fetch;
+  lookup?: HostLookup;
   maxBytes: number;
   maxRedirects: number;
   timeoutMs: number;
@@ -27,6 +33,20 @@ export interface FetchedBytes {
 
 const hostOf = (hostname: string): string =>
   hostname.replaceAll(/^\[|\]$/gu, "").toLowerCase();
+
+const addressBlocked = (address: string, family: number): boolean => {
+  const mapped = address.toLowerCase();
+  if (family === 6 && mapped.startsWith("::ffff:")) {
+    const v4 = mapped.slice("::ffff:".length);
+    if (isIP(v4) === 4) {
+      return blocked.check(v4, "ipv4");
+    }
+  }
+  return blocked.check(address, family === 6 ? "ipv6" : "ipv4");
+};
+
+const lookupHost: HostLookup = async (hostname) =>
+  await lookup(hostname, { all: true, order: "verbatim" });
 
 export const isAllowedImageUrl = (raw: string): boolean => {
   let url: URL;
@@ -53,6 +73,26 @@ export const isAllowedImageUrl = (raw: string): boolean => {
     return true;
   }
   return !blocked.check(host, kind === 4 ? "ipv4" : "ipv6");
+};
+
+const addressesAllowed = async (
+  host: string,
+  resolve: HostLookup
+): Promise<boolean> => {
+  if (isIP(host) !== 0) {
+    return isAllowedImageUrl(
+      `http://${host.includes(":") ? `[${host}]` : host}/`
+    );
+  }
+  try {
+    const records = await resolve(host);
+    return (
+      records.length > 0 &&
+      records.every((record) => !addressBlocked(record.address, record.family))
+    );
+  } catch {
+    return false;
+  }
 };
 
 const readLimited = async (
@@ -85,11 +125,15 @@ const fetchHop = async (
   current: string,
   hop: number,
   fetchImpl: typeof fetch,
+  resolve: HostLookup,
   maxBytes: number,
   maxRedirects: number,
   timeoutMs: number
 ): Promise<FetchedBytes | null> => {
   if (hop > maxRedirects || !isAllowedImageUrl(current)) {
+    return null;
+  }
+  if (!(await addressesAllowed(hostOf(new URL(current).hostname), resolve))) {
     return null;
   }
   const ctrl = new AbortController();
@@ -111,6 +155,7 @@ const fetchHop = async (
         new URL(loc, current).href,
         hop + 1,
         fetchImpl,
+        resolve,
         maxBytes,
         maxRedirects,
         timeoutMs
@@ -148,6 +193,7 @@ export const fetchPublicBytes = async (
     raw,
     0,
     opts.fetchImpl ?? fetch,
+    opts.lookup ?? lookupHost,
     opts.maxBytes,
     opts.maxRedirects,
     opts.timeoutMs

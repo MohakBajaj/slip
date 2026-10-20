@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { clipboard, systemPreferences } from "electron";
 import koffi from "koffi";
@@ -17,6 +16,7 @@ import {
 import type { MatchInput } from "../shared/capture-match";
 import {
   htmlImages,
+  isRemoteImageUrl,
   isTinyHtmlImage,
   parseDataImage,
 } from "../shared/clipboard-html";
@@ -418,19 +418,7 @@ const install = (opts: {
         });
         continue;
       }
-      if (image.src.startsWith("file://")) {
-        try {
-          const filePath = fileURLToPath(image.src);
-          const ext = path.extname(filePath).toLowerCase();
-          if (IMAGE_EXT.has(ext) && existsSync(filePath)) {
-            out.push({ bytes: readFileSync(filePath), ext });
-          }
-        } catch {
-          // Bad file URL in markup.
-        }
-        continue;
-      }
-      if (image.src.startsWith("http://") || image.src.startsWith("https://")) {
+      if (isRemoteImageUrl(image.src)) {
         pending.push(
           fetchImage(image.src).then((fetched) => {
             if (fetched) {

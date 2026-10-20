@@ -18,11 +18,38 @@ import {
   listSlips,
   mergeSlips,
   restoreSlips,
+  updateSlip,
 } from "./vault";
 
 const vault = (): string => mkdtempSync(path.join(tmpdir(), "slip-"));
 
 describe("attachments", () => {
+  test("a missing index lists the slips already on disk", () => {
+    const root = vault();
+    const slip = createSlip(root, { content: "already here" });
+    rmSync(path.join(root, "INDEX.md"));
+    expect(listSlips(root).some((item) => item.id === slip.id)).toBe(true);
+    expect(readFileSync(path.join(root, "INDEX.md"), "utf8")).toContain(
+      "already here"
+    );
+  });
+
+  test("restoring one slip leaves a later edit on another", () => {
+    const root = vault();
+    const first = createSlip(root, { content: "first" });
+    const second = createSlip(root, { content: "second" });
+    const saved = updateSlip(root, second.id, { content: "edited" });
+    expect(saved?.content).toContain("edited");
+    restoreSlips(root, [first]);
+    const slips = listSlips(root);
+    expect(slips.find((item) => item.id === second.id)?.content).toContain(
+      "edited"
+    );
+    expect(slips.find((item) => item.id === first.id)?.content).toContain(
+      "first"
+    );
+  });
+
   test("delete holds any slip and undo restores its files", () => {
     const root = vault();
     const img = path.join(root, "shot.png");
