@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Mic } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import { BulkBar } from "@/components/bulk-bar";
 import { DetailWell } from "@/components/detail-well";
@@ -266,6 +267,7 @@ export const InboxPane = ({
   onAddImages,
   onCancelRename,
   onCopy,
+  onCopyAs,
   onCreateImages,
   onDelete,
   onDraft,
@@ -287,13 +289,14 @@ export const InboxPane = ({
   current: Slip | null;
   draft: string;
   editing: boolean;
-  emptyCopy: string;
+  emptyCopy: ReactNode;
   focused: string | null;
   list: Slip[];
   marked: string[];
   onAddImages: (id: string, files: File[]) => void;
   onCancelRename: () => void;
   onCopy: (slip: Slip) => void;
+  onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
   onCreateImages: (files: File[]) => void;
   onDelete: (id: string) => void;
   onDraft: (value: string) => void;
@@ -384,9 +387,9 @@ export const InboxPane = ({
         {...listDrop.props}
       >
         {list.length === 0 ? (
-          <p className="text-muted-foreground px-4 py-5 text-center text-[13px] text-pretty">
+          <div className="text-muted-foreground px-4 py-5 text-center text-[13px]">
             {dragging || listDrop.over ? "Drop to capture images" : emptyCopy}
-          </p>
+          </div>
         ) : (
           <div
             className="relative w-full"
@@ -466,6 +469,7 @@ export const InboxPane = ({
             onEditing(false);
             onFocus(null);
           }}
+          onCopyAs={onCopyAs}
           onDelete={() => {
             onDelete(current.id);
           }}

@@ -150,13 +150,10 @@ const priceOf = (choices: readonly ModelChoice[], id: string): string =>
   choices.find((choice) => choice.id === id)?.price ?? "";
 
 const cloudDetail = (price: string, keySet: boolean): string => {
-  if (keySet) {
-    return price.length > 0 ? price : "Cloud model";
+  if (!keySet) {
+    return "No gateway key, so this runs on this Mac.";
   }
-  if (price.length > 0) {
-    return `${price}. Add a gateway key.`;
-  }
-  return "Add a gateway key.";
+  return price.length > 0 ? price : "Cloud model";
 };
 
 const GatewayKey = ({
@@ -167,6 +164,30 @@ const GatewayKey = ({
   onSet: (set: boolean) => void;
 }) => {
   const [draft, setDraft] = useState("");
+  const [status, setStatus] = useState("");
+  const saveKey = (): void => {
+    if (draft.length === 0) {
+      return;
+    }
+    window.slip
+      .setCleanupKey(draft)
+      .then((saved) => {
+        if (saved) {
+          onSet(true);
+          setDraft("");
+          setStatus("Key saved");
+          return;
+        }
+        setStatus("Couldn't save the key");
+      })
+      .catch(() => {
+        setStatus("Couldn't save the key");
+      });
+  };
+  let statusClass = "text-muted-foreground text-[11px]";
+  if (status === "Couldn't save the key") {
+    statusClass = "text-destructive text-[11px]";
+  }
   return (
     <div className="flex flex-col gap-1">
       <p className="text-[13px] leading-none">AI Gateway key</p>
@@ -177,22 +198,17 @@ const GatewayKey = ({
         <Input
           aria-label="Vercel AI Gateway API key"
           className="h-7 text-[12px]"
-          onBlur={() => {
-            if (draft.length === 0) {
-              return;
-            }
-            window.slip
-              .setCleanupKey(draft)
-              .then((saved) => {
-                if (saved) {
-                  onSet(true);
-                  setDraft("");
-                }
-              })
-              .catch(() => undefined);
-          }}
+          onBlur={saveKey}
           onChange={(event) => {
             setDraft(event.target.value);
+            setStatus("");
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") {
+              return;
+            }
+            event.preventDefault();
+            saveKey();
           }}
           placeholder={keySet ? "Key saved" : "Vercel AI Gateway key"}
           type="password"
@@ -207,6 +223,7 @@ const GatewayKey = ({
                 .then(() => {
                   onSet(false);
                   setDraft("");
+                  setStatus("");
                 })
                 .catch(() => undefined);
             }}
@@ -217,6 +234,7 @@ const GatewayKey = ({
           </Button>
         ) : null}
       </div>
+      {status.length > 0 ? <p className={statusClass}>{status}</p> : null}
     </div>
   );
 };
@@ -283,9 +301,13 @@ export const SpeechSettings = ({
     );
   }
 
+  const showKey =
+    keySet ||
+    settings.transcribeRoute === "cloud" ||
+    settings.cleanupRoute === "cloud";
+
   return (
     <div className="flex flex-col gap-3 px-2.5 py-2">
-      <GatewayKey keySet={keySet} onSet={setKeySet} />
       <RouteSwitch
         label="Transcription"
         onPick={(transcribeRoute) => {
@@ -343,6 +365,7 @@ export const SpeechSettings = ({
         />
       ) : null}
       <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
+      {showKey ? <GatewayKey keySet={keySet} onSet={setKeySet} /> : null}
     </div>
   );
 };

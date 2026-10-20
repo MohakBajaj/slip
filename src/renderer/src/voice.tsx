@@ -446,7 +446,10 @@ export const VoiceApp = () => {
     >
       {status === "denied" || status === "failed" || status === "error" ? (
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <p className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]">
+          <p
+            className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]"
+            title={problemCopy(status, label)}
+          >
             {problemCopy(status, label)}
           </p>
           <Button
@@ -465,6 +468,18 @@ export const VoiceApp = () => {
             size="xs"
           >
             {status === "denied" ? "Settings" : "Retry"}
+          </Button>
+          <Button
+            aria-label="Discard"
+            className="press"
+            onClick={() => {
+              drop();
+              void window.slip.closeVoice();
+            }}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <HugeiconsIcon className="size-3.5" icon={Cancel01Icon} />
           </Button>
         </div>
       ) : (

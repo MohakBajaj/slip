@@ -238,7 +238,12 @@ export const priceLabel = (model: GatewayModel, kind: ModelKind): string => {
     if (input === null && output === null) {
       return "";
     }
-    return `${usd((input ?? 0) * 1_000_000)} / ${usd((output ?? 0) * 1_000_000)}`;
+    const inputUsd = (input ?? 0) * 1_000_000;
+    const outputUsd = (output ?? 0) * 1_000_000;
+    if (inputUsd === 0 && outputUsd === 0) {
+      return "Free";
+    }
+    return `${usd(inputUsd)} / ${usd(outputUsd)} per 1M tokens`;
   }
   const duration = priceNumber(
     model.pricing.transcription_duration_cost_per_second

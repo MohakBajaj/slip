@@ -321,3 +321,10 @@
   --primary-foreground: oklch(0.98 0.01 250);
   --ring: oklch(0.48 0.09 250);
 }
+
+/* Title and shortcut hints hide below the measured full-header width. */
+@media (max-width: 855px) {
+  .draw-chrome {
+    display: none;
+  }
+}
