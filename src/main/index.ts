@@ -1934,6 +1934,7 @@ const boot = async (): Promise<void> => {
             label: "Search",
           },
           {
+            accelerator: "CommandOrControl+/",
             click: () => {
               showWindow(() => send("command", "cheatsheet"));
             },
