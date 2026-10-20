@@ -52,7 +52,7 @@ describe("save note", () => {
     expect(disk).toContain("source: note");
     expect(disk).toContain("first line\nsecond line");
     const parsed = parseSlip(slip.filename, disk);
-    expect(parsed?.content.trimEnd()).toBe(raw);
+    expect(parsed?.content).toBe(raw);
     expect(parsed?.source).toBe("note");
     expect(parsed?.id).toBe(slip.id);
     expect(parsed?.createdAt.length).toBeGreaterThan(0);
@@ -62,6 +62,6 @@ describe("save note", () => {
     const listed = listSlips(root);
     expect(listed.map((item) => item.id)).toEqual([slip.id]);
     expect(listed[0]?.source).toBe(NOTE_SOURCE);
-    expect(listed[0]?.content.trimEnd()).toBe(raw);
+    expect(listed[0]?.content).toBe(raw);
   });
 });

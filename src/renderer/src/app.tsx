@@ -123,7 +123,7 @@ const App = () => {
   const undoRef = useRef(undo);
   undoRef.current = undo;
 
-  const reload = useCallback(async () => {
+  const loadInbox = useCallback(async () => {
     const data = await window.slip.load();
     setSlips(data.slips);
     setSettings(data.settings);
@@ -131,19 +131,26 @@ const App = () => {
     setLogin(data.login);
   }, []);
 
+  const reloadSlips = useCallback(async () => {
+    const data = await window.slip.load();
+    setSlips(data.slips);
+  }, []);
+
   useEffect(() => {
-    reload().catch(() => undefined);
-    const offA = window.slip.onSlipsChanged(() => {
-      reload().catch(() => undefined);
+    loadInbox().catch(() => undefined);
+    const offSlips = window.slip.onSlipsChanged(() => {
+      reloadSlips().catch(() => undefined);
     });
-    const offB = window.slip.onCaptureState(setCapture);
-    const offC = window.slip.onLoginState(setLogin);
+    const offCapture = window.slip.onCaptureState(setCapture);
+    const offLogin = window.slip.onLoginState(setLogin);
+    const offSettings = window.slip.onSettings(setSettings);
     return () => {
-      offA();
-      offB();
-      offC();
+      offSlips();
+      offCapture();
+      offLogin();
+      offSettings();
     };
-  }, [reload]);
+  }, [loadInbox, reloadSlips]);
 
   useEffect(() => {
     window.slip.setSection(section).catch(() => undefined);
@@ -155,12 +162,22 @@ const App = () => {
   };
 
   const remember = useCallback(
-    (label: string, drop: string[] = [], held: string[] = []): void => {
+    (
+      label: string,
+      ids: string[],
+      drop: string[] = [],
+      held: string[] = []
+    ): void => {
       const prev = undoRef.current;
       if (prev !== null && prev.held.length > 0) {
         window.slip.commitDeletes(prev.held).catch(() => undefined);
       }
-      setUndo({ drop, held, label, slips: snapshot(slips) });
+      setUndo({
+        drop,
+        held,
+        label,
+        slips: snapshot(slips.filter((slip) => ids.includes(slip.id))),
+      });
       say(`${label}. ⌘Z to undo`);
     },
     [slips]
@@ -188,8 +205,8 @@ const App = () => {
     await window.slip.restoreSlips(undo.slips, undo.drop);
     setUndo(null);
     say("Undone");
-    await reload();
-  }, [reload, undo]);
+    await reloadSlips();
+  }, [reloadSlips, undo]);
 
   const list = useMemo(
     () => visibleSlips(slips, query, settings.showDone, showArchived),
@@ -222,7 +239,7 @@ const App = () => {
     }
     const label = patchLabel(next);
     if (label !== null) {
-      remember(label);
+      remember(label, ids);
     }
     setSlips(await window.slip.updateSlips(ids, next));
     if (ids.length > 1) {
@@ -249,7 +266,7 @@ const App = () => {
     if (slip === null) {
       return;
     }
-    remember("Added images");
+    remember("Added images", [id]);
     setFocused(id);
     setSlips((cur) => cur.map((item) => (item.id === slip.id ? slip : item)));
   };
@@ -275,7 +292,7 @@ const App = () => {
     if (slip === null) {
       return false;
     }
-    remember("Added", [slip.id]);
+    remember("Added", [], [slip.id]);
     setShowArchived(false);
     setSlips((cur) => [...cur, slip]);
     setFocused(slip.id);
@@ -288,7 +305,7 @@ const App = () => {
       return;
     }
     const drop = doomed.map((slip) => slip.id);
-    remember("Deleted", [], drop);
+    remember("Deleted", drop, [], drop);
     setSlips(await window.slip.deleteSlips(drop));
     setMarked((cur) => cur.filter((id) => !drop.includes(id)));
     setFocused((cur) => (cur !== null && drop.includes(cur) ? null : cur));
@@ -342,7 +359,10 @@ const App = () => {
       if (items.length < 2) {
         return;
       }
-      remember("Merged");
+      remember(
+        "Merged",
+        items.map((slip) => slip.id)
+      );
       if (intoSection !== undefined) {
         setSection(intoSection);
         await window.slip.setSection(intoSection);
@@ -387,7 +407,7 @@ const App = () => {
     const ids = slips
       .filter((slip) => slip.section === from)
       .map((slip) => slip.id);
-    remember("Renamed section");
+    remember("Renamed section", ids);
     setSlips(await window.slip.updateSlips(ids, { section: named }));
     setSection(named);
     stopRename();
@@ -486,7 +506,7 @@ const App = () => {
         const every = slips
           .filter((slip) => slip.section === name)
           .map((slip) => slip.id);
-        remember("Removed section");
+        remember("Removed section", every);
         apply(every, { section: "" })
           .then(() => {
             if (section === name) {
@@ -1051,7 +1071,7 @@ const App = () => {
           }}
           onDraft={setDraft}
           onFile={(name) => {
-            remember("Filed");
+            remember("Filed", marked);
             apply(marked, { section: name }).catch(() => undefined);
           }}
           onFocus={(id) => {

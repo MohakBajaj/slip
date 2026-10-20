@@ -6,6 +6,7 @@ import {
   bumpVersion,
   changelogSection,
   insertRelease,
+  releaseTagPending,
   unreleasedNotes,
 } from "./changelog";
 
@@ -34,6 +35,16 @@ const pending = `# Changelog
 `;
 
 describe("changelog", () => {
+  test("a bump commit without its tag is tagged, not bumped again", () => {
+    expect(releaseTagPending("1.0.6", "Bump version to 1.0.6.", false)).toBe(
+      true
+    );
+    expect(releaseTagPending("1.0.6", "Bump version to 1.0.6.", true)).toBe(
+      false
+    );
+    expect(releaseTagPending("1.0.6", "Ship notes", false)).toBe(false);
+  });
+
   test("bumps each level", () => {
     expect(bumpVersion("1.0.4", "patch")).toBe("1.0.5");
     expect(bumpVersion("1.0.4", "minor")).toBe("1.1.0");

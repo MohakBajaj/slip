@@ -68,6 +68,9 @@ export const bundleHtml = (text: string, images: EmbedImage[]): string => {
   return `<html><body><!--StartFragment-->${body}<!--EndFragment--></body></html>`;
 };
 
+export const isRemoteImageUrl = (src: string): boolean =>
+  src.startsWith("http://") || src.startsWith("https://");
+
 export const htmlImages = (html: string): HtmlImage[] => {
   const images: HtmlImage[] = [];
   for (const match of html.matchAll(IMG_TAG)) {

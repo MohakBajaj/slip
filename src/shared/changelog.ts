@@ -110,6 +110,12 @@ export const rebuildFooter = (markdown: string): string => {
   return `${body}\n${links.join("\n")}\n`;
 };
 
+export const releaseTagPending = (
+  version: string,
+  headSubject: string,
+  tagExists: boolean
+): boolean => !tagExists && headSubject === `Bump version to ${version}.`;
+
 export const insertRelease = (
   markdown: string,
   version: string,
