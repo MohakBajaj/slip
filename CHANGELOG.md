@@ -6,7 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-10-20
+
+1.0.5 was tagged on October 19 and never published. This is the first release since 1.0.4.
+
+### Added
+
+- Annotate anywhere. Control-Option-A marks up the image on the clipboard, or a region of the screen if the clipboard has none. Copy puts the drawing on the clipboard. Inbox saves a slip. Escape throws it away. Nothing is saved unless you ask.
+- Dictate anywhere. Control-Option-D. Hold to talk, or tap to start and stop. A small pill shows the level. Slip types the text into the app you were using. If it cannot paste, the text stays on the clipboard and the pill tells you to allow Accessibility. Dictations stay out of the inbox unless you turn on Keep dictations in inbox.
+- Annotate and Dictate are in the command palette, the menus, Settings, and the shortcut list.
+- Quick note. Control Control writes a note into the vault without opening Slip.
+- Draw can mark up an image you already captured and save a new PNG next to it.
+- Spoken slips are transcribed on this Mac. Transcription and cleanup can each stay on this Mac or use the cloud, with one Vercel AI Gateway key stored in the keychain. If cloud transcription fails, Slip uses the on-device model. If cloud cleanup fails, it tries Apple Intelligence, then keeps the raw transcript.
+- Check for Updates, in the Slip menu and every few hours. Slip downloads its own release, checks the checksum, and replaces itself. The speech model in Application Support is left alone.
+
+### Changed
+
+- Delete any slip right away, from the inbox or the archive, with Command-Delete, the menu, or the action menu. Undo puts the files back. When that undo is gone, or Slip quits, the files go to the Trash.
+- Inbox shortcuts match across the window and show on the buttons. Arrows or J and K move, Return opens, Escape closes, and ? lists them. Single-key actions stay quiet while you are typing.
+- Settings opens on capture, voice notes, and theme. The rest is under Advanced.
+- Slip uses the system font and simpler icons.
+- The buttons on an open slip stay inside the window.
+- The draw window has room for its toolbar. A failed capture is stated once. When a key, a copy, or a shortcut fails, Slip says what happened.
+- Starting a new slip leaves the archive.
+- Speech cleanup only removes filler and fixes punctuation. It does not rewrite what you said.
+- A single sentence of 20 words or fewer, with no correction or command cue, skips cleanup. Dictate pastes that transcript trimmed, as spoken.
+- A voice slip shows what cloud transcription and cleanup cost, next to the time.
+
+### Fixed
+
+- Dictating into another app no longer quits Slip. Pasting the transcript was crashing the app (#18).
+- A date in a slip stays the date you wrote, and a quoted "false" does not mark it done.
+- An update no longer removes Slip before the new copy is in place. If the swap fails, Slip puts the old app back and opens it.
+- Undo changes only the slips that action touched.
+- Refreshing the inbox no longer puts older settings back over a change you just made.
+- A page image is not fetched when its name points at this Mac, and a slip cannot copy a file outside its attachments.
+- A markdown file that is not a slip is left alone.
+- A bad message from the window is ignored instead of being saved as a slip.
+- If a release stops after the version bump, running it again adds the tag instead of bumping once more.
+- A blank line at the end of a note is kept.
+- Escape on a new note no longer marks it edited.
+- You can dictate again after a notice, and you can retake an annotation that came out blank.
+- Annotate does not open on top of the draw window.
+- Selecting a range of slips works, and amber text is easier to read.
+- Draw tooltips stay inside the window.
+- If a release has no update file, Slip treats that as up to date instead of showing an error.
+- Images fetched for a capture time out, stay under a size limit, and are not loaded from private addresses.
+- Copying a selection that includes images works again.
+
 ## [1.0.5] - 2026-10-19
+
+Tagged on this date and not published. The changes below are included in 1.0.6.
 
 ### Added
 
@@ -66,7 +116,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - CLI shipped inside Slip.app at Contents/Helpers/slip.
 - macOS disk image styled like Slip paper.
 
-[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/MohakBajaj/slip/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/MohakBajaj/slip/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/MohakBajaj/slip/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/MohakBajaj/slip/compare/v1.0.2...v1.0.3

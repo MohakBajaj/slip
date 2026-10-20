@@ -48,6 +48,7 @@ const manifest = buildManifest({
 describe("compareVersions", () => {
   test("compares numeric segments", () => {
     expect(compareVersions("1.0.4", "1.0.5")).toBe(-1);
+    expect(compareVersions("1.0.5", "1.0.6")).toBe(-1);
     expect(compareVersions("1.0.9", "1.0.10")).toBe(-1);
     expect(compareVersions("1.10.0", "1.9.0")).toBe(1);
     expect(compareVersions("1.2.0", "1.2")).toBe(0);
@@ -241,6 +242,32 @@ describe("decideUpdate", () => {
     expect(decideUpdate({ ...base, autoCheck: false, manual: true })).toEqual({
       kind: "prompt",
     });
+  });
+
+  test("a 1.0.5 install prompts for 1.0.6", () => {
+    const next = buildManifest({
+      minimumMacOS: "12.0",
+      notes: "Slip 1.0.6.",
+      sha256: sha256("zip-bytes"),
+      size: 128,
+      version: "1.0.6",
+    });
+    expect(next.zip).toBe(releaseZipUrl("1.0.6"));
+    expect(
+      decideUpdate({
+        ...base,
+        currentVersion: "1.0.5",
+        manifest: next,
+      })
+    ).toEqual({ kind: "prompt" });
+    expect(
+      assessDownload({
+        actualSha256: next.sha256.toUpperCase(),
+        actualSize: next.size,
+        expectedSha256: next.sha256,
+        expectedSize: next.size,
+      })
+    ).toEqual({ ok: true });
   });
 
   test("does not downgrade or interrupt a capture", () => {
