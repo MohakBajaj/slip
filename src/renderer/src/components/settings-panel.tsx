@@ -326,9 +326,6 @@ export const SettingsPanel = ({
             onSequence={onChord("voiceCapture")}
             value={settings.voiceCapture}
           />
-          <Card>
-            <SpeechSettings onChange={onChange} settings={settings} />
-          </Card>
           <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
           <CaptureBind
             hint="Hold ⌘ and double-tap ⇧, or record your own"
@@ -337,6 +334,9 @@ export const SettingsPanel = ({
             presets={false}
             value={settings.drawCapture}
           />
+          <Card>
+            <SpeechSettings onChange={onChange} settings={settings} />
+          </Card>
           <Card>
             <SettingsRow
               detail="A banner when a selection lands"

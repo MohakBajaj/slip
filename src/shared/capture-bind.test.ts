@@ -6,6 +6,7 @@ import {
   defaultDrawCapture,
   defaultNoteCapture,
   defaultVoiceCapture,
+  formatDrawHint,
   formatHold,
   sanitizeDrawCapture,
   sanitizeNoteCapture,
@@ -32,6 +33,11 @@ describe("voice capture bind", () => {
   test("hold label uses the first modifier", () => {
     expect(formatHold(["Option", "Option"])).toBe("hold ⌥");
     expect(formatHold(["Mod+Shift+V"])).toBe("hold ⌘ ⇧ V");
+  });
+
+  test("draw hint explains the double-tap instead of four keys", () => {
+    expect(formatDrawHint(defaultDrawCapture())).toBe("hold ⌘, double-tap ⇧");
+    expect(formatDrawHint(["Mod+K"])).toBe("⌘ K");
   });
 
   test("settings keep a distinct voice chord", () => {

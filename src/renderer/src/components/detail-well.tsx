@@ -27,7 +27,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { copySlip } from "@/lib/copy-slip";
 import { filesFromClipboard, useFileDrop } from "@/lib/drop-images";
 import { cn } from "@/lib/utils";
 
@@ -182,12 +181,16 @@ const Action = ({
   </Button>
 );
 
-const CopyGroup = ({ slip }: { slip: Slip }) => (
+const CopyGroup = ({
+  onCopyAs,
+}: {
+  onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
+}) => (
   <ButtonGroup className="ml-auto shrink-0">
     <Button
       className="press"
       onClick={() => {
-        copySlip(slip).catch(() => undefined);
+        onCopyAs("copy");
       }}
       size="xs"
       type="button"
@@ -216,21 +219,21 @@ const CopyGroup = ({ slip }: { slip: Slip }) => (
       >
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyAtRef(slip.id).catch(() => undefined);
+            onCopyAs("ref");
           }}
         >
           @ reference
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyPath(slip.id).catch(() => undefined);
+            onCopyAs("path");
           }}
         >
           File path
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyPrompt([slip.id]).catch(() => undefined);
+            onCopyAs("prompt");
           }}
         >
           As prompt
@@ -321,6 +324,7 @@ export const DetailWell = ({
   editing,
   onAddImages,
   onClose,
+  onCopyAs,
   onDelete,
   onEditing,
   onMenu,
@@ -331,6 +335,7 @@ export const DetailWell = ({
   editing: boolean;
   onAddImages: (files: File[]) => void;
   onClose: () => void;
+  onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
   onDelete: () => void;
   onEditing: (on: boolean) => void;
   onMenu: () => void;
@@ -352,6 +357,12 @@ export const DetailWell = ({
   onPatchRef.current = onPatch;
   onEditingRef.current = onEditing;
   const app = sourceApp(slip.source);
+  let memoLabel = "Add memo";
+  if (editing) {
+    memoLabel = "Save";
+  } else if (!blankMemo(slip.content)) {
+    memoLabel = "Edit";
+  }
 
   const startEdit = (): void => {
     setNote(blankMemo(slip.content) ? "" : slip.content);
@@ -612,7 +623,7 @@ export const DetailWell = ({
           ) : null}
           <Action
             icon={PencilEdit01Icon}
-            label={editing ? "Save" : "Memo"}
+            label={memoLabel}
             named
             on={editing}
             onClick={() => {
@@ -643,7 +654,7 @@ export const DetailWell = ({
             Annotate
           </Button>
         ) : null}
-        <CopyGroup slip={slip} />
+        <CopyGroup onCopyAs={onCopyAs} />
       </footer>
     </section>
   );

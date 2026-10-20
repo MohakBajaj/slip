@@ -321,3 +321,10 @@
   --primary-foreground: oklch(0.98 0.01 250);
   --ring: oklch(0.48 0.09 250);
 }
+
+/* Full header fits at 856. Keep the title and hints hidden until there is slack. */
+@media (max-width: 879px) {
+  .draw-chrome {
+    display: none;
+  }
+}
