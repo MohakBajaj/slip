@@ -9,7 +9,12 @@ import { defaultNoteCapture } from "../shared/capture-bind";
 import { planCopy, pollPasteboardChange } from "../shared/capture-clip";
 import type { ClipSnap, PasteSnap } from "../shared/capture-clip";
 import { createVoiceHold, HOLD_MS } from "../shared/capture-hold";
-import { createCaptureMatcher, MOD_FLAGS } from "../shared/capture-match";
+import {
+  createCaptureMatcher,
+  KEYCODES,
+  MOD_FLAGS,
+} from "../shared/capture-match";
+import type { MatchInput } from "../shared/capture-match";
 import {
   htmlImages,
   isTinyHtmlImage,
@@ -33,6 +38,7 @@ const kCGSessionEventTap = 1;
 const kCGHeadInsertEventTap = 0;
 const kCGEventTapOptionListenOnly = 1;
 const kCGEventKeyDown = 10;
+const kCGEventKeyUp = 11;
 const kCGEventFlagsChanged = 12;
 const kCGKeyboardEventKeycode = 9;
 const kCGEventTapDisabledByTimeout = 0xff_ff_ff_fe;
@@ -47,7 +53,7 @@ const kCGAnnotatedSessionEventTap = 2;
 const kCGEventFlagMaskCommand = 0x00_10_00_00;
 const kVK_ANSI_C = 0x08;
 const FLAGS_MASK = 1 << kCGEventFlagsChanged;
-const KEY_MASK = (1 << kCGEventKeyDown) | FLAGS_MASK;
+const KEY_MASK = (1 << kCGEventKeyDown) | (1 << kCGEventKeyUp) | FLAGS_MASK;
 
 export interface CaptureEvent {
   context: ReturnType<typeof startFrontContext>;
@@ -56,6 +62,8 @@ export interface CaptureEvent {
 }
 
 export interface CaptureHandle {
+  setAnnotateSequence: (seq: string[]) => void;
+  setDictateSequence: (seq: string[]) => void;
   setDrawSequence: (seq: string[]) => void;
   setNoteSequence: (seq: string[]) => void;
   setSequence: (seq: string[]) => void;
@@ -67,6 +75,8 @@ const trusted = (): boolean =>
   systemPreferences.isTrustedAccessibilityClient(false);
 
 const idle: CaptureHandle = {
+  setAnnotateSequence: () => undefined,
+  setDictateSequence: () => undefined,
   setDrawSequence: () => undefined,
   setNoteSequence: () => undefined,
   setSequence: () => undefined,
@@ -75,9 +85,17 @@ const idle: CaptureHandle = {
 };
 
 export const startCapture = (opts: {
+  annotateSequence?: string[];
+  dictateOpen?: () => boolean;
+  dictateSequence?: string[];
   drawSequence?: string[];
   imageDir: string;
   noteSequence?: string[];
+  onAnnotate?: () => void;
+  onDictateCancel?: () => void;
+  onDictateHold?: () => void;
+  onDictateRelease?: () => void;
+  onDictateTap?: () => void;
   onDraw: () => void;
   onEvent: (event: CaptureEvent) => void;
   onNote: () => void;
@@ -106,8 +124,16 @@ export const startCapture = (opts: {
 const install = (opts: {
   imageDir: string;
   onEvent: (event: CaptureEvent) => void;
+  annotateSequence?: string[];
+  dictateOpen?: () => boolean;
+  dictateSequence?: string[];
   drawSequence?: string[];
   noteSequence?: string[];
+  onAnnotate?: () => void;
+  onDictateCancel?: () => void;
+  onDictateHold?: () => void;
+  onDictateRelease?: () => void;
+  onDictateTap?: () => void;
   onDraw: () => void;
   onNote: () => void;
   onState: (state: CaptureState) => void;
@@ -129,7 +155,13 @@ const install = (opts: {
   const noteMatcher = createCaptureMatcher(
     opts.noteSequence ?? defaultNoteCapture()
   );
+  const annotateMatcher = createCaptureMatcher(
+    opts.annotateSequence ?? ["Control+Option+A"]
+  );
   const voiceHold = createVoiceHold(opts.voiceSequence ?? ["Option", "Option"]);
+  const dictateHold = createVoiceHold(
+    opts.dictateSequence ?? ["Control+Option+D"]
+  );
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   let holdLive = false;
   let listenKeys =
@@ -137,7 +169,9 @@ const install = (opts: {
     voiceMatcher.needsKeys() ||
     drawMatcher.needsKeys() ||
     noteMatcher.needsKeys() ||
-    voiceHold.needsKeys();
+    annotateMatcher.needsKeys() ||
+    voiceHold.needsKeys() ||
+    dictateHold.needsKeys();
   const pasteboard = createMacPasteboard();
   mkdirSync(opts.imageDir, { recursive: true });
   const cg = koffi.load(
@@ -246,6 +280,56 @@ const install = (opts: {
       } catch {
         // Overlay must not kill the tap.
       }
+    }
+  };
+
+  let dictateTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearDictateTimer = (): void => {
+    if (dictateTimer === null) {
+      return;
+    }
+    clearTimeout(dictateTimer);
+    dictateTimer = null;
+  };
+
+  const safeDictate = (fn: (() => void) | undefined): void => {
+    if (!fn) {
+      return;
+    }
+    try {
+      fn();
+    } catch {
+      // Overlay must not kill the tap.
+    }
+  };
+
+  const applyDictate = (action: ReturnType<typeof dictateHold.push>): void => {
+    if (action === "arm") {
+      clearDictateTimer();
+      dictateTimer = setTimeout(() => {
+        dictateTimer = null;
+        dictateHold.markStarted();
+        safeDictate(opts.onDictateHold);
+      }, HOLD_MS);
+      return;
+    }
+    if (action === "tap") {
+      clearDictateTimer();
+      safeDictate(opts.onDictateTap);
+      return;
+    }
+    if (action === "disarm") {
+      clearDictateTimer();
+    }
+    if (action === "end") {
+      clearDictateTimer();
+      safeDictate(opts.onDictateRelease);
+      return;
+    }
+    if (action === "cancel") {
+      clearDictateTimer();
+      safeDictate(opts.onDictateCancel);
     }
   };
 
@@ -505,6 +589,67 @@ const install = (opts: {
     }
   };
 
+  const onInput = (input: MatchInput): void => {
+    applyHold(voiceHold.push(input));
+    applyDictate(dictateHold.push(input));
+    const textHit = matcher.push(input);
+    const voiceHit = holdLive ? false : voiceMatcher.push(input);
+    const drawHit = drawMatcher.push(input);
+    const noteHit = noteMatcher.push(input);
+    const annotateHit = annotateMatcher.push(input);
+    if (textHit) {
+      voiceMatcher.reset();
+      drawMatcher.reset();
+      noteMatcher.reset();
+      annotateMatcher.reset();
+      fire();
+      return;
+    }
+    if (voiceHit) {
+      matcher.reset();
+      drawMatcher.reset();
+      noteMatcher.reset();
+      annotateMatcher.reset();
+      try {
+        opts.onVoice();
+      } catch {
+        // Overlay must not kill the tap.
+      }
+      return;
+    }
+    if (drawHit) {
+      matcher.reset();
+      voiceMatcher.reset();
+      noteMatcher.reset();
+      annotateMatcher.reset();
+      try {
+        opts.onDraw();
+      } catch {
+        // Overlay must not kill the tap.
+      }
+      return;
+    }
+    if (noteHit) {
+      matcher.reset();
+      voiceMatcher.reset();
+      drawMatcher.reset();
+      annotateMatcher.reset();
+      try {
+        opts.onNote();
+      } catch {
+        // Overlay must not kill the tap.
+      }
+      return;
+    }
+    if (annotateHit) {
+      matcher.reset();
+      voiceMatcher.reset();
+      drawMatcher.reset();
+      noteMatcher.reset();
+      safeDictate(opts.onAnnotate);
+    }
+  };
+
   const installTap = (): boolean => {
     if (tap) {
       return true;
@@ -524,64 +669,30 @@ const install = (opts: {
           return event;
         }
         const flags = Number(CGEventGetFlags(event)) & MOD_FLAGS;
-        let input:
-          | { flags: number; type: "flags" }
-          | {
-              code: number;
-              flags: number;
-              type: "key";
-            }
-          | null = null;
+        let input: MatchInput | null = null;
         if (type === kCGEventFlagsChanged) {
           input = { flags, type: "flags" };
-        } else if (type === kCGEventKeyDown) {
+        } else if (type === kCGEventKeyDown || type === kCGEventKeyUp) {
           input = {
             code: Number(
               CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
             ),
             flags,
-            type: "key",
+            type: type === kCGEventKeyUp ? "up" : "key",
           };
         }
         if (input) {
-          applyHold(voiceHold.push(input));
-          const textHit = matcher.push(input);
-          const voiceHit = holdLive ? false : voiceMatcher.push(input);
-          const drawHit = drawMatcher.push(input);
-          const noteHit = noteMatcher.push(input);
-          if (textHit) {
-            voiceMatcher.reset();
-            drawMatcher.reset();
-            noteMatcher.reset();
-            fire();
-          } else if (voiceHit) {
-            matcher.reset();
-            drawMatcher.reset();
-            noteMatcher.reset();
-            try {
-              opts.onVoice();
-            } catch {
-              // Overlay must not kill the tap.
-            }
-          } else if (drawHit) {
-            matcher.reset();
-            voiceMatcher.reset();
-            noteMatcher.reset();
-            try {
-              opts.onDraw();
-            } catch {
-              // Overlay must not kill the tap.
-            }
-          } else if (noteHit) {
-            matcher.reset();
-            voiceMatcher.reset();
-            drawMatcher.reset();
-            try {
-              opts.onNote();
-            } catch {
-              // Overlay must not kill the tap.
-            }
+          if (
+            input.type === "key" &&
+            input.code === KEYCODES.Escape &&
+            opts.dictateOpen?.() === true
+          ) {
+            clearDictateTimer();
+            dictateHold.reset();
+            safeDictate(opts.onDictateCancel);
+            return event;
           }
+          onInput(input);
         }
         return event;
       },
@@ -638,7 +749,9 @@ const install = (opts: {
       voiceMatcher.needsKeys() ||
       drawMatcher.needsKeys() ||
       noteMatcher.needsKeys() ||
-      voiceHold.needsKeys();
+      annotateMatcher.needsKeys() ||
+      voiceHold.needsKeys() ||
+      dictateHold.needsKeys();
     if (listenKeys === prevKeys) {
       return;
     }
@@ -668,17 +781,30 @@ const install = (opts: {
     syncListenKeys();
   };
 
+  const setAnnotateSequence = (seq: string[]): void => {
+    annotateMatcher.setSequence(seq);
+    syncListenKeys();
+  };
+
+  const setDictateSequence = (seq: string[]): void => {
+    dictateHold.setSequence(seq);
+    syncListenKeys();
+  };
+
   systemPreferences.isTrustedAccessibilityClient(true);
   syncTrust();
   const poll = setInterval(syncTrust, TRUST_POLL_MS);
 
   return {
+    setAnnotateSequence,
+    setDictateSequence,
     setDrawSequence,
     setNoteSequence,
     setSequence,
     setVoiceSequence,
     stop: () => {
       clearHoldTimer();
+      clearDictateTimer();
       clearInterval(poll);
       dropTap();
     },

@@ -18,9 +18,9 @@ const page = async (): Promise<ReactElement> => {
     const { DrawApp } = await import("./draw");
     return <DrawApp />;
   }
-  if (hash === "#voice") {
+  if (hash === "#voice" || hash === "#voice-out") {
     const { VoiceApp } = await import("./voice");
-    return <VoiceApp />;
+    return <VoiceApp out={hash === "#voice-out"} />;
   }
   if (hash === "#note") {
     const { NoteApp } = await import("./note");

@@ -127,6 +127,7 @@ test("keeps raw transcripts", () => {
 test("caption helper", () => {
   expect(isMergeCaption("")).toBe(true);
   expect(isMergeCaption("Drawing")).toBe(true);
+  expect(isMergeCaption("Annotation")).toBe(true);
   expect(isMergeCaption("Voice note")).toBe(true);
   expect(isMergeCaption("a real note")).toBe(false);
   expect(isMergeCaption("Drawing\nmore")).toBe(false);

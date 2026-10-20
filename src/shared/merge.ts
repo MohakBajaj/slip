@@ -1,7 +1,7 @@
 import { sourcePrompt } from "./source";
 import type { Slip } from "./types";
 
-const CAPTION = /^(?:drawing|untitled|voice note)$/iu;
+const CAPTION = /^(?:drawing|annotation|untitled|voice note)$/iu;
 
 export const isMergeCaption = (content: string): boolean => {
   const text = content.trim();

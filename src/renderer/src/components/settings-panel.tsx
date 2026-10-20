@@ -224,6 +224,34 @@ export const SettingsPanel = ({
             onSequence={onChord("capture")}
             value={settings.capture}
           />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Annotate</p>
+          <CaptureBind
+            hint="Clipboard image, or a region."
+            onBind={onBind}
+            onSequence={onChord("annotateOut")}
+            presets={false}
+            value={settings.annotateOut}
+          />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Dictate</p>
+          <CaptureBind
+            hint="Hold to talk. Tap to toggle."
+            onBind={onBind}
+            onSequence={onChord("dictateCapture")}
+            presets={false}
+            value={settings.dictateCapture}
+          />
+          <Card>
+            <SettingsRow label="Keep dictations in inbox">
+              <Switch
+                aria-label="Keep dictations in inbox"
+                checked={settings.keepDictations}
+                onCheckedChange={(keepDictations) => {
+                  onChange({ ...settings, keepDictations });
+                }}
+                size="sm"
+              />
+            </SettingsRow>
+          </Card>
           <button
             aria-expanded={moreCapture}
             className="flex items-center justify-between px-0.5 text-left"

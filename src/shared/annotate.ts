@@ -16,7 +16,7 @@ export interface DrawTarget {
 }
 
 export interface DrawSession {
-  mode: "attach" | "slip";
+  mode: "attach" | "out" | "slip";
   target: DrawTarget | null;
 }
 
@@ -27,6 +27,23 @@ export const BLANK_MAX = 4096;
 
 /** Page-space padding around a blank drawing export. */
 export const EXPORT_MARGIN = 24;
+
+/** Annotate-anywhere pen. Dark-mode ink is too light on a screenshot. */
+export const ANNOTATE_INK = "red";
+
+/** Width the annotate toolbar needs, including the window chrome. */
+export const ANNOTATE_TOOLBAR_W = 821;
+
+export const annotateRetake = (hasStrokes: boolean): "keep" | "replace" =>
+  hasStrokes ? "keep" : "replace";
+
+export const annotateWindowSize = (area: {
+  height: number;
+  width: number;
+}): { height: number; width: number } => ({
+  height: Math.min(680, Math.max(420, area.height - 80)),
+  width: Math.min(ANNOTATE_TOOLBAR_W, Math.max(0, area.width)),
+});
 
 const emptyRect = (): Rect => ({ h: 0, w: 0, x: 0, y: 0 });
 

@@ -100,6 +100,13 @@ describe("note capture bind", () => {
     ].map((seq) => seq.join("|"));
     expect(new Set(chords).size).toBe(4);
     expect(next.noteCapture).toEqual(["Control", "Control"]);
+    expect(next.annotateOut).toEqual(["Control+Option+A"]);
+    expect(next.dictateCapture).toEqual(["Control+Option+D"]);
+    expect(
+      sanitizeSettings({ dictateCapture: ["Control+Option+Space"] })
+        .dictateCapture
+    ).toEqual(["Control+Option+Space"]);
+    expect(next.keepDictations).toBe(false);
     const collided = sanitizeSettings({
       capture: ["Control", "Control"],
       noteCapture: ["Control", "Control"],
@@ -112,7 +119,9 @@ describe("note capture bind", () => {
   test("editing one chord keeps the others distinct", () => {
     const next = assignCapture(
       {
+        annotateOut: ["Control+Option+A"],
         capture: ["Shift", "Shift"],
+        dictateCapture: ["Control+Option+Space"],
         drawCapture: ["Mod+Shift", "Mod+Shift"],
         noteCapture: ["Control", "Control"],
         voiceCapture: ["Option", "Option"],

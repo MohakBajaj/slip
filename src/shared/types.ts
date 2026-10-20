@@ -1,11 +1,15 @@
 import type { FontId, ThemeId, TrayIconId } from "./appearance";
 import { isFontId, isThemeId, isTrayIconId } from "./appearance";
 import {
+  defaultAnnotateOut,
   defaultCapture,
+  defaultDictateCapture,
   defaultDrawCapture,
   defaultNoteCapture,
   defaultVoiceCapture,
+  sanitizeAnnotateOut,
   sanitizeCapture,
+  sanitizeDictateCapture,
   sanitizeDrawCapture,
   sanitizeNoteCapture,
   sanitizeVoiceCapture,
@@ -44,15 +48,18 @@ export interface Slip {
 export interface Settings {
   accent: Accent;
   alwaysOnTop: boolean;
+  annotateOut: string[];
   capture: string[];
   checkUpdates: boolean;
   cleanupDevice: string;
   cleanupModel: string;
   cleanupRoute: CleanupRoute;
+  dictateCapture: string[];
   dock: boolean;
   drawCapture: string[];
   font: FontId;
   fontMigrated: boolean;
+  keepDictations: boolean;
   noteCapture: string[];
   notify: boolean;
   scheme: Scheme;
@@ -98,15 +105,18 @@ export const defaultSettings = (): Settings => {
   return {
     accent: "amber",
     alwaysOnTop: true,
+    annotateOut: defaultAnnotateOut(),
     capture: defaultCapture(),
     checkUpdates: true,
     cleanupDevice: speech.cleanupDevice,
     cleanupModel: speech.cleanupModel,
     cleanupRoute: speech.cleanupRoute,
+    dictateCapture: defaultDictateCapture(),
     dock: true,
     drawCapture: defaultDrawCapture(),
     font: "system",
     fontMigrated: true,
+    keepDictations: false,
     noteCapture: defaultNoteCapture(),
     notify: false,
     scheme: "system",
@@ -137,6 +147,14 @@ const isAccent = (value: unknown): value is Accent =>
 
 const isScheme = (value: unknown): value is Scheme =>
   value === "system" || value === "light" || value === "dark";
+
+export const fontMigrationPending = (raw: unknown): boolean => {
+  if (raw === null || typeof raw !== "object") {
+    return false;
+  }
+  const stored = raw as { font?: unknown; fontMigrated?: unknown };
+  return stored.fontMigrated !== true && stored.font === "geist";
+};
 
 export const sanitizeSettings = (raw: unknown): Settings => {
   const input = raw !== null && typeof raw === "object" ? raw : {};
@@ -178,6 +196,28 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     next.voiceCapture,
     next.drawCapture
   );
+  const legacyOut = input as {
+    annotateOut?: unknown;
+    dictateCapture?: unknown;
+  };
+  next.annotateOut = sanitizeAnnotateOut(
+    legacyOut.annotateOut,
+    next.capture,
+    next.voiceCapture,
+    next.drawCapture,
+    next.noteCapture
+  );
+  next.dictateCapture = sanitizeDictateCapture(
+    legacyOut.dictateCapture,
+    next.capture,
+    next.voiceCapture,
+    next.drawCapture,
+    next.noteCapture,
+    next.annotateOut
+  );
+  if (typeof next.keepDictations !== "boolean") {
+    next.keepDictations = false;
+  }
   if (!isScheme(next.scheme)) {
     next.scheme = "system";
   }
@@ -214,15 +254,18 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   return {
     accent: next.accent,
     alwaysOnTop: next.alwaysOnTop,
+    annotateOut: next.annotateOut,
     capture: next.capture,
     checkUpdates: next.checkUpdates,
     cleanupDevice: next.cleanupDevice,
     cleanupModel: next.cleanupModel,
     cleanupRoute: next.cleanupRoute,
+    dictateCapture: next.dictateCapture,
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,
     fontMigrated: next.fontMigrated,
+    keepDictations: next.keepDictations,
     noteCapture: next.noteCapture,
     notify: next.notify,
     scheme: next.scheme,

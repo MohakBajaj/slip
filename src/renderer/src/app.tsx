@@ -1117,6 +1117,16 @@ const App = () => {
 
       {helpOpen ? (
         <Cheatsheet
+          anywhere={[
+            {
+              keys: formatCapture(settings.annotateOut),
+              label: "Annotate anywhere",
+            },
+            {
+              keys: formatCapture(settings.dictateCapture),
+              label: "Dictate anywhere",
+            },
+          ]}
           onClose={() => {
             setHelpOpen(false);
           }}
@@ -1139,6 +1149,14 @@ const App = () => {
             onCopyPrompt={() => {
               setSettingsOpen(false);
               copyPrompt().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onAnnotate={() => {
+              void window.slip.openAnnotate();
+              setPaletteOpen(false);
+            }}
+            onDictate={() => {
+              void window.slip.openDictate();
               setPaletteOpen(false);
             }}
             onDraw={() => {

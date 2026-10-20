@@ -1,6 +1,8 @@
 import { CHEATSHEET, shortcutLabel } from "../../../shared/shortcuts";
 import type { Shortcuts } from "../../../shared/shortcuts";
 
+const NO_ANYWHERE: { keys: string; label: string }[] = [];
+
 const rowKeys = (hotkey: string, alias: string | undefined): string => {
   const main = shortcutLabel(hotkey);
   if (alias === undefined) {
@@ -10,9 +12,11 @@ const rowKeys = (hotkey: string, alias: string | undefined): string => {
 };
 
 export const Cheatsheet = ({
+  anywhere = NO_ANYWHERE,
   onClose,
   shortcuts,
 }: {
+  anywhere?: { keys: string; label: string }[];
   onClose: () => void;
   shortcuts: Shortcuts;
 }) => (
@@ -49,6 +53,26 @@ export const Cheatsheet = ({
             ))}
           </section>
         ))}
+        {anywhere.length > 0 ? (
+          <section className="flex flex-col">
+            <p className="text-muted-foreground px-0.5 pb-1 text-[11px]">
+              Anywhere
+            </p>
+            {anywhere.map((row) => (
+              <div
+                className="flex items-center justify-between gap-3 py-0.5"
+                key={row.label}
+              >
+                <span className="min-w-0 truncate text-[13px]">
+                  {row.label}
+                </span>
+                <span className="text-muted-foreground shrink-0 font-mono text-[11px]">
+                  {row.keys}
+                </span>
+              </div>
+            ))}
+          </section>
+        ) : null}
       </div>
       <p className="text-muted-foreground mt-3 text-[11px]">
         ⇧⌘C list · ⇧⌘P prompt · ⇧⌘M merge

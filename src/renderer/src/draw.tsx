@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
+  ANNOTATE_INK,
   blankExportScale,
   cameraForFrame,
   EXPORT_MARGIN,
@@ -269,6 +270,8 @@ export const DrawApp = () => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [attach, setAttach] = useState(false);
+  const [out, setOut] = useState(false);
+  const outRef = useRef(false);
   const [plate, setPlate] = useState<{ slipId: string; url: string } | null>(
     null
   );
@@ -293,7 +296,11 @@ export const DrawApp = () => {
   };
 
   const syncDoc = (editor: Editor): void => {
-    setInk(editor.store.shapes().length > 0);
+    const drawn = editor.store.shapes().length > 0;
+    setInk(drawn);
+    if (outRef.current) {
+      void window.slip.setAnnotateDirty(drawn);
+    }
     setCanUndo(editor.store.canUndo);
     setCanRedo(editor.store.canRedo);
     setZoom(editor.camera.z);
@@ -514,9 +521,14 @@ export const DrawApp = () => {
       return;
     }
     const ok = await window.slip.copyImage(bytes);
-    if (ok) {
-      showFlash("Copied");
+    if (!ok) {
+      return;
     }
+    if (outRef.current) {
+      await window.slip.closeDraw();
+      return;
+    }
+    showFlash("Copied");
   };
 
   const save = async (): Promise<void> => {
@@ -602,6 +614,31 @@ export const DrawApp = () => {
       };
       run().catch(() => undefined);
     };
+    const showLoose = async (): Promise<void> => {
+      const bytes = await window.slip.readOutImage();
+      if (gone) {
+        return;
+      }
+      if (bytes === null) {
+        showFlash("Couldn't read image");
+        return;
+      }
+      const copyBytes = Uint8Array.from(bytes);
+      const url = URL.createObjectURL(
+        new Blob([copyBytes], { type: "image/png" })
+      );
+      const img = await loadImage(url);
+      if (gone) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      if (img === null) {
+        URL.revokeObjectURL(url);
+        showFlash("Couldn't read image");
+        return;
+      }
+      placePlate(img, url, "");
+    };
     const boot = async (): Promise<void> => {
       const data = await window.slip.load();
       if (gone) {
@@ -612,9 +649,20 @@ export const DrawApp = () => {
       if (gone) {
         return;
       }
+      const loose = session.mode === "out";
+      outRef.current = loose;
       setAttach(session.mode === "attach");
+      setOut(loose);
+      if (loose) {
+        setColor(ANNOTATE_INK);
+        editorRef.current?.setStyle("color", ANNOTATE_INK);
+      }
       if (session.target) {
         openTarget(session.target);
+        return;
+      }
+      if (loose) {
+        await showLoose();
         return;
       }
       if (offeredRef.current) {
@@ -633,7 +681,10 @@ export const DrawApp = () => {
     };
     boot().catch(() => undefined);
     const offMode = window.slip.onDrawMode((mode) => {
+      const loose = mode === "out";
+      outRef.current = loose;
       setAttach(mode === "attach");
+      setOut(loose);
     });
     const offTarget = window.slip.onDrawTarget((target) => {
       if (!target) {
@@ -643,6 +694,9 @@ export const DrawApp = () => {
       openTarget(target);
     });
     const offSettings = window.slip.onSettings(setSettings);
+    const offImage = window.slip.onAnnotateImage(() => {
+      showLoose().catch(() => undefined);
+    });
     return () => {
       gone = true;
       targetKeyRef.current = "";
@@ -655,8 +709,16 @@ export const DrawApp = () => {
       offMode();
       offTarget();
       offSettings();
+      offImage();
     };
   }, []);
+
+  useEffect(() => {
+    if (!out) {
+      return;
+    }
+    void window.slip.setAnnotateDirty(ink);
+  }, [ink, out]);
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent): void => {
@@ -862,6 +924,9 @@ export const DrawApp = () => {
 
   const mount = (editor: Editor): void => {
     editorRef.current = editor;
+    if (outRef.current) {
+      editor.setStyle("color", ANNOTATE_INK);
+    }
     installPlateLayer(editor, () => {
       const { current } = plateRef;
       if (!current || current.frame.w <= 0 || current.frame.h <= 0) {
@@ -904,6 +969,18 @@ export const DrawApp = () => {
   };
 
   const slipId = plate?.slipId ?? "";
+  let saveLabel = "Slip";
+  if (out) {
+    saveLabel = "Inbox";
+  } else if (attach || slipId.length > 0) {
+    saveLabel = "Add";
+  }
+  let heading = "Slip Draw";
+  if (flash.length > 0) {
+    heading = flash;
+  } else if (out || plate !== null) {
+    heading = "Annotate";
+  }
 
   return (
     <div
@@ -912,7 +989,7 @@ export const DrawApp = () => {
       data-font={settings.font}
       data-theme={settings.theme}
     >
-      <header className="drag flex h-9.5 shrink-0 items-center gap-2 pr-2.5">
+      <header className="drag flex min-h-9.5 shrink-0 flex-wrap items-center gap-2 py-1 pr-2.5">
         <div className="flex min-w-28 shrink-0 items-center gap-1.5 pl-20">
           <img
             alt=""
@@ -921,14 +998,11 @@ export const DrawApp = () => {
             src={dark ? darkIcon : lightIcon}
           />
           <p className="draw-chrome truncate text-[13px] font-medium">
-            {flash || (plate === null ? "Slip Draw" : "Annotate")}
+            {heading}
           </p>
         </div>
-        <div
-          className="flex min-w-0 flex-1 overflow-x-auto"
-          style={{ justifyContent: "safe center" }}
-        >
-          <div className="bg-card/92 no-drag flex items-center gap-0.5 rounded-xl px-1 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
+        <div className="flex min-w-0 flex-1 justify-center">
+          <div className="bg-card/92 no-drag flex flex-wrap items-center justify-center gap-0.5 rounded-xl px-1 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
             {TOOLS.map((item) => (
               <Tip hint={item.hint} key={item.id} label={item.label}>
                 <Chip
@@ -1054,7 +1128,7 @@ export const DrawApp = () => {
               onMouseDown={keepFocus}
               size="xs"
             >
-              {attach || slipId.length > 0 ? "Add" : "Slip"}
+              {saveLabel}
               <kbd className="draw-chrome text-[11px] font-medium opacity-70">
                 ⌘↵
               </kbd>

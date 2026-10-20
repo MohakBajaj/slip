@@ -45,7 +45,9 @@ const api = {
     ipcRenderer.invoke("createSlip", content, images) as Promise<Slip | null>,
   createVoiceSlip: (wav: Uint8Array) =>
     ipcRenderer.invoke("createVoiceSlip", wav) as Promise<{
+      costLabel: string;
       error: string;
+      notice: string;
       slip: Slip | null;
     }>,
   deleteSlips: (ids: string[]) =>
@@ -70,6 +72,13 @@ const api = {
       created: Slip;
       slips: Slip[];
     } | null>,
+  onAnnotateImage: (fn: () => void) => {
+    const listener = () => fn();
+    ipcRenderer.on("annotate-image", listener);
+    return () => {
+      ipcRenderer.removeListener("annotate-image", listener);
+    };
+  },
   onCaptureState: (fn: (state: CaptureState) => void) => {
     const listener = (_: unknown, state: CaptureState) => fn(state);
     ipcRenderer.on("capture-state", listener);
@@ -91,8 +100,8 @@ const api = {
       ipcRenderer.removeListener("draw-attach", listener);
     };
   },
-  onDrawMode: (fn: (mode: "attach" | "slip") => void) => {
-    const listener = (_: unknown, mode: "attach" | "slip") => fn(mode);
+  onDrawMode: (fn: (mode: "attach" | "out" | "slip") => void) => {
+    const listener = (_: unknown, mode: "attach" | "out" | "slip") => fn(mode);
     ipcRenderer.on("draw-mode", listener);
     return () => {
       ipcRenderer.removeListener("draw-mode", listener);
@@ -164,6 +173,8 @@ const api = {
     };
   },
   openAccess: () => ipcRenderer.invoke("openAccess"),
+  openAnnotate: () => ipcRenderer.invoke("openAnnotate"),
+  openDictate: () => ipcRenderer.invoke("openDictate"),
   openDraw: (
     mode?:
       | "attach"
@@ -183,12 +194,16 @@ const api = {
       "readAttachment",
       filePath
     ) as Promise<Uint8Array | null>,
+  readOutImage: () =>
+    ipcRenderer.invoke("readOutImage") as Promise<Uint8Array | null>,
   restoreSlips: (slips: Slip[], drop: string[] = []) =>
     ipcRenderer.invoke("restoreSlips", slips, drop),
   saveNote: (content: string) =>
     ipcRenderer.invoke("saveNote", content) as Promise<Slip | null>,
   saveSettings: (settings: Settings) =>
     ipcRenderer.invoke("saveSettings", settings),
+  setAnnotateDirty: (dirty: boolean) =>
+    ipcRenderer.invoke("setAnnotateDirty", dirty),
   setCleanupKey: (key: string) =>
     ipcRenderer.invoke("setCleanupKey", key) as Promise<boolean>,
   setLogin: (on: boolean) =>
