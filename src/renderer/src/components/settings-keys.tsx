@@ -1,13 +1,13 @@
-import {
-  formatForDisplay,
-  normalizeHotkey,
-  useHotkeyRecorder,
-} from "@tanstack/react-hotkeys";
+import { normalizeHotkey, useHotkeyRecorder } from "@tanstack/react-hotkeys";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { defaultShortcuts, SHORTCUT_META } from "../../../shared/shortcuts";
+import {
+  defaultShortcuts,
+  SHORTCUT_META,
+  shortcutLabel,
+} from "../../../shared/shortcuts";
 import type { ShortcutId } from "../../../shared/shortcuts";
 import type { Settings } from "../../../shared/types";
 import { SettingsRow } from "./settings-row";
@@ -87,13 +87,13 @@ export const SettingsKeys = ({
   }, [onBind, recorder.isRecording]);
 
   return (
-    <div className="bg-card flex flex-col gap-0.5 rounded-[16px] py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+    <div className="bg-card flex flex-col gap-0.5 rounded-xl py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
       {SHORTCUT_META.map((item) => {
-        let hint = formatForDisplay(settings.shortcuts[item.id]);
+        let hint = shortcutLabel(settings.shortcuts[item.id]);
         if (editing === item.id) {
           hint = "Press keys";
           if (recorder.recordedHotkey !== null) {
-            hint = formatForDisplay(recorder.recordedHotkey);
+            hint = shortcutLabel(recorder.recordedHotkey);
           }
         }
         return (

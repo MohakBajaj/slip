@@ -192,7 +192,7 @@ const GatewayKey = ({
     <div className="flex flex-col gap-1">
       <p className="text-[13px] leading-none">AI Gateway key</p>
       <p className="text-muted-foreground text-[11px]">
-        One key for cloud transcription and cleanup. Stored in the keychain.
+        Stored in the keychain.
       </p>
       <div className="flex gap-1">
         <Input

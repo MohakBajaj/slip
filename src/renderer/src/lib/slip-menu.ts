@@ -1,4 +1,6 @@
 import type { MenuEntry } from "../../../shared/menu";
+import { menuAccelerator } from "../../../shared/shortcuts";
+import type { Shortcuts } from "../../../shared/shortcuts";
 import type { Slip } from "../../../shared/types";
 
 export const slipMenuEntries = ({
@@ -8,6 +10,7 @@ export const slipMenuEntries = ({
   sections,
   setArchived,
   setDone,
+  shortcuts,
   slip,
 }: {
   canSelectTo: boolean;
@@ -16,6 +19,7 @@ export const slipMenuEntries = ({
   sections: string[];
   setArchived: boolean;
   setDone: boolean;
+  shortcuts: Shortcuts;
   slip: Slip;
 }): MenuEntry[] => {
   const useSet = manyMarked && marked;
@@ -45,8 +49,10 @@ export const slipMenuEntries = ({
     archiveLabel = setArchived ? "Restore Selected" : "Archive Selected";
   }
 
+  const key = (id: keyof Shortcuts): string => menuAccelerator(shortcuts[id]);
+
   return [
-    { accelerator: "Return", id: copyId, label: copyLabel },
+    { accelerator: key("copy"), id: copyId, label: copyLabel },
     {
       label: "Copy as",
       submenu: [
@@ -59,13 +65,14 @@ export const slipMenuEntries = ({
       ],
     },
     {
-      accelerator: "X",
+      accelerator: key("toggleMark"),
       id: "mark",
       label: marked ? "Remove from Selection" : "Add to Selection",
     },
     ...(canSelectTo ? [{ id: "select-to", label: "Select to Here" }] : []),
-    { id: "done", label: doneLabel },
+    { accelerator: key("done"), id: "done", label: doneLabel },
     {
+      accelerator: key("pin"),
       id: "pin",
       label: slip.pin ? "Unpin" : "Pin",
     },
@@ -76,21 +83,21 @@ export const slipMenuEntries = ({
       submenu: sectionItems,
     },
     {
-      accelerator: "Command+E",
+      accelerator: key("archive"),
       id: "archive",
       label: archiveLabel,
     },
-    ...(setArchived
-      ? [
-          {
-            id: "delete",
-            label: useSet ? "Delete Selected" : "Delete",
-          },
-        ]
-      : []),
+    {
+      accelerator: key("delete"),
+      id: "delete",
+      label: useSet ? "Delete Selected" : "Delete",
+    },
     ...(useSet
       ? []
-      : [{ type: "separator" as const }, { id: "edit", label: "Edit" }]),
+      : [
+          { type: "separator" as const },
+          { accelerator: key("edit"), id: "edit", label: "Edit" },
+        ]),
   ];
 };
 

@@ -69,7 +69,8 @@ export const FONTS: {
     id: "system",
     label: "System",
     sample: "A captured thought",
-    stack: "ui-sans-serif, system-ui, sans-serif",
+    stack:
+      '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif',
   },
   {
     id: "serif",
@@ -87,7 +88,8 @@ export const FONTS: {
     id: "mono",
     label: "Mono",
     sample: "A captured thought",
-    stack: 'ui-monospace, "SF Mono", Menlo, monospace',
+    stack:
+      'ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace',
   },
 ];
 

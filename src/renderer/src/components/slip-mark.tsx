@@ -1,5 +1,4 @@
-import { CheckmarkCircle02Icon, PinIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { CircleCheck, Pin } from "lucide-react";
 
 import type { Slip } from "../../../shared/types";
 
@@ -11,10 +10,10 @@ export const SlipMark = ({
   slip: Slip;
 }) => {
   if (slip.done) {
-    return <HugeiconsIcon className="size-3.5" icon={CheckmarkCircle02Icon} />;
+    return <CircleCheck className="size-3.5" />;
   }
   if (slip.pin) {
-    return <HugeiconsIcon className="size-3.5" icon={PinIcon} />;
+    return <Pin className="size-3.5" />;
   }
   if (marked) {
     return <span className="bg-primary block size-3.5 rounded-full" />;

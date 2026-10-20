@@ -72,6 +72,9 @@ export const NoteApp = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "geist") {
+      void import("@fontsource-variable/geist/wght.css");
+    }
     if (settings.font === "news") {
       void import("@fontsource-variable/newsreader/wght.css");
     }

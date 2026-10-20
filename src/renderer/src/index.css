@@ -1,13 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist/wght.css";
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Geist Variable", sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui,
+    sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -60,7 +62,7 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.42 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -72,7 +74,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -84,18 +86,18 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --background: oklch(0.17 0 0);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.22 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.22 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted-foreground: oklch(0.78 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
@@ -107,7 +109,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.22 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -179,7 +181,7 @@
   --popover: oklch(0.99 0.008 85);
   --foreground: oklch(0.22 0.012 80);
   --muted: oklch(0.94 0.012 85);
-  --muted-foreground: oklch(0.48 0.02 80);
+  --muted-foreground: oklch(0.4 0.02 80);
   --border: oklch(0.9 0.016 85);
 }
 .dark[data-theme="paper"] {
@@ -188,7 +190,7 @@
   --popover: oklch(0.22 0.012 80);
   --foreground: oklch(0.96 0.01 85);
   --muted: oklch(0.26 0.012 80);
-  --muted-foreground: oklch(0.7 0.02 80);
+  --muted-foreground: oklch(0.78 0.02 80);
   --border: oklch(1 0 0 / 10%);
 }
 
@@ -198,7 +200,7 @@
   --popover: oklch(1 0 0);
   --foreground: oklch(0.14 0.01 80);
   --muted: oklch(0.94 0.004 90);
-  --muted-foreground: oklch(0.45 0.01 80);
+  --muted-foreground: oklch(0.42 0.01 80);
   --border: oklch(0.9 0.006 90);
 }
 .dark[data-theme="ink"] {
@@ -207,7 +209,7 @@
   --popover: oklch(0.18 0.004 80);
   --foreground: oklch(0.97 0.004 90);
   --muted: oklch(0.24 0.004 80);
-  --muted-foreground: oklch(0.7 0.01 80);
+  --muted-foreground: oklch(0.78 0.01 80);
   --border: oklch(1 0 0 / 12%);
 }
 
@@ -217,7 +219,7 @@
   --popover: oklch(0.99 0.006 250);
   --foreground: oklch(0.2 0.03 260);
   --muted: oklch(0.93 0.012 250);
-  --muted-foreground: oklch(0.46 0.03 260);
+  --muted-foreground: oklch(0.38 0.03 260);
   --border: oklch(0.88 0.016 250);
 }
 .dark[data-theme="midnight"] {
@@ -226,7 +228,7 @@
   --popover: oklch(0.21 0.028 260);
   --foreground: oklch(0.96 0.01 250);
   --muted: oklch(0.26 0.024 260);
-  --muted-foreground: oklch(0.72 0.02 250);
+  --muted-foreground: oklch(0.78 0.02 250);
   --border: oklch(1 0 0 / 10%);
 }
 
@@ -236,7 +238,7 @@
   --popover: oklch(0.99 0.01 145);
   --foreground: oklch(0.22 0.03 145);
   --muted: oklch(0.93 0.016 145);
-  --muted-foreground: oklch(0.44 0.03 145);
+  --muted-foreground: oklch(0.38 0.03 145);
   --border: oklch(0.88 0.02 145);
 }
 .dark[data-theme="moss"] {
@@ -245,7 +247,7 @@
   --popover: oklch(0.22 0.02 145);
   --foreground: oklch(0.96 0.012 145);
   --muted: oklch(0.26 0.018 145);
-  --muted-foreground: oklch(0.72 0.02 145);
+  --muted-foreground: oklch(0.78 0.02 145);
   --border: oklch(1 0 0 / 10%);
 }
 
@@ -255,7 +257,7 @@
   --popover: oklch(0.99 0.008 20);
   --foreground: oklch(0.24 0.03 20);
   --muted: oklch(0.93 0.016 20);
-  --muted-foreground: oklch(0.46 0.03 20);
+  --muted-foreground: oklch(0.38 0.03 20);
   --border: oklch(0.9 0.02 20);
 }
 .dark[data-theme="rose"] {
@@ -264,7 +266,7 @@
   --popover: oklch(0.22 0.02 20);
   --foreground: oklch(0.96 0.01 20);
   --muted: oklch(0.26 0.018 20);
-  --muted-foreground: oklch(0.72 0.02 20);
+  --muted-foreground: oklch(0.78 0.02 20);
   --border: oklch(1 0 0 / 10%);
 }
 
@@ -274,7 +276,7 @@
   --popover: oklch(0.99 0.001 260);
   --foreground: oklch(0.2 0.004 260);
   --muted: oklch(0.93 0.002 260);
-  --muted-foreground: oklch(0.46 0.006 260);
+  --muted-foreground: oklch(0.4 0.006 260);
   --border: oklch(0.9 0.004 260);
 }
 .dark[data-theme="mono"] {
@@ -283,7 +285,7 @@
   --popover: oklch(0.21 0.004 260);
   --foreground: oklch(0.96 0.002 260);
   --muted: oklch(0.26 0.004 260);
-  --muted-foreground: oklch(0.7 0.006 260);
+  --muted-foreground: oklch(0.78 0.006 260);
   --border: oklch(1 0 0 / 10%);
 }
 
@@ -291,7 +293,9 @@
   --font-sans: "Geist Variable", sans-serif;
 }
 [data-font="system"] {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui,
+    sans-serif;
 }
 [data-font="serif"] {
   --font-sans: ui-serif, "Iowan Old Style", Palatino, serif;
@@ -300,12 +304,13 @@
   --font-sans: "Newsreader Variable", ui-serif, serif;
 }
 [data-font="mono"] {
-  --font-sans: ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans:
+    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 [data-accent="amber"] {
   --primary: oklch(0.64 0.13 70);
-  --primary-foreground: oklch(0.99 0.01 85);
+  --primary-foreground: oklch(0.2 0.03 70);
   --ring: oklch(0.64 0.13 70);
 }
 [data-accent="ink"] {

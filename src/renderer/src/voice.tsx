@@ -1,8 +1,4 @@
-import {
-  Cancel01Icon,
-  CheckmarkCircle02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { CircleCheck, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -430,6 +426,9 @@ export const VoiceApp = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "geist") {
+      void import("@fontsource-variable/geist/wght.css");
+    }
     if (settings.font === "news") {
       void import("@fontsource-variable/newsreader/wght.css");
     }
@@ -479,7 +478,7 @@ export const VoiceApp = () => {
             size="icon-xs"
             variant="ghost"
           >
-            <HugeiconsIcon className="size-3.5" icon={Cancel01Icon} />
+            <X className="size-3.5" />
           </Button>
         </div>
       ) : (
@@ -511,7 +510,7 @@ export const VoiceApp = () => {
             size="icon-xs"
             variant="ghost"
           >
-            <HugeiconsIcon className="size-3.5" icon={Cancel01Icon} />
+            <X className="size-3.5" />
           </Button>
           {live ? (
             <Button
@@ -520,10 +519,7 @@ export const VoiceApp = () => {
               onClick={finish}
               size="icon-xs"
             >
-              <HugeiconsIcon
-                className="size-3.5"
-                icon={CheckmarkCircle02Icon}
-              />
+              <CircleCheck className="size-3.5" />
             </Button>
           ) : null}
         </>

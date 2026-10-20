@@ -5,6 +5,7 @@ import {
   openSync,
   readFileSync,
   readSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -62,6 +63,8 @@ import {
   createSlip,
   deleteSlips,
   ensureVault,
+  heldDeletePaths,
+  listHeldDeletes,
   listSlips,
   mergeSlips,
   resolveAttachment,
@@ -227,6 +230,21 @@ const saveSettings = (next: Settings): void => {
 };
 
 const vaultRoot = (): string => settings.vaultPath;
+
+const releaseHeld = async (ids?: string[]): Promise<void> => {
+  const root = vaultRoot();
+  const targets =
+    ids === undefined ? listHeldDeletes(root) : heldDeletePaths(root, ids);
+  await Promise.all(
+    targets.map(async (target) => {
+      try {
+        await shell.trashItem(target);
+      } catch {
+        rmSync(target, { force: true, recursive: true });
+      }
+    })
+  );
+};
 
 const isDark = (): boolean =>
   settings.scheme === "dark" ||
@@ -1720,6 +1738,12 @@ const boot = async (): Promise<void> => {
     rebuildTray();
     return slips;
   });
+  ipcMain.handle("commitDeletes", async (_e, ids: unknown) => {
+    const drop = Array.isArray(ids)
+      ? ids.filter((id) => typeof id === "string")
+      : [];
+    await releaseHeld(drop);
+  });
   ipcMain.handle(
     "restoreSlips",
     (_e, previous: Slip[], drop: string[] = []) => {
@@ -1903,6 +1927,20 @@ const boot = async (): Promise<void> => {
             label: "New Slip",
           },
           {
+            accelerator: "Command+F",
+            click: () => {
+              showWindow(() => send("command", "search"));
+            },
+            label: "Search",
+          },
+          {
+            accelerator: "CommandOrControl+/",
+            click: () => {
+              showWindow(() => send("command", "cheatsheet"));
+            },
+            label: "Keyboard Shortcuts",
+          },
+          {
             click: () => showNote(),
             label: "Quick Note",
           },
@@ -1953,6 +1991,7 @@ const boot = async (): Promise<void> => {
 
   bootWatch();
   bootCapture();
+  releaseHeld().catch(() => undefined);
   ensureNote();
   if (!loginItem().wasOpenedAtLogin) {
     createWindow();
@@ -1972,7 +2011,19 @@ boot().catch(() => {
   setCapture("failed");
 });
 
-app.on("before-quit", () => {
+let releasingHeld = false;
+
+app.on("before-quit", (event) => {
+  if (!releasingHeld && listHeldDeletes(vaultRoot()).length > 0) {
+    event.preventDefault();
+    releasingHeld = true;
+    releaseHeld()
+      .catch(() => undefined)
+      .finally(() => {
+        app.quit();
+      });
+    return;
+  }
   noteOpen = false;
   noteGen += 1;
   captureCtl?.stop();

@@ -1,21 +1,22 @@
 import { PreviewCard } from "@base-ui/react/preview-card";
 import {
-  Archive02Icon,
-  ArchiveRestoreIcon,
-  BrushIcon,
-  Cancel01Icon,
-  CheckmarkCircle02Icon,
-  Copy01Icon,
-  Delete02Icon,
-  PencilEdit01Icon,
-  PinIcon,
-  PinOffIcon,
-  ReloadIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronDownIcon, Pause, Play } from "lucide-react";
+  Archive,
+  ArchiveRestore,
+  ChevronDownIcon,
+  CircleCheck,
+  Copy,
+  Pause,
+  PenLine,
+  Pencil,
+  Pin,
+  PinOff,
+  Play,
+  RotateCcw,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ComponentProps, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 
 import { ImagePicker, ImageStrip } from "@/components/image-strip";
 import { SectionPicker } from "@/components/section-picker";
@@ -25,6 +26,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -33,6 +36,8 @@ import { cn } from "@/lib/utils";
 
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { whenLabel } from "../../../shared/logic";
+import { shortcutLabel, shortcutTip } from "../../../shared/shortcuts";
+import type { ShortcutId, Shortcuts } from "../../../shared/shortcuts";
 import { isWebUrl, sourceApp, urlLabel } from "../../../shared/source";
 import { costTip, formatUsd } from "../../../shared/speech-cost";
 import type { Slip } from "../../../shared/types";
@@ -177,36 +182,44 @@ const AudioClip = ({ file }: { file: string }) => {
 };
 
 const Action = ({
-  icon,
+  icon: Icon,
   label,
   named,
   on,
   onClick,
+  tip,
 }: {
-  icon: ComponentProps<typeof HugeiconsIcon>["icon"];
+  icon: LucideIcon;
   label: string;
   named?: boolean;
   on?: boolean;
   onClick: () => void;
+  tip: string;
 }) => (
   <Button
     aria-label={label}
     className="press"
     onClick={onClick}
     size={named === true ? "xs" : "icon-xs"}
-    title={label}
+    title={tip}
     type="button"
     variant={on === true ? "default" : "ghost"}
   >
-    <HugeiconsIcon className="size-3" icon={icon} />
+    <Icon className="size-3" />
     {named === true ? label : null}
   </Button>
 );
 
 const CopyGroup = ({
+  copyTip,
+  deleteKey,
   onCopyAs,
+  onDelete,
 }: {
+  copyTip: string;
+  deleteKey: string;
   onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
+  onDelete: () => void;
 }) => (
   <ButtonGroup className="ml-auto shrink-0">
     <Button
@@ -215,10 +228,11 @@ const CopyGroup = ({
         onCopyAs("copy");
       }}
       size="xs"
+      title={copyTip}
       type="button"
       variant="outline"
     >
-      <HugeiconsIcon className="size-3" icon={Copy01Icon} />
+      <Copy className="size-3" />
       Copy
     </Button>
     <DropdownMenu>
@@ -260,6 +274,13 @@ const CopyGroup = ({
         >
           As prompt
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDelete}>
+          Delete
+          <DropdownMenuShortcut className="font-mono tracking-normal">
+            {deleteKey}
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   </ButtonGroup>
@@ -268,7 +289,7 @@ const CopyGroup = ({
 const OriginUrl = ({ page, url }: { page: string; url: string }) => {
   const label = urlLabel(url);
   const className = cn(
-    "text-muted-foreground truncate text-[10px]",
+    "text-muted-foreground truncate text-[11px]",
     page ? "mt-1" : ""
   );
   if (!isWebUrl(url)) {
@@ -352,6 +373,7 @@ export const DetailWell = ({
   onMenu,
   onPatch,
   sections,
+  shortcuts,
   slip,
 }: {
   editing: boolean;
@@ -363,6 +385,7 @@ export const DetailWell = ({
   onMenu: () => void;
   onPatch: (id: string, patch: Partial<Slip>) => void;
   sections: string[];
+  shortcuts: Shortcuts;
   slip: Slip;
 }) => {
   const [tag, setTag] = useState("");
@@ -380,6 +403,8 @@ export const DetailWell = ({
   onPatchRef.current = onPatch;
   onEditingRef.current = onEditing;
   const app = sourceApp(slip.source);
+  const tip = (label: string, id: ShortcutId): string =>
+    shortcutTip(label, shortcuts[id]);
   let memoLabel = "Add memo";
   if (editing) {
     memoLabel = "Save";
@@ -526,6 +551,7 @@ export const DetailWell = ({
           onAdd={() => {
             picker.current?.click();
           }}
+          annotateTitle={tip("Annotate", "annotate")}
           onAnnotate={(key) => {
             window.slip
               .openDraw({ imagePath: key, slipId: slip.id })
@@ -561,7 +587,7 @@ export const DetailWell = ({
             setTag("");
           }}
         >
-          <span className="text-muted-foreground flex h-6 items-center gap-1 text-[10px] leading-none">
+          <span className="text-muted-foreground flex h-6 items-center gap-1 text-[11px] leading-none">
             <span className="tabular-nums">{whenLabel(slip.createdAt)}</span>
             {slip.cost ? (
               <span title={costTip(slip.cost)}>
@@ -584,7 +610,7 @@ export const DetailWell = ({
           />
           {slip.tags.map((name) => (
             <button
-              className="press bg-muted text-muted-foreground hover:text-foreground relative flex h-6 items-center rounded-full px-2 text-[10px] leading-none after:absolute after:-inset-1.5 after:content-['']"
+              className="press bg-muted text-muted-foreground hover:text-foreground relative flex h-6 items-center rounded-full px-2 text-[11px] leading-none after:absolute after:-inset-1.5 after:content-['']"
               key={name}
               onClick={() =>
                 onPatch(slip.id, {
@@ -599,7 +625,7 @@ export const DetailWell = ({
           ))}
           <Input
             aria-label="Add tag"
-            className="h-6 min-h-6 w-16 min-w-12 flex-1 border-0 bg-transparent px-1 py-0 text-[10px] leading-none shadow-none dark:bg-transparent"
+            className="h-6 min-h-6 w-16 min-w-12 flex-1 border-0 bg-transparent px-1 py-0 text-[11px] leading-none shadow-none dark:bg-transparent"
             onChange={(event) => setTag(event.target.value)}
             placeholder={slip.tags.length === 0 ? "Add a tag" : "Tag"}
             value={tag}
@@ -615,37 +641,38 @@ export const DetailWell = ({
             onClose();
           }}
           size="icon-xs"
+          title={tip("Close", "dismiss")}
           variant="ghost"
         >
-          <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
+          <X className="size-3" />
         </Button>
       </div>
 
       <footer className="flex min-w-0 items-center gap-1 px-2.5 pt-1 pb-1.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)]">
         <ButtonGroup>
           <Action
-            icon={slip.done ? ReloadIcon : CheckmarkCircle02Icon}
+            icon={slip.done ? RotateCcw : CircleCheck}
             label={slip.done ? "Reopen" : "Done"}
             named
             on={slip.done}
             onClick={() => onPatch(slip.id, { done: !slip.done })}
+            tip={tip(slip.done ? "Reopen" : "Done", "done")}
           />
           <Action
-            icon={slip.pin ? PinOffIcon : PinIcon}
+            icon={slip.pin ? PinOff : Pin}
             label={slip.pin ? "Unpin" : "Pin"}
             on={slip.pin}
             onClick={() => onPatch(slip.id, { pin: !slip.pin })}
+            tip={tip(slip.pin ? "Unpin" : "Pin", "pin")}
           />
           <Action
-            icon={slip.archived ? ArchiveRestoreIcon : Archive02Icon}
+            icon={slip.archived ? ArchiveRestore : Archive}
             label={slip.archived ? "Restore" : "Archive"}
             onClick={() => onPatch(slip.id, { archived: !slip.archived })}
+            tip={tip(slip.archived ? "Restore" : "Archive", "archive")}
           />
-          {slip.archived ? (
-            <Action icon={Delete02Icon} label="Delete" onClick={onDelete} />
-          ) : null}
           <Action
-            icon={PencilEdit01Icon}
+            icon={Pencil}
             label={memoLabel}
             named={!narrowActions}
             on={editing}
@@ -656,10 +683,11 @@ export const DetailWell = ({
               }
               startEdit();
             }}
+            tip={tip(memoLabel, "edit")}
           />
           {slip.images.length > 0 ? (
             <Action
-              icon={BrushIcon}
+              icon={PenLine}
               label="Annotate"
               onClick={() => {
                 const [imagePath] = slip.images;
@@ -670,10 +698,16 @@ export const DetailWell = ({
                   .openDraw({ imagePath, slipId: slip.id })
                   .catch(() => undefined);
               }}
+              tip={tip("Annotate", "annotate")}
             />
           ) : null}
         </ButtonGroup>
-        <CopyGroup onCopyAs={onCopyAs} />
+        <CopyGroup
+          copyTip={tip("Copy", "copy")}
+          deleteKey={shortcutLabel(shortcuts.delete)}
+          onCopyAs={onCopyAs}
+          onDelete={onDelete}
+        />
       </footer>
     </section>
   );

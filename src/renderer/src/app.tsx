@@ -1,21 +1,18 @@
-import {
-  Cancel01Icon,
-  Search01Icon,
-  Settings02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Search, Settings as SettingsIcon, X } from "lucide-react";
 import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 
 import darkIcon from "@/assets/dock-dark.png";
 import lightIcon from "@/assets/dock-light.png";
+import { Cheatsheet } from "@/components/cheatsheet";
 import { Chip } from "@/components/chip";
 import { InboxPane } from "@/components/inbox-pane";
 import { Button } from "@/components/ui/button";
@@ -40,6 +37,7 @@ import {
   slipIdsOf,
   visibleSlips,
 } from "../../shared/logic";
+import { shortcutTip } from "../../shared/shortcuts";
 import { clampZoom, defaultSettings } from "../../shared/types";
 import type {
   CaptureState,
@@ -114,12 +112,16 @@ const App = () => {
   const [binding, setBinding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [flash, setFlash] = useState("");
   const [undo, setUndo] = useState<{
     drop: string[];
+    held: string[];
     label: string;
     slips: Slip[];
   } | null>(null);
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
 
   const reload = useCallback(async () => {
     const data = await window.slip.load();
@@ -153,8 +155,12 @@ const App = () => {
   };
 
   const remember = useCallback(
-    (label: string, drop: string[] = []): void => {
-      setUndo({ drop, label, slips: snapshot(slips) });
+    (label: string, drop: string[] = [], held: string[] = []): void => {
+      const prev = undoRef.current;
+      if (prev !== null && prev.held.length > 0) {
+        window.slip.commitDeletes(prev.held).catch(() => undefined);
+      }
+      setUndo({ drop, held, label, slips: snapshot(slips) });
       say(`${label}. ⌘Z to undo`);
     },
     [slips]
@@ -277,14 +283,12 @@ const App = () => {
   };
 
   const removeSlips = async (ids: string[]): Promise<void> => {
-    const archived = slips.filter(
-      (slip) => ids.includes(slip.id) && slip.archived
-    );
-    if (archived.length === 0) {
+    const doomed = slips.filter((slip) => ids.includes(slip.id));
+    if (doomed.length === 0) {
       return;
     }
-    const drop = archived.map((slip) => slip.id);
-    remember("Deleted");
+    const drop = doomed.map((slip) => slip.id);
+    remember("Deleted", [], drop);
     setSlips(await window.slip.deleteSlips(drop));
     setMarked((cur) => cur.filter((id) => !drop.includes(id)));
     setFocused((cur) => (cur !== null && drop.includes(cur) ? null : cur));
@@ -408,6 +412,7 @@ const App = () => {
         sections,
         setArchived,
         setDone,
+        shortcuts: settings.shortcuts,
         slip,
       })
     );
@@ -522,9 +527,14 @@ const App = () => {
   useEffect(() => {
     const off = window.slip.onCommand((name) => {
       runMenuCommand(name, {
+        cheatsheet: () => {
+          setPaletteOpen(false);
+          setHelpOpen((open) => !open);
+        },
         compose: () => {
           setSettingsOpen(false);
           setPaletteOpen(false);
+          setHelpOpen(false);
           setShowArchived(false);
           setEditingId(null);
           setFocused(null);
@@ -545,8 +555,26 @@ const App = () => {
         merge: () => {
           merge().catch(() => undefined);
         },
-        palette: () => setPaletteOpen(true),
-        settings: () => setSettingsOpen(true),
+        palette: () => {
+          setHelpOpen(false);
+          setPaletteOpen(true);
+        },
+        search: () => {
+          setSettingsOpen(false);
+          setPaletteOpen(false);
+          setHelpOpen(false);
+          window.setTimeout(() => {
+            const node =
+              document.querySelector<HTMLInputElement>("[data-search]");
+            node?.focus();
+            node?.select();
+          }, 50);
+        },
+        settings: () => {
+          setHelpOpen(false);
+          setPaletteOpen(false);
+          setSettingsOpen(true);
+        },
         undo: () => {
           runUndo().catch(() => undefined);
         },
@@ -585,15 +613,30 @@ const App = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "geist") {
+      void import("@fontsource-variable/geist/wght.css");
+    }
     if (settings.font === "news") {
       void import("@fontsource-variable/newsreader/wght.css");
     }
   }, [dark, settings.accent, settings.font, settings.theme]);
 
-  useSlipHotkeys({
+  const clearRangeAnchor = useSlipHotkeys({
+    binding,
+    editing: editingId !== null,
     focused,
+    helpOpen,
     listIds,
     marked,
+    onAnnotate: () => {
+      const imagePath = current?.images[0];
+      if (current === null || imagePath === undefined) {
+        return;
+      }
+      window.slip
+        .openDraw({ imagePath, slipId: current.id })
+        .catch(() => undefined);
+    },
     onArchive: () => {
       if (marked.length > 0) {
         toggle(marked, "archived");
@@ -604,11 +647,86 @@ const App = () => {
         toggle([slip.id], "archived");
       }
     },
+    onCheatsheet: () => {
+      setPaletteOpen(false);
+      setHelpOpen((open) => !open);
+    },
+    onCompose: () => {
+      setSettingsOpen(false);
+      setPaletteOpen(false);
+      setHelpOpen(false);
+      setShowArchived(false);
+      setEditingId(null);
+      setFocused(null);
+      setMarked([]);
+      setRenaming(null);
+      window.setTimeout(() => {
+        document.querySelector<HTMLTextAreaElement>("[data-composer]")?.focus();
+      }, 50);
+    },
     onCopy: () => {
       copyFocused().catch(() => undefined);
     },
+    onDelete: () => {
+      let ids: string[] = [];
+      if (marked.length > 0) {
+        ids = marked;
+      } else if (current) {
+        ids = [current.id];
+      }
+      removeSlips(ids).catch(() => undefined);
+    },
+    onEdit: () => {
+      if (current === null) {
+        return;
+      }
+      setFocused(current.id);
+      setMarked([]);
+      setEditingId(current.id);
+    },
+    onOpen: () => {
+      if (focused !== null) {
+        return;
+      }
+      const [first] = listIds;
+      if (first !== undefined) {
+        setFocused(first);
+        setMarked([]);
+      }
+    },
     onPalette: () => {
+      setHelpOpen(false);
       setPaletteOpen((open) => !open);
+    },
+    onPin: () => {
+      let ids: string[] = [];
+      if (marked.length > 0) {
+        ids = marked;
+      } else if (current) {
+        ids = [current.id];
+      }
+      const items = slips.filter((slip) => ids.includes(slip.id));
+      if (items.length === 0) {
+        return;
+      }
+      apply(ids, { pin: !items.every((slip) => slip.pin) }).catch(
+        () => undefined
+      );
+    },
+    onSearch: () => {
+      setSettingsOpen(false);
+      setPaletteOpen(false);
+      setHelpOpen(false);
+      window.setTimeout(() => {
+        const node = document.querySelector<HTMLInputElement>("[data-search]");
+        node?.focus();
+        node?.select();
+      }, 50);
+    },
+    onSettings: () => {
+      setHelpOpen(false);
+      setPaletteOpen(false);
+      setSettingsOpen(true);
     },
     onToggleDone: () => {
       if (marked.length > 0) {
@@ -623,8 +741,8 @@ const App = () => {
       runUndo().catch(() => undefined);
     },
     paletteOpen,
-    paused: binding || editingId !== null,
     setFocused,
+    setHelpOpen,
     setMarked,
     setQuery,
     setSettingsOpen,
@@ -723,10 +841,7 @@ const App = () => {
             </p>
           ) : (
             <div className="no-drag relative min-w-0 flex-1">
-              <HugeiconsIcon
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
-                icon={Search01Icon}
-              />
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
               <Input
                 autoComplete="off"
                 autoCorrect="off"
@@ -735,6 +850,7 @@ const App = () => {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search slips"
                 spellCheck={false}
+                title={shortcutTip("Search", settings.shortcuts.search)}
                 value={query}
               />
               {query ? (
@@ -746,7 +862,7 @@ const App = () => {
                   type="button"
                   variant="ghost"
                 >
-                  <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
+                  <X className="size-3" />
                 </Button>
               ) : null}
             </div>
@@ -754,15 +870,21 @@ const App = () => {
           <Button
             aria-label="Command palette"
             className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+            title={shortcutTip("Commands", settings.shortcuts.palette)}
             onClick={() => setPaletteOpen(true)}
             size="icon-sm"
             variant="ghost"
           >
-            <span className="text-[10px] font-medium">⌘K</span>
+            <span className="text-[11px] font-medium">⌘K</span>
           </Button>
           <Button
             aria-label={settingsOpen ? "Close settings" : "Settings"}
             className="press no-drag relative after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-['']"
+            title={
+              settingsOpen
+                ? shortcutTip("Close", settings.shortcuts.dismiss)
+                : shortcutTip("Settings", settings.shortcuts.settings)
+            }
             onClick={() => {
               stopRename();
               setSettingsOpen((value) => !value);
@@ -773,7 +895,7 @@ const App = () => {
             {settingsOpen ? (
               <span className="text-[11px]">Done</span>
             ) : (
-              <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
+              <SettingsIcon className="size-3.5" />
             )}
           </Button>
         </div>
@@ -829,11 +951,23 @@ const App = () => {
                   archiveLabel: subject.every((slip) => slip.archived)
                     ? "Restore"
                     : "Archive",
-                  canDelete: subject.every((slip) => slip.archived),
+                  archiveTip: shortcutTip(
+                    subject.every((slip) => slip.archived)
+                      ? "Restore"
+                      : "Archive",
+                    settings.shortcuts.archive
+                  ),
+                  canDelete: true,
                   canMerge: marked.length > 1,
+                  copyTip: shortcutTip("Copy", settings.shortcuts.copy),
+                  deleteTip: shortcutTip("Delete", settings.shortcuts.delete),
                   doneLabel: subject.every((slip) => slip.done)
                     ? "Reopen"
                     : "Done",
+                  doneTip: shortcutTip(
+                    subject.every((slip) => slip.done) ? "Reopen" : "Done",
+                    settings.shortcuts.done
+                  ),
                   fileValue: subject.every(
                     (slip) => slip.section === subject[0]?.section
                   )
@@ -921,6 +1055,7 @@ const App = () => {
             apply(marked, { section: name }).catch(() => undefined);
           }}
           onFocus={(id) => {
+            clearRangeAnchor();
             setFocused(id);
             setMarked([]);
           }}
@@ -930,7 +1065,10 @@ const App = () => {
           onMenu={(slip) => {
             openSlipMenu(slip).catch(() => undefined);
           }}
-          onPick={pick}
+          onPick={(id, mods) => {
+            clearRangeAnchor();
+            pick(id, mods);
+          }}
           onPatch={(id, next) => {
             apply([id], next).catch(() => undefined);
           }}
@@ -962,10 +1100,11 @@ const App = () => {
           renaming={renaming}
           section={section}
           sections={sections}
+          shortcuts={settings.shortcuts}
         />
       )}
 
-      <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
+      <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[11px] tabular-nums">
         <span>
           {statusLine(
             flash,
@@ -976,9 +1115,22 @@ const App = () => {
         <span>{capture === "failed" ? "" : captureLabel(capture)}</span>
       </footer>
 
+      {helpOpen ? (
+        <Cheatsheet
+          onClose={() => {
+            setHelpOpen(false);
+          }}
+          shortcuts={settings.shortcuts}
+        />
+      ) : null}
+
       {paletteOpen ? (
         <Suspense fallback={null}>
           <CommandPalette
+            onCheatsheet={() => {
+              setPaletteOpen(false);
+              setHelpOpen((open) => !open);
+            }}
             onCopyList={() => {
               setSettingsOpen(false);
               copyList().catch(() => undefined);
