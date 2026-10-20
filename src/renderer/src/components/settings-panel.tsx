@@ -129,6 +129,7 @@ export const SettingsPanel = ({
   settings: Settings;
 }) => {
   const [advanced, setAdvanced] = useState(false);
+  const [moreCapture, setMoreCapture] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
 
   useEffect(() => {
@@ -223,28 +224,51 @@ export const SettingsPanel = ({
             onSequence={onChord("capture")}
             value={settings.capture}
           />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Quick note</p>
-          <CaptureBind
-            hint="On this screen, without opening Slip."
-            onBind={onBind}
-            onSequence={onChord("noteCapture")}
-            value={settings.noteCapture}
-          />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Voice</p>
-          <CaptureBind
-            hint="Hold to talk. Double-tap to latch."
-            onBind={onBind}
-            onSequence={onChord("voiceCapture")}
-            value={settings.voiceCapture}
-          />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
-          <CaptureBind
-            hint="Hold ⌘ and double-tap ⇧."
-            onBind={onBind}
-            onSequence={onChord("drawCapture")}
-            presets={false}
-            value={settings.drawCapture}
-          />
+          <button
+            aria-expanded={moreCapture}
+            className="flex items-center justify-between px-0.5 text-left"
+            onClick={() => {
+              setMoreCapture((open) => !open);
+            }}
+            type="button"
+          >
+            <span className="text-muted-foreground text-[12px]">
+              Note, voice, draw
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              {moreCapture ? "Hide" : "Show"}
+            </span>
+          </button>
+          {moreCapture ? (
+            <>
+              <p className="text-muted-foreground px-0.5 text-[12px]">
+                Quick note
+              </p>
+              <CaptureBind
+                hint="On this screen, without opening Slip."
+                onBind={onBind}
+                onSequence={onChord("noteCapture")}
+                presets={false}
+                value={settings.noteCapture}
+              />
+              <p className="text-muted-foreground px-0.5 text-[12px]">Voice</p>
+              <CaptureBind
+                hint="Hold to talk. Double-tap to latch."
+                onBind={onBind}
+                onSequence={onChord("voiceCapture")}
+                presets={false}
+                value={settings.voiceCapture}
+              />
+              <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
+              <CaptureBind
+                hint="Hold ⌘ and double-tap ⇧."
+                onBind={onBind}
+                onSequence={onChord("drawCapture")}
+                presets={false}
+                value={settings.drawCapture}
+              />
+            </>
+          ) : null}
         </section>
 
         <section className="flex flex-col gap-2">
