@@ -1903,6 +1903,19 @@ const boot = async (): Promise<void> => {
             label: "New Slip",
           },
           {
+            accelerator: "Command+F",
+            click: () => {
+              showWindow(() => send("command", "search"));
+            },
+            label: "Search",
+          },
+          {
+            click: () => {
+              showWindow(() => send("command", "cheatsheet"));
+            },
+            label: "Keyboard Shortcuts",
+          },
+          {
             click: () => showNote(),
             label: "Quick Note",
           },

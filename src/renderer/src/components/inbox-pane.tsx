@@ -30,15 +30,20 @@ import { cn } from "@/lib/utils";
 import { titleOf } from "../../../shared/format";
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { groupedRows, whenLabel } from "../../../shared/logic";
+import type { Shortcuts } from "../../../shared/shortcuts";
 import { sourceWhere } from "../../../shared/source";
 import { costTip, formatUsd } from "../../../shared/speech-cost";
 import type { Slip } from "../../../shared/types";
 
 interface BulkActions {
   archiveLabel: string;
+  archiveTip: string;
   canDelete: boolean;
   canMerge: boolean;
+  copyTip: string;
+  deleteTip: string;
   doneLabel: string;
+  doneTip: string;
   fileValue: string;
   onArchive: () => void;
   onClear: () => void;
@@ -52,9 +57,13 @@ interface BulkActions {
 const MarkedActions = ({ actions }: { actions: BulkActions }) => {
   const {
     archiveLabel,
+    archiveTip,
     canDelete,
     canMerge,
+    copyTip,
+    deleteTip,
     doneLabel,
+    doneTip,
     onArchive: handleArchive,
     onClear: handleClear,
     onCopyList: handleCopyList,
@@ -66,9 +75,13 @@ const MarkedActions = ({ actions }: { actions: BulkActions }) => {
   return (
     <BulkBar
       archiveLabel={archiveLabel}
+      archiveTip={archiveTip}
       canDelete={canDelete}
       canMerge={canMerge}
+      copyTip={copyTip}
+      deleteTip={deleteTip}
       doneLabel={doneLabel}
+      doneTip={doneTip}
       onArchive={handleArchive}
       onClear={handleClear}
       onCopyList={handleCopyList}
@@ -284,6 +297,7 @@ export const InboxPane = ({
   renaming,
   section,
   sections,
+  shortcuts,
 }: {
   bulk: BulkActions | null;
   current: Slip | null;
@@ -313,6 +327,7 @@ export const InboxPane = ({
   renaming: string | null;
   section: string;
   sections: string[];
+  shortcuts: Shortcuts;
 }) => {
   const rows = useMemo(() => groupedRows(list), [list]);
   const marks = useMemo(() => new Set(marked), [marked]);
@@ -479,6 +494,7 @@ export const InboxPane = ({
           }}
           onPatch={onPatch}
           sections={sections}
+          shortcuts={shortcuts}
           slip={current}
         />
       ) : null}

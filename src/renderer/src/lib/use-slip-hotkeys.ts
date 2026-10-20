@@ -1,8 +1,10 @@
 import { normalizeHotkey, useHotkeys } from "@tanstack/react-hotkeys";
+import type { UseHotkeyDefinition } from "@tanstack/react-hotkeys";
 
 import { neighborId, rangeIds } from "@/lib/range-ids";
 
-import type { Shortcuts } from "../../../shared/shortcuts";
+import { SHORTCUT_ALIASES, shortcutInField } from "../../../shared/shortcuts";
+import type { ShortcutId, Shortcuts } from "../../../shared/shortcuts";
 
 const typingIn = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) {
@@ -26,11 +28,13 @@ const inControl = (target: EventTarget | null): boolean => {
 export const runMenuCommand = (
   name: string,
   actions: {
+    cheatsheet: () => void;
     compose: () => void;
     copy_as_list: () => void;
     copy_as_prompt: () => void;
     merge: () => void;
     palette: () => void;
+    search: () => void;
     settings: () => void;
     undo: () => void;
     voice: () => void;
@@ -43,42 +47,72 @@ export const runMenuCommand = (
   run[name]?.();
 };
 
+const keysFor = (id: ShortcutId, shortcuts: Shortcuts): string[] => [
+  shortcuts[id],
+  ...(SHORTCUT_ALIASES[id] ?? []),
+];
+
 export const useSlipHotkeys = ({
+  binding,
+  editing,
   focused,
+  helpOpen,
   listIds,
   marked,
+  onAnnotate,
   onArchive,
+  onCheatsheet,
+  onCompose,
   onCopy,
+  onDelete,
+  onEdit,
+  onOpen,
   onPalette,
+  onPin,
+  onSearch,
+  onSettings,
   onToggleDone,
   onUndo,
   paletteOpen,
-  paused,
   setFocused,
+  setHelpOpen,
   setMarked,
   setQuery,
   setSettingsOpen,
   settingsOpen,
   shortcuts,
 }: {
+  binding: boolean;
+  editing: boolean;
   focused: string | null;
+  helpOpen: boolean;
   listIds: string[];
   marked: string[];
+  onAnnotate: () => void;
   onArchive: () => void;
+  onCheatsheet: () => void;
+  onCompose: () => void;
   onCopy: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onOpen: () => void;
   onPalette: () => void;
+  onPin: () => void;
+  onSearch: () => void;
+  onSettings: () => void;
   onToggleDone: () => void;
   onUndo: () => void;
   paletteOpen: boolean;
-  paused: boolean;
   setFocused: (id: string | null) => void;
+  setHelpOpen: (open: boolean) => void;
   setMarked: (ids: string[]) => void;
   setQuery: (query: string) => void;
   setSettingsOpen: (open: boolean) => void;
   settingsOpen: boolean;
   shortcuts: Shortcuts;
 }): void => {
-  const listOn = !(paused || paletteOpen || settingsOpen);
+  const held = binding || editing;
+  const listOn = !(held || paletteOpen || settingsOpen || helpOpen);
   const move = (delta: number, extend: boolean): void => {
     const next = neighborId(listIds, focused, delta);
     if (next === null) {
@@ -93,19 +127,41 @@ export const useSlipHotkeys = ({
     setFocused(next);
     setMarked([]);
   };
+  const slipKey = (run: () => void) => (): void => {
+    if (inControl(document.activeElement)) {
+      return;
+    }
+    run();
+  };
+
+  const bind = (
+    id: ShortcutId,
+    callback: () => void,
+    options: UseHotkeyDefinition["options"]
+  ): UseHotkeyDefinition[] =>
+    keysFor(id, shortcuts).map((hotkey) => ({
+      callback,
+      hotkey: normalizeHotkey(hotkey),
+      options: {
+        ...options,
+        ignoreInputs: !shortcutInField(hotkey),
+      },
+    }));
 
   useHotkeys(
     [
-      {
-        callback: onUndo,
-        hotkey: normalizeHotkey(shortcuts.undo),
-        options: { enabled: !paused, requireReset: true },
-      },
-      {
-        callback: onPalette,
-        hotkey: normalizeHotkey(shortcuts.palette),
-        options: { enabled: !paused, requireReset: true },
-      },
+      ...bind("undo", onUndo, { enabled: !held, requireReset: true }),
+      ...bind("palette", onPalette, { enabled: !binding, requireReset: true }),
+      ...bind("search", onSearch, { enabled: !binding, requireReset: true }),
+      ...bind("compose", onCompose, { enabled: !binding, requireReset: true }),
+      ...bind("settings", onSettings, {
+        enabled: !binding,
+        requireReset: true,
+      }),
+      ...bind("cheatsheet", onCheatsheet, {
+        enabled: !binding,
+        requireReset: true,
+      }),
       {
         callback: (event) => {
           if (
@@ -120,6 +176,10 @@ export const useSlipHotkeys = ({
             return;
           }
           event.preventDefault();
+          if (helpOpen) {
+            setHelpOpen(false);
+            return;
+          }
           if (settingsOpen) {
             setSettingsOpen(false);
             return;
@@ -134,74 +194,48 @@ export const useSlipHotkeys = ({
         },
         hotkey: normalizeHotkey(shortcuts.dismiss),
         options: {
-          enabled: !paused,
+          enabled: !binding,
           ignoreInputs: false,
           preventDefault: false,
           requireReset: true,
         },
       },
-      {
-        callback: () => {
+      ...bind(
+        "selectAll",
+        () => {
           setMarked(listIds);
         },
-        hotkey: normalizeHotkey(shortcuts.selectAll),
-        options: { enabled: listOn, requireReset: true },
-      },
-      {
-        callback: onArchive,
-        hotkey: normalizeHotkey(shortcuts.archive),
-        options: { enabled: listOn, requireReset: true },
-      },
-      {
-        callback: () => {
-          move(1, false);
-        },
-        hotkey: normalizeHotkey(shortcuts.focusNext),
-        options: { enabled: listOn },
-      },
-      {
-        callback: () => {
-          move(-1, false);
-        },
-        hotkey: normalizeHotkey(shortcuts.focusPrev),
-        options: { enabled: listOn },
-      },
-      {
-        callback: () => {
-          move(1, true);
-        },
-        hotkey: normalizeHotkey(shortcuts.extendNext),
-        options: { enabled: listOn },
-      },
-      {
-        callback: () => {
-          move(-1, true);
-        },
-        hotkey: normalizeHotkey(shortcuts.extendPrev),
-        options: { enabled: listOn },
-      },
-      {
-        callback: () => {
-          if (inControl(document.activeElement) || focused === null) {
-            return;
-          }
-          onCopy();
-        },
-        hotkey: normalizeHotkey(shortcuts.copy),
-        options: { enabled: listOn, requireReset: true },
-      },
-      {
-        callback: () => {
-          if (inControl(document.activeElement) || focused === null) {
-            return;
-          }
-          onToggleDone();
-        },
-        hotkey: normalizeHotkey(shortcuts.done),
-        options: { enabled: listOn, requireReset: true },
-      },
-      {
-        callback: () => {
+        { enabled: listOn, requireReset: true }
+      ),
+      ...bind("archive", slipKey(onArchive), {
+        enabled: listOn,
+        requireReset: true,
+      }),
+      ...bind("delete", slipKey(onDelete), {
+        enabled: listOn,
+        requireReset: true,
+      }),
+      ...bind("copy", slipKey(onCopy), { enabled: listOn, requireReset: true }),
+      ...bind("done", slipKey(onToggleDone), {
+        enabled: listOn,
+        requireReset: true,
+      }),
+      ...bind("pin", slipKey(onPin), { enabled: listOn, requireReset: true }),
+      ...bind("edit", slipKey(onEdit), { enabled: listOn, requireReset: true }),
+      ...bind("annotate", slipKey(onAnnotate), {
+        enabled: listOn,
+        requireReset: true,
+      }),
+      ...bind(
+        "open",
+        slipKey(() => {
+          onOpen();
+        }),
+        { enabled: listOn, requireReset: true }
+      ),
+      ...bind(
+        "toggleMark",
+        () => {
           if (
             inControl(document.activeElement) ||
             focused === null ||
@@ -215,9 +249,36 @@ export const useSlipHotkeys = ({
               : [...marked, focused]
           );
         },
-        hotkey: normalizeHotkey(shortcuts.toggleMark),
-        options: { enabled: listOn, requireReset: true },
-      },
+        { enabled: listOn, requireReset: true }
+      ),
+      ...bind(
+        "focusNext",
+        () => {
+          move(1, false);
+        },
+        { enabled: listOn }
+      ),
+      ...bind(
+        "focusPrev",
+        () => {
+          move(-1, false);
+        },
+        { enabled: listOn }
+      ),
+      ...bind(
+        "extendNext",
+        () => {
+          move(1, true);
+        },
+        { enabled: listOn }
+      ),
+      ...bind(
+        "extendPrev",
+        () => {
+          move(-1, true);
+        },
+        { enabled: listOn }
+      ),
     ],
     { conflictBehavior: "replace", ignoreInputs: true }
   );

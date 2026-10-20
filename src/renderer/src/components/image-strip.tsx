@@ -35,12 +35,14 @@ export const ImagePicker = ({
 
 export const ImageStrip = ({
   items,
+  annotateTitle = "Annotate",
   onAdd,
   onAnnotate,
   onOpen,
   onRemove,
   onReorder,
 }: {
+  annotateTitle?: string;
   items: { key: string; src: string }[];
   onAdd?: () => void;
   onAnnotate?: (key: string) => void;
@@ -152,7 +154,7 @@ export const ImageStrip = ({
                 onAnnotate(item.key);
               }}
               size="icon-xs"
-              title="Annotate"
+              title={annotateTitle}
               type="button"
               variant="secondary"
             >

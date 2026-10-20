@@ -11,9 +11,13 @@ import {
 
 export const BulkBar = ({
   archiveLabel,
+  archiveTip,
   canDelete,
   canMerge,
+  copyTip,
+  deleteTip,
   doneLabel,
+  doneTip,
   onArchive,
   onClear,
   onCopyList,
@@ -23,9 +27,13 @@ export const BulkBar = ({
   onMerge,
 }: {
   archiveLabel: string;
+  archiveTip: string;
   canDelete: boolean;
   canMerge: boolean;
+  copyTip: string;
+  deleteTip: string;
   doneLabel: string;
+  doneTip: string;
   onArchive: () => void;
   onClear: () => void;
   onCopyList: () => void;
@@ -40,6 +48,7 @@ export const BulkBar = ({
         className="press"
         onClick={onDone}
         size="xs"
+        title={doneTip}
         type="button"
         variant="ghost"
       >
@@ -49,6 +58,7 @@ export const BulkBar = ({
         className="press"
         onClick={onArchive}
         size="xs"
+        title={archiveTip}
         type="button"
         variant="ghost"
       >
@@ -69,6 +79,7 @@ export const BulkBar = ({
           className="press"
           onClick={onDelete}
           size="xs"
+          title={deleteTip}
           type="button"
           variant="ghost"
         >
@@ -82,6 +93,7 @@ export const BulkBar = ({
           className="press"
           onClick={onCopyList}
           size="xs"
+          title={copyTip}
           type="button"
           variant="ghost"
         >

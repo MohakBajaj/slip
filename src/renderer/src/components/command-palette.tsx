@@ -1,5 +1,3 @@
-import { formatForDisplay } from "@tanstack/react-hotkeys";
-
 import {
   CommandDialog,
   CommandEmpty,
@@ -11,10 +9,12 @@ import {
 } from "@/components/ui/command";
 
 import { titleOf } from "../../../shared/format";
+import { shortcutLabel } from "../../../shared/shortcuts";
 import type { Shortcuts } from "../../../shared/shortcuts";
 import type { Slip } from "../../../shared/types";
 
 export const CommandPalette = ({
+  onCheatsheet,
   onCopyList,
   onCopyPrompt,
   onDraw,
@@ -33,6 +33,7 @@ export const CommandPalette = ({
   subjectCount,
   undoLabel,
 }: {
+  onCheatsheet: () => void;
   onCopyList: () => void;
   onCopyPrompt: () => void;
   onDraw: () => void;
@@ -61,15 +62,25 @@ export const CommandPalette = ({
         ) : (
           <CommandItem onSelect={onSettings}>
             Settings
-            <CommandShortcut>⌘,</CommandShortcut>
+            <CommandShortcut>
+              {shortcutLabel(shortcuts.settings)}
+            </CommandShortcut>
           </CommandItem>
         )}
+        <CommandItem
+          onSelect={() => {
+            onCheatsheet();
+          }}
+        >
+          Shortcuts
+          <CommandShortcut>
+            {shortcutLabel(shortcuts.cheatsheet)}
+          </CommandShortcut>
+        </CommandItem>
         {undoLabel === null ? null : (
           <CommandItem onSelect={onUndo}>
             Undo {undoLabel.toLowerCase()}
-            <CommandShortcut>
-              {formatForDisplay(shortcuts.undo)}
-            </CommandShortcut>
+            <CommandShortcut>{shortcutLabel(shortcuts.undo)}</CommandShortcut>
           </CommandItem>
         )}
       </CommandGroup>
