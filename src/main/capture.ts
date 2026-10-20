@@ -160,7 +160,7 @@ const install = (opts: {
   );
   const voiceHold = createVoiceHold(opts.voiceSequence ?? ["Option", "Option"]);
   const dictateHold = createVoiceHold(
-    opts.dictateSequence ?? ["Control+Option+Space"]
+    opts.dictateSequence ?? ["Control+Option+D"]
   );
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   let holdLive = false;

@@ -31,13 +31,19 @@ import {
 } from "electron";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
-import { annotateWindowSize } from "../shared/annotate";
+import { annotateRetake, annotateWindowSize } from "../shared/annotate";
 import type { DrawTarget } from "../shared/annotate";
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { captureLabel } from "../shared/capture-label";
 import { bundleHtml } from "../shared/clipboard-html";
+import {
+  dictateHold,
+  dictateToggle,
+  noticeLine,
+  voiceReplySettles,
+} from "../shared/dictate";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
 import { attachmentType, imageExt } from "../shared/images";
@@ -59,6 +65,7 @@ import { localTranscribers } from "../shared/speech-engines";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
+  fontMigrationPending,
   sanitizeSettings,
   settingsFile,
 } from "../shared/types";
@@ -212,13 +219,17 @@ let stopWatch: (() => void) | null = null;
 let capture: CaptureState = "off";
 let currentSection = "";
 
+let persistFont = false;
+
 const loadSettings = (): Settings => {
   mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   if (!existsSync(SETTINGS_FILE)) {
     return defaultSettings();
   }
   try {
-    return sanitizeSettings(JSON.parse(readFileSync(SETTINGS_FILE, "utf-8")));
+    const raw: unknown = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
+    persistFont = fontMigrationPending(raw);
+    return sanitizeSettings(raw);
   } catch {
     return defaultSettings();
   }
@@ -236,6 +247,10 @@ const saveSettings = (next: Settings): void => {
   mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 };
+
+if (persistFont) {
+  saveSettings(settings);
+}
 
 const vaultRoot = (): string => settings.vaultPath;
 
@@ -938,6 +953,7 @@ const askMic = async (): Promise<boolean> => {
 };
 
 let voiceOut = false;
+let voiceSettled = false;
 
 const placeVoice = (target: BrowserWindow): void => {
   const area = screen.getDisplayNearestPoint(
@@ -958,6 +974,7 @@ let voiceJob: AbortController | null = null;
 
 const hideVoice = (): void => {
   voiceOut = false;
+  voiceSettled = false;
   voiceJob?.abort();
   voiceJob = null;
   voiceGen += 1;
@@ -1002,12 +1019,30 @@ const releaseVoice = (): void => {
 const dictateOpen = (): boolean =>
   voiceOut && voiceWin !== null && !voiceWin.isDestroyed();
 
+const voiceWindowOpen = (): boolean =>
+  voiceWin !== null && !voiceWin.isDestroyed();
+
+const restartDictate = (mode: "hold" | "open"): void => {
+  hideVoice();
+  voiceOut = true;
+  showVoice(mode);
+};
+
 const toggleDictate = (): void => {
-  if (dictateOpen()) {
+  const step = dictateToggle({
+    open: dictateOpen(),
+    settled: voiceSettled,
+    window: voiceWindowOpen(),
+  });
+  if (step === "restart") {
+    restartDictate("open");
+    return;
+  }
+  if (step === "commit") {
     releaseVoice();
     return;
   }
-  if (voiceWin && !voiceWin.isDestroyed()) {
+  if (step === "ignore") {
     return;
   }
   voiceOut = true;
@@ -1015,7 +1050,16 @@ const toggleDictate = (): void => {
 };
 
 const holdDictate = (): void => {
-  if (voiceWin && !voiceWin.isDestroyed() && !voiceOut) {
+  const step = dictateHold({
+    out: voiceOut,
+    settled: voiceSettled,
+    window: voiceWindowOpen(),
+  });
+  if (step === "restart") {
+    restartDictate("hold");
+    return;
+  }
+  if (step === "ignore") {
     return;
   }
   voiceOut = true;
@@ -1069,8 +1113,11 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
     voiceWin.on("ready-to-show", () => {
       revealVoice();
     });
-    voiceWin.on("closed", () => {
-      voiceWin = null;
+    const opened = voiceWin;
+    opened?.on("closed", () => {
+      if (voiceWin === opened) {
+        voiceWin = null;
+      }
       applyDock(settings.dock);
     });
     loadHashPage(voiceWin, out ? "voice-out" : "voice");
@@ -1080,6 +1127,7 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
 let drawAttach = false;
 let drawTarget: DrawTarget | null = null;
 let annotateLoose = "";
+let annotateDirty = false;
 
 const drawMode = (): "attach" | "slip" => (drawAttach ? "attach" : "slip");
 
@@ -1123,6 +1171,7 @@ const hideDraw = (): void => {
 const hideAnnotate = (): void => {
   const file = annotateLoose;
   annotateLoose = "";
+  annotateDirty = false;
   if (annotateWin && !annotateWin.isDestroyed()) {
     annotateWin.close();
   }
@@ -1163,11 +1212,22 @@ const parseDrawOpen = (
 
 const showAnnotateFile = (file: string): void => {
   if (annotateWin && !annotateWin.isDestroyed()) {
-    deleteAnnotateTemp(file);
+    if (annotateRetake(annotateDirty) === "keep") {
+      deleteAnnotateTemp(file);
+      annotateWin.show();
+      annotateWin.focus();
+      return;
+    }
+    const previous = annotateLoose;
+    annotateLoose = file;
+    annotateDirty = false;
+    deleteAnnotateTemp(previous);
+    annotateWin.webContents.send("annotate-image");
     annotateWin.show();
     annotateWin.focus();
     return;
   }
+  annotateDirty = false;
   annotateLoose = file;
   const area = screen.getDisplayNearestPoint(
     screen.getCursorScreenPoint()
@@ -1214,6 +1274,7 @@ const showAnnotateFile = (file: string): void => {
     const shot = annotateLoose;
     annotateWin = null;
     annotateLoose = "";
+    annotateDirty = false;
     deleteAnnotateTemp(shot);
     applyDock(settings.dock);
   });
@@ -1696,7 +1757,13 @@ const boot = async (): Promise<void> => {
     slip: Slip | null,
     notice = "",
     costLabel = ""
-  ) => ({ costLabel, error, notice, slip });
+  ) => {
+    const reply = { costLabel, error, notice, slip };
+    if (voiceReplySettles(reply)) {
+      voiceSettled = true;
+    }
+    return reply;
+  };
   ipcMain.handle("createVoiceSlip", async (event, wav: unknown) => {
     const out = voiceOut;
     const bytes = asBytes(wav);
@@ -1790,9 +1857,10 @@ const boot = async (): Promise<void> => {
           settings.keepDictations && body.trim().length > 0 ? keep() : null;
         if (outcome === "copied") {
           const notice = "Copied. Allow Accessibility to paste.";
+          const line = noticeLine(notice, costLabel);
           if (voiceWin && !voiceWin.isDestroyed()) {
             const [, height] = voiceWin.getSize();
-            voiceWin.setSize(voicePillWidth(notice), height);
+            voiceWin.setSize(voicePillWidth(line), height);
             placeVoice(voiceWin);
           }
           return voiceReply("", slip, notice, costLabel);
@@ -1858,6 +1926,11 @@ const boot = async (): Promise<void> => {
     }
     dismissNote();
     return slip;
+  });
+  ipcMain.handle("setAnnotateDirty", (e, dirty: unknown) => {
+    if (fromAnnotate(e.sender)) {
+      annotateDirty = dirty === true;
+    }
   });
   ipcMain.handle("closeDraw", (e) => {
     if (fromAnnotate(e.sender)) {

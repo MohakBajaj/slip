@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { NOTICE_DISMISS_MS, noticeLine } from "../../shared/dictate";
 import {
   encodeWavPcm16,
   isSilentPcm,
@@ -197,7 +198,7 @@ export const VoiceApp = ({ out = false }: { out?: boolean }) => {
       }
       if (result.notice.length > 0) {
         setStatus("notice");
-        setLabel(result.notice);
+        setLabel(noticeLine(result.notice, result.costLabel));
         return;
       }
       if (result.costLabel.length > 0) {
@@ -423,6 +424,21 @@ export const VoiceApp = ({ out = false }: { out?: boolean }) => {
       window.removeEventListener("keydown", onKey, true);
     };
   }, [drop]);
+
+  useEffect(() => {
+    if (status !== "notice") {
+      return () => {
+        // idle
+      };
+    }
+    const id = window.setTimeout(() => {
+      drop();
+      void window.slip.closeVoice();
+    }, NOTICE_DISMISS_MS);
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [drop, status]);
 
   useEffect(() => {
     if (status !== "listening") {

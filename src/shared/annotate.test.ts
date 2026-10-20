@@ -7,6 +7,7 @@ import { drawShape, pageBounds, Store, themeOf } from "@quickdrawjs/core";
 import {
   ANNOTATE_INK,
   ANNOTATE_TOOLBAR_W,
+  annotateRetake,
   annotateWindowSize,
   appendAnnotatedImage,
   blankExportScale,
@@ -473,6 +474,11 @@ test("a Quickdraw snapshot export flattens onto native image pixels", async () =
   } catch {
     // Pixel asserts above are the check.
   }
+});
+
+test("a second annotate keeps a sketch and replaces a blank one", () => {
+  expect(annotateRetake(false)).toBe("replace");
+  expect(annotateRetake(true)).toBe("keep");
 });
 
 test("annotate window fits the toolbar and stays on the screen", () => {

@@ -296,7 +296,11 @@ export const DrawApp = () => {
   };
 
   const syncDoc = (editor: Editor): void => {
-    setInk(editor.store.shapes().length > 0);
+    const drawn = editor.store.shapes().length > 0;
+    setInk(drawn);
+    if (outRef.current) {
+      void window.slip.setAnnotateDirty(drawn);
+    }
     setCanUndo(editor.store.canUndo);
     setCanRedo(editor.store.canRedo);
     setZoom(editor.camera.z);
@@ -610,6 +614,31 @@ export const DrawApp = () => {
       };
       run().catch(() => undefined);
     };
+    const showLoose = async (): Promise<void> => {
+      const bytes = await window.slip.readOutImage();
+      if (gone) {
+        return;
+      }
+      if (bytes === null) {
+        showFlash("Couldn't read image");
+        return;
+      }
+      const copyBytes = Uint8Array.from(bytes);
+      const url = URL.createObjectURL(
+        new Blob([copyBytes], { type: "image/png" })
+      );
+      const img = await loadImage(url);
+      if (gone) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      if (img === null) {
+        URL.revokeObjectURL(url);
+        showFlash("Couldn't read image");
+        return;
+      }
+      placePlate(img, url, "");
+    };
     const boot = async (): Promise<void> => {
       const data = await window.slip.load();
       if (gone) {
@@ -633,29 +662,7 @@ export const DrawApp = () => {
         return;
       }
       if (loose) {
-        const bytes = await window.slip.readOutImage();
-        if (gone) {
-          return;
-        }
-        if (bytes === null) {
-          showFlash("Couldn't read image");
-          return;
-        }
-        const copyBytes = Uint8Array.from(bytes);
-        const url = URL.createObjectURL(
-          new Blob([copyBytes], { type: "image/png" })
-        );
-        const img = await loadImage(url);
-        if (gone) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        if (img === null) {
-          URL.revokeObjectURL(url);
-          showFlash("Couldn't read image");
-          return;
-        }
-        placePlate(img, url, "");
+        await showLoose();
         return;
       }
       if (offeredRef.current) {
@@ -687,6 +694,9 @@ export const DrawApp = () => {
       openTarget(target);
     });
     const offSettings = window.slip.onSettings(setSettings);
+    const offImage = window.slip.onAnnotateImage(() => {
+      showLoose().catch(() => undefined);
+    });
     return () => {
       gone = true;
       targetKeyRef.current = "";
@@ -699,8 +709,16 @@ export const DrawApp = () => {
       offMode();
       offTarget();
       offSettings();
+      offImage();
     };
   }, []);
+
+  useEffect(() => {
+    if (!out) {
+      return;
+    }
+    void window.slip.setAnnotateDirty(ink);
+  }, [ink, out]);
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent): void => {

@@ -72,6 +72,13 @@ const api = {
       created: Slip;
       slips: Slip[];
     } | null>,
+  onAnnotateImage: (fn: () => void) => {
+    const listener = () => fn();
+    ipcRenderer.on("annotate-image", listener);
+    return () => {
+      ipcRenderer.removeListener("annotate-image", listener);
+    };
+  },
   onCaptureState: (fn: (state: CaptureState) => void) => {
     const listener = (_: unknown, state: CaptureState) => fn(state);
     ipcRenderer.on("capture-state", listener);
@@ -195,6 +202,8 @@ const api = {
     ipcRenderer.invoke("saveNote", content) as Promise<Slip | null>,
   saveSettings: (settings: Settings) =>
     ipcRenderer.invoke("saveSettings", settings),
+  setAnnotateDirty: (dirty: boolean) =>
+    ipcRenderer.invoke("setAnnotateDirty", dirty),
   setCleanupKey: (key: string) =>
     ipcRenderer.invoke("setCleanupKey", key) as Promise<boolean>,
   setLogin: (on: boolean) =>

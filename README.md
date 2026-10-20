@@ -23,7 +23,7 @@ Defaults, remappable in Settings:
 - **⌥** hold — speak; the text is saved. **⌥ ⌥** latches the recorder
 - **⌘⇧ ⌘⇧** — draw on a transparent overlay. Annotate draws on a slip image and saves a new png next to the original
 - **⌃⌥A** — annotate a screenshot, or a region when the clipboard has no image. A drawing that is already open stays open
-- **⌃⌥Space** — dictate into the focused app. Hold to talk, tap to start and stop
+- **⌃⌥D** — dictate into the focused app. Hold to talk, tap to start and stop
 
 Drop images onto a slip. Merge selected slips from the command palette.
 

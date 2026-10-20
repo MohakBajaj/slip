@@ -34,6 +34,9 @@ export const ANNOTATE_INK = "red";
 /** Width the annotate toolbar needs, including the window chrome. */
 export const ANNOTATE_TOOLBAR_W = 821;
 
+export const annotateRetake = (hasStrokes: boolean): "keep" | "replace" =>
+  hasStrokes ? "keep" : "replace";
+
 export const annotateWindowSize = (area: {
   height: number;
   width: number;

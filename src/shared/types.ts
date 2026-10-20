@@ -148,6 +148,14 @@ const isAccent = (value: unknown): value is Accent =>
 const isScheme = (value: unknown): value is Scheme =>
   value === "system" || value === "light" || value === "dark";
 
+export const fontMigrationPending = (raw: unknown): boolean => {
+  if (raw === null || typeof raw !== "object") {
+    return false;
+  }
+  const stored = raw as { font?: unknown; fontMigrated?: unknown };
+  return stored.fontMigrated !== true && stored.font === "geist";
+};
+
 export const sanitizeSettings = (raw: unknown): Settings => {
   const input = raw !== null && typeof raw === "object" ? raw : {};
   const next = { ...defaultSettings(), ...(input as Partial<Settings>) };
