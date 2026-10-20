@@ -87,15 +87,11 @@ export const slipMenuEntries = ({
       id: "archive",
       label: archiveLabel,
     },
-    ...(setArchived
-      ? [
-          {
-            accelerator: key("delete"),
-            id: "delete",
-            label: useSet ? "Delete Selected" : "Delete",
-          },
-        ]
-      : []),
+    {
+      accelerator: key("delete"),
+      id: "delete",
+      label: useSet ? "Delete Selected" : "Delete",
+    },
     ...(useSet
       ? []
       : [

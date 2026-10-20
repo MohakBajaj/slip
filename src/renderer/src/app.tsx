@@ -10,6 +10,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -120,9 +121,12 @@ const App = () => {
   const [flash, setFlash] = useState("");
   const [undo, setUndo] = useState<{
     drop: string[];
+    held: string[];
     label: string;
     slips: Slip[];
   } | null>(null);
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
 
   const reload = useCallback(async () => {
     const data = await window.slip.load();
@@ -156,8 +160,12 @@ const App = () => {
   };
 
   const remember = useCallback(
-    (label: string, drop: string[] = []): void => {
-      setUndo({ drop, label, slips: snapshot(slips) });
+    (label: string, drop: string[] = [], held: string[] = []): void => {
+      const prev = undoRef.current;
+      if (prev !== null && prev.held.length > 0) {
+        window.slip.commitDeletes(prev.held).catch(() => undefined);
+      }
+      setUndo({ drop, held, label, slips: snapshot(slips) });
       say(`${label}. ⌘Z to undo`);
     },
     [slips]
@@ -280,14 +288,12 @@ const App = () => {
   };
 
   const removeSlips = async (ids: string[]): Promise<void> => {
-    const archived = slips.filter(
-      (slip) => ids.includes(slip.id) && slip.archived
-    );
-    if (archived.length === 0) {
+    const doomed = slips.filter((slip) => ids.includes(slip.id));
+    if (doomed.length === 0) {
       return;
     }
-    const drop = archived.map((slip) => slip.id);
-    remember("Deleted");
+    const drop = doomed.map((slip) => slip.id);
+    remember("Deleted", [], drop);
     setSlips(await window.slip.deleteSlips(drop));
     setMarked((cur) => cur.filter((id) => !drop.includes(id)));
     setFocused((cur) => (cur !== null && drop.includes(cur) ? null : cur));
@@ -956,7 +962,7 @@ const App = () => {
                       : "Archive",
                     settings.shortcuts.archive
                   ),
-                  canDelete: subject.every((slip) => slip.archived),
+                  canDelete: true,
                   canMerge: marked.length > 1,
                   copyTip: shortcutTip("Copy", settings.shortcuts.copy),
                   deleteTip: shortcutTip("Delete", settings.shortcuts.delete),

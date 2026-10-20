@@ -6,6 +6,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -13,23 +14,61 @@ import {
   addImages,
   createSlip,
   deleteSlips,
+  heldDeletePaths,
   listSlips,
   mergeSlips,
-  updateSlip,
+  restoreSlips,
 } from "./vault";
 
 const vault = (): string => mkdtempSync(path.join(tmpdir(), "slip-"));
 
 describe("attachments", () => {
-  test("delete removes the slip folder", () => {
+  test("delete holds any slip and undo restores its files", () => {
     const root = vault();
     const img = path.join(root, "shot.png");
-    writeFileSync(img, "png");
-    const slip = createSlip(root, { content: "x", images: [img] });
-    expect(existsSync(path.join(root, "attachments", slip.id))).toBe(true);
-    updateSlip(root, slip.id, { archived: true });
+    const clip = path.join(root, "note.webm");
+    writeFileSync(img, "png-bytes");
+    writeFileSync(clip, "audio-bytes");
+    const slip = createSlip(root, {
+      audio: [clip],
+      content: "keep me",
+      images: [img],
+    });
+    const image = slip.images[0] ?? "";
+    const audio = slip.audio[0] ?? "";
+    expect(slip.archived).toBe(false);
     deleteSlips(root, [slip.id]);
-    expect(existsSync(path.join(root, "attachments", slip.id))).toBe(false);
+    expect(listSlips(root).some((item) => item.id === slip.id)).toBe(false);
+    expect(existsSync(image)).toBe(false);
+    expect(existsSync(audio)).toBe(false);
+    expect(existsSync(path.join(root, slip.filename))).toBe(false);
+    const held = heldDeletePaths(root, [slip.id]);
+    expect(held).toEqual([path.join(root, ".trash", slip.id)]);
+    expect(existsSync(path.join(held[0] ?? "", "files"))).toBe(true);
+    restoreSlips(root, [slip]);
+    expect(existsSync(image)).toBe(true);
+    expect(readFileSync(image, "utf8")).toBe("png-bytes");
+    expect(readFileSync(audio, "utf8")).toBe("audio-bytes");
+    const saved = listSlips(root).find((item) => item.id === slip.id);
+    expect(saved?.content).toContain("keep me");
+    expect(saved?.archived).toBe(false);
+    expect(heldDeletePaths(root, [slip.id])).toEqual([]);
+  });
+
+  test("held files are the ones to remove after undo expires", () => {
+    const root = vault();
+    const img = path.join(root, "shot.png");
+    writeFileSync(img, "png-bytes");
+    const slip = createSlip(root, { content: "gone", images: [img] });
+    const image = slip.images[0] ?? "";
+    deleteSlips(root, [slip.id]);
+    const [held] = heldDeletePaths(root, [slip.id]);
+    expect(held).toBe(path.join(root, ".trash", slip.id));
+    rmSync(held ?? "", { force: true, recursive: true });
+    expect(existsSync(image)).toBe(false);
+    restoreSlips(root, [slip]);
+    expect(existsSync(image)).toBe(false);
+    expect(listSlips(root).some((item) => item.id === slip.id)).toBe(true);
   });
 
   test("annotation appends a png and keeps the original file", () => {

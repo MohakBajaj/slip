@@ -29,6 +29,7 @@ const api = {
   closeDraw: () => ipcRenderer.invoke("closeDraw"),
   closeNote: () => ipcRenderer.invoke("closeNote"),
   closeVoice: () => ipcRenderer.invoke("closeVoice"),
+  commitDeletes: (ids: string[]) => ipcRenderer.invoke("commitDeletes", ids),
   copyAtRef: (id: string) => ipcRenderer.invoke("copyAtRef", id),
   copyBundle: (text: string, paths: string[]) =>
     ipcRenderer.invoke("copyBundle", text, paths),

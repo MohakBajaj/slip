@@ -98,6 +98,61 @@ const attachmentDir = (root: string, id: string): string | null => {
   return dir;
 };
 
+const holdDir = (root: string, id: string): string | null => {
+  if (!SLIP_ID.test(id)) {
+    return null;
+  }
+  const base = path.resolve(root, ".trash");
+  const dir = path.resolve(base, id);
+  const rel = path.relative(base, dir);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    return null;
+  }
+  return dir;
+};
+
+const parkSlip = (root: string, slip: Slip): void => {
+  const dest = holdDir(root, slip.id);
+  if (dest === null) {
+    return;
+  }
+  rmSync(dest, { force: true, recursive: true });
+  mkdirSync(dest, { recursive: true });
+  const file = slipPath(root, slip.filename);
+  if (file !== null && existsSync(file)) {
+    renameSync(file, path.join(dest, slip.filename));
+  }
+  const dir = attachmentDir(root, slip.id);
+  if (dir !== null && existsSync(dir)) {
+    renameSync(dir, path.join(dest, "files"));
+  }
+};
+
+const unparkSlip = (root: string, slip: Slip): void => {
+  const dest = holdDir(root, slip.id);
+  if (dest === null || !existsSync(dest)) {
+    return;
+  }
+  const file = slipPath(root, slip.filename);
+  const heldFile = path.join(dest, slip.filename);
+  if (file !== null && existsSync(heldFile)) {
+    if (existsSync(file)) {
+      unlinkSync(file);
+    }
+    renameSync(heldFile, file);
+  }
+  const dir = attachmentDir(root, slip.id);
+  const heldFiles = path.join(dest, "files");
+  if (dir !== null && existsSync(heldFiles)) {
+    if (existsSync(dir)) {
+      rmSync(dir, { force: true, recursive: true });
+    }
+    mkdirSync(path.dirname(dir), { recursive: true });
+    renameSync(heldFiles, dir);
+  }
+  rmSync(dest, { force: true, recursive: true });
+};
+
 export const ensureVault = (root: string): void => {
   mkdirSync(path.join(root, "attachments"), { recursive: true });
   writeIfChanged(path.join(root, "SKILL.md"), SKILL_MD);
@@ -338,22 +393,30 @@ export const deleteSlips = (root: string, ids: string[]): Slip[] => {
   ensureVault(root);
   const want = new Set(ids);
   for (const slip of readSlips(root)) {
-    if (!want.has(slip.id) || !slip.archived) {
-      continue;
-    }
-    const file = slipPath(root, slip.filename);
-    if (file !== null && existsSync(file)) {
-      unlinkSync(file);
-    }
-    // ponytail: undo rewrites the note; attachment bytes stay gone
-    const dir = attachmentDir(root, slip.id);
-    if (dir !== null) {
-      rmSync(dir, { force: true, recursive: true });
+    if (want.has(slip.id)) {
+      parkSlip(root, slip);
     }
   }
   const slips = readSlips(root);
   writeIndex(root, slips);
   return slips;
+};
+
+export const heldDeletePaths = (root: string, ids: string[]): string[] =>
+  ids.flatMap((id) => {
+    const dir = holdDir(root, id);
+    return dir !== null && existsSync(dir) ? [dir] : [];
+  });
+
+export const listHeldDeletes = (root: string): string[] => {
+  const base = path.resolve(root, ".trash");
+  if (!existsSync(base)) {
+    return [];
+  }
+  return readdirSync(base).flatMap((name) => {
+    const dir = holdDir(root, name);
+    return dir !== null && existsSync(dir) ? [dir] : [];
+  });
 };
 
 export const addImages = (
@@ -382,6 +445,7 @@ export const restoreSlips = (
   ensureVault(root);
   const byId = new Map(readSlips(root).map((slip) => [slip.id, slip]));
   for (const slip of previous) {
+    unparkSlip(root, slip);
     writeSlipFile(root, slip);
     if (SLIP_ID.test(slip.id) && slipPath(root, slip.filename) !== null) {
       byId.set(slip.id, slip);

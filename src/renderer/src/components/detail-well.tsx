@@ -6,7 +6,6 @@ import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
   Copy01Icon,
-  Delete02Icon,
   PencilEdit01Icon,
   PinIcon,
   PinOffIcon,
@@ -25,6 +24,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 import { moveItem, slipImgSrc } from "../../../shared/images";
 import { whenLabel } from "../../../shared/logic";
-import { shortcutTip } from "../../../shared/shortcuts";
+import { shortcutLabel, shortcutTip } from "../../../shared/shortcuts";
 import type { ShortcutId, Shortcuts } from "../../../shared/shortcuts";
 import { isWebUrl, sourceApp, urlLabel } from "../../../shared/source";
 import { costTip, formatUsd } from "../../../shared/speech-cost";
@@ -209,10 +210,14 @@ const Action = ({
 
 const CopyGroup = ({
   copyTip,
+  deleteKey,
   onCopyAs,
+  onDelete,
 }: {
   copyTip: string;
+  deleteKey: string;
   onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
+  onDelete: () => void;
 }) => (
   <ButtonGroup className="ml-auto shrink-0">
     <Button
@@ -266,6 +271,13 @@ const CopyGroup = ({
           }}
         >
           As prompt
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDelete}>
+          Delete
+          <DropdownMenuShortcut className="font-mono tracking-normal">
+            {deleteKey}
+          </DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -657,14 +669,6 @@ export const DetailWell = ({
             onClick={() => onPatch(slip.id, { archived: !slip.archived })}
             tip={tip(slip.archived ? "Restore" : "Archive", "archive")}
           />
-          {slip.archived ? (
-            <Action
-              icon={Delete02Icon}
-              label="Delete"
-              onClick={onDelete}
-              tip={tip("Delete", "delete")}
-            />
-          ) : null}
           <Action
             icon={PencilEdit01Icon}
             label={memoLabel}
@@ -696,7 +700,12 @@ export const DetailWell = ({
             />
           ) : null}
         </ButtonGroup>
-        <CopyGroup copyTip={tip("Copy", "copy")} onCopyAs={onCopyAs} />
+        <CopyGroup
+          copyTip={tip("Copy", "copy")}
+          deleteKey={shortcutLabel(shortcuts.delete)}
+          onCopyAs={onCopyAs}
+          onDelete={onDelete}
+        />
       </footer>
     </section>
   );
