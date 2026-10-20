@@ -43,6 +43,7 @@ interface Objc {
   idCStr: IdCStr;
   idIndex: IdIndex;
   idPtrLen: IdPtrLen;
+  memcpy: (dst: Uint8Array, src: unknown, length: number) => unknown;
   sel: (name: string) => unknown;
   u64: U64;
 }
@@ -55,11 +56,16 @@ const countOf = (value: number | bigint): number => {
   return Math.trunc(n);
 };
 
-const copyBytes = (ptr: unknown, length: number): Uint8Array => {
+const copyBytes = (api: Objc, ptr: unknown, length: number): Uint8Array => {
   if (!ptr || length <= 0) {
     return new Uint8Array();
   }
-  return new Uint8Array(koffi.view(ptr, length)).slice();
+  // koffi.view wraps the pointer in an external ArrayBuffer. Electron rejects
+  // that, and koffi then calls ByteLength on an empty buffer, which aborts
+  // through napi_fatal_error. Copy into a buffer Node allocated instead.
+  const out = Buffer.alloc(length);
+  api.memcpy(out, ptr, length);
+  return new Uint8Array(out);
 };
 
 const copyString = (ptr: unknown): string => {
@@ -79,6 +85,7 @@ const loadObjc = (): Objc => {
     global: true,
   });
   const lib = koffi.load("/usr/lib/libobjc.A.dylib");
+  const libc = koffi.load("/usr/lib/libSystem.B.dylib");
   const getClass = lib.func("void *objc_getClass(const char *name)") as (
     name: string
   ) => unknown;
@@ -119,6 +126,9 @@ const loadObjc = (): Objc => {
     idPtrLen: lib.func(
       "void *objc_msgSend(void *self, void *sel, void *bytes, uint64 len)"
     ) as IdPtrLen,
+    memcpy: libc.func(
+      "void *memcpy(void *dst, const void *src, size_t n)"
+    ) as Objc["memcpy"],
     sel: (name: string) => {
       const cached = selectors.get(name);
       if (cached) {
@@ -181,7 +191,7 @@ const readSnap = (api: Objc): PasteSnap =>
           ? countOf(api.u64(dataRef, api.sel("length")))
           : 0;
         const bytes = dataRef ? api.id(dataRef, api.sel("bytes")) : null;
-        flavors.push({ data: copyBytes(bytes, length), type });
+        flavors.push({ data: copyBytes(api, bytes, length), type });
       }
       items.push({ flavors });
     }

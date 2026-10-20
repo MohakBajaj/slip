@@ -65,6 +65,18 @@ const loadPostV = (): (() => boolean) => {
   };
 };
 
+const writeClipboard = (value: string): void => {
+  clipboard.writeText(value);
+};
+
+const emptySnap = (): { items: [] } => ({ items: [] });
+
+const declinePaste = (): boolean => false;
+
+const leaveClipboard = (): void => {
+  // Nothing was read, so there is nothing to put back.
+};
+
 const postCommandV = (): boolean => {
   if (process.platform !== "darwin") {
     return false;
@@ -86,6 +98,16 @@ export const pasteOutText = async (text: string): Promise<PasteOutcome> => {
     clipboard.writeText(body);
     return "copied";
   }
+  if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+    return await pasteIntoFocus(text, {
+      paste: declinePaste,
+      read: emptySnap,
+      restore: leaveClipboard,
+      trusted: false,
+      wait: delay,
+      writeText: writeClipboard,
+    });
+  }
   const board = createMacPasteboard();
   return await pasteIntoFocus(text, {
     paste: postCommandV,
@@ -93,11 +115,9 @@ export const pasteOutText = async (text: string): Promise<PasteOutcome> => {
     restore: (snap) => {
       board.write(snap);
     },
-    trusted: systemPreferences.isTrustedAccessibilityClient(false),
+    trusted: true,
     wait: delay,
-    writeText: (value) => {
-      clipboard.writeText(value);
-    },
+    writeText: writeClipboard,
   });
 };
 
