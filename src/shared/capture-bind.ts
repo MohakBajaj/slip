@@ -233,6 +233,24 @@ const MOD_GLYPH: Record<CaptureMod, string> = {
   shift: "⇧",
 };
 
+/** Draw's stored double-tap, the way Settings describes the gesture. */
+export const formatDrawHint = (seq: string[]): string => {
+  const [first, second, ...rest] = seq;
+  if (rest.length === 0 && first !== undefined && first === second) {
+    const parts = first.split("+").map((part) => MOD_TOKEN[part] ?? part);
+    const [held, tapped, ...extra] = parts;
+    if (
+      held !== undefined &&
+      tapped !== undefined &&
+      extra.length === 0 &&
+      first.includes("+")
+    ) {
+      return `hold ${held}, double-tap ${tapped}`;
+    }
+  }
+  return formatCapture(seq);
+};
+
 export const formatHold = (seq: string[]): string => {
   const [first] = parseCapture(seq);
   if (first?.kind === "mod") {

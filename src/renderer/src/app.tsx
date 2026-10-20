@@ -12,6 +12,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import type { ReactNode } from "react";
 
 import darkIcon from "@/assets/dock-dark.png";
 import lightIcon from "@/assets/dock-light.png";
@@ -26,7 +27,12 @@ import { handleSectionMenu, sectionMenuEntries } from "@/lib/section-menu";
 import { handleSlipMenu, slipMenuEntries } from "@/lib/slip-menu";
 import { runMenuCommand, useSlipHotkeys } from "@/lib/use-slip-hotkeys";
 
-import { formatCapture, formatHold } from "../../shared/capture-bind";
+import {
+  formatCapture,
+  formatDrawHint,
+  formatHold,
+} from "../../shared/capture-bind";
+import { captureLabel } from "../../shared/capture-label";
 import { imageTitle } from "../../shared/images";
 import {
   groupedRows,
@@ -149,7 +155,7 @@ const App = () => {
   const remember = useCallback(
     (label: string, drop: string[] = []): void => {
       setUndo({ drop, label, slips: snapshot(slips) });
-      say(`${label} — ⌘Z`);
+      say(`${label}. ⌘Z to undo`);
     },
     [slips]
   );
@@ -264,6 +270,7 @@ const App = () => {
       return false;
     }
     remember("Added", [slip.id]);
+    setShowArchived(false);
     setSlips((cur) => [...cur, slip]);
     setFocused(slip.id);
     return true;
@@ -628,10 +635,41 @@ const App = () => {
   const chordName = formatCapture(settings.capture);
   const noteName = formatCapture(settings.noteCapture);
   const voiceName = formatHold(settings.voiceCapture);
-  const drawName = formatCapture(settings.drawCapture);
-  let emptyCopy = `${chordName} a selection, ${noteName} for a note, ${voiceName} to speak, ${drawName} to draw, drop images, or type below.`;
-  if (query) {
-    emptyCopy = "No matches";
+  const drawName = formatDrawHint(settings.drawCapture);
+  let emptyCopy: ReactNode = (
+    <div className="flex flex-col items-center gap-1">
+      <p>
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {chordName}
+        </kbd>{" "}
+        a selection
+      </p>
+      <p>
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {noteName}
+        </kbd>{" "}
+        for a note
+      </p>
+      <p>
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {voiceName}
+        </kbd>{" "}
+        to speak
+      </p>
+      <p>
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {drawName}
+        </kbd>{" "}
+        to draw
+      </p>
+      <p>Drop images, or type below.</p>
+    </div>
+  );
+  if (showArchived) {
+    emptyCopy = "No archived slips";
+  }
+  if (query.trim()) {
+    emptyCopy = `No slips match "${query.trim()}"`;
   }
 
   return (
@@ -755,6 +793,20 @@ const App = () => {
           </Button>
         </div>
       ) : null}
+      {capture === "failed" ? (
+        <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+          <p>Shortcuts could not start.</p>
+          <Button
+            className="press"
+            onClick={() => {
+              window.slip.openAccess().catch(() => undefined);
+            }}
+            size="xs"
+          >
+            Open Settings
+          </Button>
+        </div>
+      ) : null}
 
       {settingsOpen ? (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -837,6 +889,26 @@ const App = () => {
             }
             copyNamed("Copied", () => copySlip(slip));
           }}
+          onCopyAs={(kind) => {
+            if (current === null) {
+              return;
+            }
+            if (kind === "copy") {
+              copyNamed("Copied", () => copySlip(current));
+              return;
+            }
+            if (kind === "ref") {
+              copyNamed("Copied @", () => window.slip.copyAtRef(current.id));
+              return;
+            }
+            if (kind === "path") {
+              copyNamed("Copied path", () => window.slip.copyPath(current.id));
+              return;
+            }
+            copyNamed("Copied as prompt", () =>
+              window.slip.copyPrompt([current.id])
+            );
+          }}
           onEditing={(on) => {
             setEditingId(on ? (current?.id ?? null) : null);
           }}
@@ -901,7 +973,7 @@ const App = () => {
             list.filter((slip) => !slip.done).length
           )}
         </span>
-        <span>{capture === "live" ? "listening" : capture}</span>
+        <span>{capture === "failed" ? "" : captureLabel(capture)}</span>
       </footer>
 
       {paletteOpen ? (

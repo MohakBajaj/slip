@@ -79,7 +79,7 @@ test("the bundled snapshot is the public models list", () => {
       findModel(models, "alibaba/qwen3.7-flash") ?? models[0],
       "language"
     )
-  ).toBe("$0.03 / $0.13");
+  ).toBe("$0.03 / $0.13 per 1M tokens");
   expect(
     priceLabel(
       findModel(models, "microsoft/mai-transcribe-2") ?? models[0],
@@ -247,6 +247,23 @@ test("recommended skips free and stealth, then price sorts the rest", () => {
   });
   expect(modelSortPrice(both[0] ?? models[0], "transcription")).toBe(0.00001);
   expect(catalogChoices(models).transcription[0]?.group).toBe("recommended");
+});
+
+test("a free language model is labeled Free", () => {
+  expect(
+    priceLabel(
+      {
+        id: "example/free",
+        name: "Free",
+        pricing: { input: "0", output: "0" },
+        reasoning: [],
+        tags: [],
+        temperature: true,
+        type: "language",
+      },
+      "language"
+    )
+  ).toBe("Free");
 });
 
 test("a malformed catalog is empty", () => {

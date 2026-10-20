@@ -917,7 +917,7 @@ export const DrawApp = () => {
             draggable={false}
             src={dark ? darkIcon : lightIcon}
           />
-          <p className="truncate text-[13px] font-medium">
+          <p className="draw-chrome truncate text-[13px] font-medium">
             {flash || (plate === null ? "Slip Draw" : "Annotate")}
           </p>
         </div>
@@ -1037,7 +1037,7 @@ export const DrawApp = () => {
               variant="ghost"
             >
               Copy
-              <kbd className="text-muted-foreground text-[10px] font-medium">
+              <kbd className="draw-chrome text-muted-foreground text-[10px] font-medium">
                 ⌘C
               </kbd>
             </Button>
@@ -1052,7 +1052,9 @@ export const DrawApp = () => {
               size="xs"
             >
               {attach || slipId.length > 0 ? "Add" : "Slip"}
-              <kbd className="text-[10px] font-medium opacity-70">⌘↵</kbd>
+              <kbd className="draw-chrome text-[10px] font-medium opacity-70">
+                ⌘↵
+              </kbd>
             </Button>
           </div>
         </div>
@@ -1138,7 +1140,7 @@ export const DrawApp = () => {
           </Tip>
         </div>
         <p className="text-muted-foreground pointer-events-none absolute right-3 bottom-3 text-[10px] tracking-wide">
-          Space pan
+          Space to pan
         </p>
       </div>
     </div>

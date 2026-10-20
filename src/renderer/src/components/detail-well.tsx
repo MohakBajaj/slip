@@ -28,7 +28,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { copySlip } from "@/lib/copy-slip";
 import { filesFromClipboard, useFileDrop } from "@/lib/drop-images";
 import { cn } from "@/lib/utils";
 
@@ -52,9 +51,9 @@ const storedMemo = (text: string, hasAudio: boolean): string => {
   return hasAudio ? "Voice note" : "";
 };
 
-// Reopen plus a labeled Memo button overshoots the 340px window. Below this
-// width Memo/Save stay icon-only so the row keeps at least 8px of slack.
-const NARROW_ACTION_MQ = "(max-width: 355px)";
+// Reopen plus "Add memo" is wider than the 360px window. Below this width the
+// memo button stays icon-only so the row keeps at least 8px of slack.
+const NARROW_ACTION_MQ = "(max-width: 380px)";
 
 const useNarrowActions = (): boolean => {
   const [narrow, setNarrow] = useState(
@@ -204,12 +203,16 @@ const Action = ({
   </Button>
 );
 
-const CopyGroup = ({ slip }: { slip: Slip }) => (
+const CopyGroup = ({
+  onCopyAs,
+}: {
+  onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
+}) => (
   <ButtonGroup className="ml-auto shrink-0">
     <Button
       className="press"
       onClick={() => {
-        copySlip(slip).catch(() => undefined);
+        onCopyAs("copy");
       }}
       size="xs"
       type="button"
@@ -238,21 +241,21 @@ const CopyGroup = ({ slip }: { slip: Slip }) => (
       >
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyAtRef(slip.id).catch(() => undefined);
+            onCopyAs("ref");
           }}
         >
           @ reference
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyPath(slip.id).catch(() => undefined);
+            onCopyAs("path");
           }}
         >
           File path
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            window.slip.copyPrompt([slip.id]).catch(() => undefined);
+            onCopyAs("prompt");
           }}
         >
           As prompt
@@ -343,6 +346,7 @@ export const DetailWell = ({
   editing,
   onAddImages,
   onClose,
+  onCopyAs,
   onDelete,
   onEditing,
   onMenu,
@@ -353,6 +357,7 @@ export const DetailWell = ({
   editing: boolean;
   onAddImages: (files: File[]) => void;
   onClose: () => void;
+  onCopyAs: (kind: "copy" | "path" | "prompt" | "ref") => void;
   onDelete: () => void;
   onEditing: (on: boolean) => void;
   onMenu: () => void;
@@ -375,6 +380,12 @@ export const DetailWell = ({
   onPatchRef.current = onPatch;
   onEditingRef.current = onEditing;
   const app = sourceApp(slip.source);
+  let memoLabel = "Add memo";
+  if (editing) {
+    memoLabel = "Save";
+  } else if (!blankMemo(slip.content)) {
+    memoLabel = "Edit";
+  }
 
   const startEdit = (): void => {
     setNote(blankMemo(slip.content) ? "" : slip.content);
@@ -635,7 +646,7 @@ export const DetailWell = ({
           ) : null}
           <Action
             icon={PencilEdit01Icon}
-            label={editing ? "Save" : "Memo"}
+            label={memoLabel}
             named={!narrowActions}
             on={editing}
             onClick={() => {
@@ -662,7 +673,7 @@ export const DetailWell = ({
             />
           ) : null}
         </ButtonGroup>
-        <CopyGroup slip={slip} />
+        <CopyGroup onCopyAs={onCopyAs} />
       </footer>
     </section>
   );

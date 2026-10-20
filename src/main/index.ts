@@ -34,6 +34,7 @@ import type { DrawTarget } from "../shared/annotate";
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
+import { captureLabel } from "../shared/capture-label";
 import { bundleHtml } from "../shared/clipboard-html";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
@@ -383,19 +384,6 @@ const pinWorkspace = (target: BrowserWindow): void => {
     skipTransformProcessType: true,
     visibleOnFullScreen: true,
   });
-};
-
-const captureLabel = (state: CaptureState): string => {
-  if (state === "live") {
-    return "Capture ready";
-  }
-  if (state === "denied") {
-    return "Accessibility not granted";
-  }
-  if (state === "failed") {
-    return "Capture could not start";
-  }
-  return "Starting…";
 };
 
 const copySlip = (slip: Slip): void => {
@@ -1066,7 +1054,8 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
     backgroundColor: windowHex(),
     height,
     minHeight: 400,
-    minWidth: 640,
+    // Compact header fits at 797. 24px of slack for macOS fonts and traffic lights.
+    minWidth: 821,
     show: false,
     title: "Slip Draw",
     titleBarStyle: "hiddenInset",
