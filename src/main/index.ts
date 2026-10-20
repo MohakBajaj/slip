@@ -37,6 +37,7 @@ import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { captureLabel } from "../shared/capture-label";
+import { isShortTranscript } from "../shared/cleanup";
 import { bundleHtml } from "../shared/clipboard-html";
 import {
   dictateHold,
@@ -1805,7 +1806,7 @@ const boot = async (): Promise<void> => {
       }
       let body = spoken.text;
       let cleanupCost: SpeechStepCost | null = null;
-      if (settings.cleanupRoute !== "off") {
+      if (settings.cleanupRoute !== "off" && !isShortTranscript(spoken.text)) {
         tell({ error: "", phase: "cleaning", received: 0, total: 0 });
         const cleaned = await cleanTranscript(spoken.text, {
           bin: bundledBin("slip-cleanup"),

@@ -132,6 +132,99 @@ export const parseCleanupResponse = (raw: string): string | null => {
   return text.length > 0 ? text : null;
 };
 
+/** One sentence at or under this many words is left as spoken. */
+export const CLEANUP_WORD_CAP = 20;
+
+/**
+ * Corrections and spoken commands. A transcript that contains one still
+ * goes through cleanup. Matched case-insensitively on word boundaries.
+ */
+export const CLEANUP_CUES = [
+  "no wait",
+  "actually",
+  "i mean",
+  "scratch that",
+  "sorry",
+  "new line",
+  "new paragraph",
+  "comma",
+  "period",
+  "full stop",
+  "question mark",
+] as const;
+
+/** Titles and Latin abbreviations. A period after these is not a sentence end. */
+const ABBREVIATIONS = new Set([
+  "dr",
+  "eg",
+  "etc",
+  "ie",
+  "jr",
+  "mr",
+  "mrs",
+  "ms",
+  "prof",
+  "sr",
+  "st",
+  "vs",
+]);
+
+/**
+ * Terminal punctuation, an optional closing quote or bracket, whitespace,
+ * then more text.
+ */
+const SENTENCE_GAP = /[.?!।。？！]+["“”'’)\]}]*\s+[^\s.?!।。？！]/u;
+
+/** Danda and CJK marks also end a sentence when no space follows. */
+const TIGHT_SENTENCE = /[।。？！]+["“”'’)\]}]*[^\s.?!।。？！"“”'’)\]}]/u;
+
+const escapeCue = (cue: string): string =>
+  cue.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+const CUE = new RegExp(
+  `(?<![\\p{L}\\p{N}_])(?:${CLEANUP_CUES.map((cue) => escapeCue(cue)).join("|")})(?![\\p{L}\\p{N}_])`,
+  "iu"
+);
+
+const mentionsCue = (text: string): boolean => CUE.test(text);
+
+const periodIsAbbreviation = (text: string, index: number): boolean => {
+  if ((text[index] ?? "") !== ".") {
+    return false;
+  }
+  let start = index;
+  while (start > 0 && /[A-Za-z]/u.test(text[start - 1] ?? "")) {
+    start -= 1;
+  }
+  return ABBREVIATIONS.has(text.slice(start, index).toLowerCase());
+};
+
+const hasSentenceBreak = (text: string): boolean => {
+  const spaced = new RegExp(SENTENCE_GAP.source, "gu");
+  for (const match of text.matchAll(spaced)) {
+    const index = match.index ?? 0;
+    if (!periodIsAbbreviation(text, index)) {
+      return true;
+    }
+  }
+  return TIGHT_SENTENCE.test(text);
+};
+
+/**
+ * True when cleanup should not run: one sentence, at most CLEANUP_WORD_CAP
+ * words, and no correction or command cue.
+ */
+export const isShortTranscript = (transcript: string): boolean => {
+  const text = transcript.trim();
+  if (mentionsCue(text) || hasSentenceBreak(text)) {
+    return false;
+  }
+  if (text.length === 0) {
+    return true;
+  }
+  return text.split(/\s+/u).length <= CLEANUP_WORD_CAP;
+};
+
 const rawOutcome = (transcript: string): CleanupOutcome => ({
   body: transcript,
   cleaned: false,
@@ -155,19 +248,20 @@ const attempt = async (
 /**
  * The first step that returns text wins. Later steps are fallbacks.
  * Empty output, errors, and timeouts move to the next step, then the raw transcript.
+ * A short transcript with no correction or command cue is returned trimmed,
+ * and no step is called.
  */
 export const settleCleanup = async (
   transcript: string,
   steps: readonly CleanupAsk[],
   timeoutMs: number,
-  parent?: AbortSignal,
-  dictionary = ""
+  parent?: AbortSignal
 ): Promise<CleanupOutcome> => {
   const raw = transcript.trim();
-  if (raw.length === 0) {
-    return rawOutcome("");
+  if (isShortTranscript(raw)) {
+    return rawOutcome(raw);
   }
-  const request = cleanupRequest(raw, dictionary);
+  const request = cleanupRequest(raw);
   const stopped = (): boolean => parent?.aborted === true;
   const nextStep = async (index: number): Promise<CleanupOutcome> => {
     const ask = steps[index];
