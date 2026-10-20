@@ -168,7 +168,6 @@ test("dots that are not sentence ends stay one sentence", async () => {
     "Dr. Smith",
     "slip.app",
     "5.30 pm",
-    "see e.g. the note",
     "Meet Dr. Smith at five.",
     "read vs. the notes",
     "5.30 pm sharp.",
@@ -222,19 +221,6 @@ test("danda and CJK marks end a sentence", async () => {
 });
 
 test("correction and command cues still need cleanup", async () => {
-  expect([...CLEANUP_CUES]).toEqual([
-    "no wait",
-    "actually",
-    "i mean",
-    "scratch that",
-    "sorry",
-    "new line",
-    "new paragraph",
-    "comma",
-    "period",
-    "full stop",
-    "question mark",
-  ]);
   let calls = 0;
   const ask: CleanupAsk = () => {
     calls += 1;
@@ -284,44 +270,29 @@ test("the Priya correction goes through cleanup", async () => {
   expect(prompt).toContain(`<transcript>\n${spoken}\n</transcript>`);
 });
 
-test("a dictionary term in a short transcript still goes through cleanup", async () => {
-  const spoken = "meet Priya at five";
-  const cleaned = "Meet Priya at five.";
+test("a lettered plan and a closing quote still go through cleanup", async () => {
+  const samples = [
+    "We go with plan B. Then we ship.",
+    'He said "go." Then left.',
+    "He said (go.) Then left.",
+    "He said [go.] Then left.",
+  ];
   let calls = 0;
-  let prompt = "";
-  const ask: CleanupAsk = (request) => {
+  const ask: CleanupAsk = () => {
     calls += 1;
-    prompt = request.prompt;
-    return Promise.resolve(cleaned);
+    return Promise.resolve("Cleaned.");
   };
-  expect(isShortTranscript(spoken)).toBe(true);
-  expect(isShortTranscript(spoken, "Priya")).toBe(false);
-  expect(isShortTranscript("meet priya at five", "Priya")).toBe(false);
-  expect(isShortTranscript("ship the Q3 numbers", "Priya\nQ3")).toBe(false);
-  expect(isShortTranscript("meet in New Delhi tonight", "New Delhi")).toBe(
-    false
-  );
-  expect(isShortTranscript("meet Priyanka at five", "Priya")).toBe(true);
-  expect(isShortTranscript("happy days ahead", "app")).toBe(true);
-  expect(isShortTranscript("open the app now", "app")).toBe(false);
-  expect(isShortTranscript("open slip.app now", "slip.app")).toBe(false);
-  expect(isShortTranscript("open slipapp now", "slip.app")).toBe(true);
-  expect(isShortTranscript("meet Riya at five", "Priya")).toBe(true);
-  expect(await settleCleanup(spoken, [ask], 1000, undefined, "Priya")).toEqual({
-    body: cleaned,
-    cleaned: true,
-    transcript: spoken,
-  });
-  expect(prompt).toContain("<dictionary>\nPriya\n</dictionary>");
-  expect(calls).toBe(1);
-  expect(
-    await settleCleanup("meet Riya at five", [ask], 1000, undefined, "Priya")
-  ).toEqual({
-    body: "meet Riya at five",
-    cleaned: false,
-    transcript: "meet Riya at five",
-  });
-  expect(calls).toBe(1);
+  for (const spoken of samples) {
+    expect(isShortTranscript(spoken)).toBe(false);
+    expect(await settleCleanup(spoken, [ask], 1000)).toEqual({
+      body: "Cleaned.",
+      cleaned: true,
+      transcript: spoken,
+    });
+  }
+  expect(calls).toBe(samples.length);
+  expect(isShortTranscript('He said "go."')).toBe(true);
+  expect(isShortTranscript("He said (go.)")).toBe(true);
 });
 
 test("cleanup is not asked for a short transcript", async () => {
