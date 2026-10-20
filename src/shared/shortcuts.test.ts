@@ -1,14 +1,56 @@
 import { describe, expect, test } from "bun:test";
 
+import { matchesKeyboardEvent, normalizeHotkey } from "@tanstack/hotkeys";
+
 import {
   CHEATSHEET,
   defaultShortcuts,
+  matchableHotkey,
   menuAccelerator,
   sanitizeShortcuts,
+  searchEscape,
   SHORTCUT_ALIASES,
   shortcutInField,
   shortcutLabel,
 } from "./shortcuts";
+
+if (typeof globalThis.KeyboardEvent !== "function") {
+  globalThis.KeyboardEvent = class KeyboardEvent extends Event {
+    readonly altKey: boolean;
+    readonly code: string;
+    readonly ctrlKey: boolean;
+    readonly key: string;
+    readonly metaKey: boolean;
+    readonly shiftKey: boolean;
+
+    constructor(
+      _type: string,
+      init: Partial<{
+        altKey: boolean;
+        code: string;
+        ctrlKey: boolean;
+        key: string;
+        metaKey: boolean;
+        shiftKey: boolean;
+      }> = {}
+    ) {
+      super("keydown");
+      this.altKey = init.altKey ?? false;
+      this.code = init.code ?? "";
+      this.ctrlKey = init.ctrlKey ?? false;
+      this.key = init.key ?? "";
+      this.metaKey = init.metaKey ?? false;
+      this.shiftKey = init.shiftKey ?? false;
+    }
+  } as unknown as typeof KeyboardEvent;
+}
+
+const press = (init: {
+  code: string;
+  key: string;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+}): KeyboardEvent => new KeyboardEvent("keydown", init);
 
 describe("shortcuts", () => {
   test("defaults and aliases do not share a key", () => {
@@ -74,6 +116,45 @@ describe("shortcuts", () => {
     expect(menuAccelerator(shortcuts.open)).toBe("Return");
     expect(menuAccelerator(shortcuts.settings)).toBe("Command+,");
     expect(menuAccelerator(shortcuts.focusNext)).toBe("Down");
+  });
+
+  test("slash and comma names match the keys the browser sends", () => {
+    const question = press({ code: "Slash", key: "?", shiftKey: true });
+    const commandSlash = press({ code: "Slash", key: "/", metaKey: true });
+    const commandComma = press({ code: "Comma", key: ",", metaKey: true });
+    expect(
+      matchesKeyboardEvent(
+        question,
+        normalizeHotkey(matchableHotkey("Shift+Slash"), "mac"),
+        "mac"
+      )
+    ).toBe(true);
+    expect(
+      matchesKeyboardEvent(
+        commandSlash,
+        normalizeHotkey(matchableHotkey("Mod+Slash"), "mac"),
+        "mac"
+      )
+    ).toBe(true);
+    expect(
+      matchesKeyboardEvent(
+        commandComma,
+        normalizeHotkey(matchableHotkey("Mod+Comma"), "mac"),
+        "mac"
+      )
+    ).toBe(true);
+    expect(
+      matchesKeyboardEvent(
+        question,
+        normalizeHotkey("Shift+Slash", "mac"),
+        "mac"
+      )
+    ).toBe(false);
+  });
+
+  test("escape clears a search query before it blurs the field", () => {
+    expect(searchEscape("draft")).toBe("clear");
+    expect(searchEscape("")).toBe("blur");
   });
 
   test("cheatsheet covers every shortcut", () => {

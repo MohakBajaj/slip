@@ -310,7 +310,7 @@
 
 [data-accent="amber"] {
   --primary: oklch(0.64 0.13 70);
-  --primary-foreground: oklch(0.99 0.01 85);
+  --primary-foreground: oklch(0.2 0.03 70);
   --ring: oklch(0.64 0.13 70);
 }
 [data-accent="ink"] {

@@ -56,9 +56,10 @@ export interface Settings {
   cleanupRoute: CleanupRoute;
   dictateCapture: string[];
   dock: boolean;
-  keepDictations: boolean;
   drawCapture: string[];
   font: FontId;
+  fontMigrated: boolean;
+  keepDictations: boolean;
   noteCapture: string[];
   notify: boolean;
   scheme: Scheme;
@@ -114,6 +115,7 @@ export const defaultSettings = (): Settings => {
     dock: true,
     drawCapture: defaultDrawCapture(),
     font: "system",
+    fontMigrated: true,
     keepDictations: false,
     noteCapture: defaultNoteCapture(),
     notify: false,
@@ -155,6 +157,11 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (!isFontId(next.font)) {
     next.font = "system";
   }
+  const stored = input as { font?: unknown; fontMigrated?: unknown };
+  if (stored.fontMigrated !== true && stored.font === "geist") {
+    next.font = "system";
+  }
+  next.fontMigrated = true;
   if (!isTrayIconId(next.trayIcon)) {
     next.trayIcon = "slip";
   }
@@ -249,6 +256,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     dock: next.dock,
     drawCapture: next.drawCapture,
     font: next.font,
+    fontMigrated: next.fontMigrated,
     keepDictations: next.keepDictations,
     noteCapture: next.noteCapture,
     notify: next.notify,

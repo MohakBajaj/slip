@@ -148,6 +148,21 @@ const MOD_LABEL: Record<string, string> = {
   Shift: "⇧",
 };
 
+// The hotkey library matches event.key ("/", ",") and ignores names like Slash.
+const LIBRARY_KEYS: Record<string, string> = {
+  Comma: ",",
+  Slash: "/",
+};
+
+export const matchableHotkey = (hotkey: string): string =>
+  hotkey
+    .split("+")
+    .map((part) => LIBRARY_KEYS[part] ?? part)
+    .join("+");
+
+export const searchEscape = (query: string): "blur" | "clear" =>
+  query.length > 0 ? "clear" : "blur";
+
 const KEY_LABEL: Record<string, string> = {
   ArrowDown: "↓",
   ArrowLeft: "←",

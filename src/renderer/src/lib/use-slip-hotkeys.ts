@@ -1,10 +1,23 @@
 import { normalizeHotkey, useHotkeys } from "@tanstack/react-hotkeys";
 import type { UseHotkeyDefinition } from "@tanstack/react-hotkeys";
+import { useRef } from "react";
 
-import { neighborId, rangeIds } from "@/lib/range-ids";
-
-import { SHORTCUT_ALIASES, shortcutInField } from "../../../shared/shortcuts";
+import { moveListCursor } from "../../../shared/list-cursor";
+import {
+  SHORTCUT_ALIASES,
+  matchableHotkey,
+  searchEscape,
+  shortcutInField,
+} from "../../../shared/shortcuts";
 import type { ShortcutId, Shortcuts } from "../../../shared/shortcuts";
+
+const searchField = (target: EventTarget | null): HTMLInputElement | null => {
+  if (!(target instanceof HTMLElement)) {
+    return null;
+  }
+  const field = target.closest("[data-search]");
+  return field instanceof HTMLInputElement ? field : null;
+};
 
 const typingIn = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) {
@@ -110,22 +123,24 @@ export const useSlipHotkeys = ({
   setSettingsOpen: (open: boolean) => void;
   settingsOpen: boolean;
   shortcuts: Shortcuts;
-}): void => {
+}): (() => void) => {
+  const anchor = useRef<string | null>(null);
   const held = binding || editing;
   const listOn = !(held || paletteOpen || settingsOpen || helpOpen);
   const move = (delta: number, extend: boolean): void => {
-    const next = neighborId(listIds, focused, delta);
-    if (next === null) {
-      return;
+    const next = moveListCursor(
+      listIds,
+      { anchor: anchor.current, focused, marked },
+      delta,
+      extend
+    );
+    anchor.current = next.anchor;
+    if (next.focused !== focused) {
+      setFocused(next.focused);
     }
-    if (extend) {
-      const anchor = focused ?? marked[0] ?? next;
-      setFocused(next);
-      setMarked(rangeIds(listIds, anchor, next));
-      return;
+    if (extend && next.marked !== marked) {
+      setMarked(next.marked);
     }
-    setFocused(next);
-    setMarked([]);
   };
   const slipKey = (run: () => void) => (): void => {
     if (inControl(document.activeElement)) {
@@ -141,7 +156,7 @@ export const useSlipHotkeys = ({
   ): UseHotkeyDefinition[] =>
     keysFor(id, shortcuts).map((hotkey) => ({
       callback,
-      hotkey: normalizeHotkey(hotkey),
+      hotkey: normalizeHotkey(matchableHotkey(hotkey)),
       options: {
         ...options,
         ignoreInputs: !shortcutInField(hotkey),
@@ -164,12 +179,14 @@ export const useSlipHotkeys = ({
       }),
       {
         callback: (event) => {
-          if (
-            event.target instanceof HTMLElement &&
-            event.target.closest("[data-search]")
-          ) {
+          const field = searchField(event.target);
+          if (field !== null) {
             event.preventDefault();
-            setQuery("");
+            if (searchEscape(field.value) === "clear") {
+              setQuery("");
+              return;
+            }
+            field.blur();
             return;
           }
           if (typingIn(event.target) || paletteOpen) {
@@ -192,7 +209,7 @@ export const useSlipHotkeys = ({
             setFocused(null);
           }
         },
-        hotkey: normalizeHotkey(shortcuts.dismiss),
+        hotkey: normalizeHotkey(matchableHotkey(shortcuts.dismiss)),
         options: {
           enabled: !binding,
           ignoreInputs: false,
@@ -282,4 +299,8 @@ export const useSlipHotkeys = ({
     ],
     { conflictBehavior: "replace", ignoreInputs: true }
   );
+
+  return () => {
+    anchor.current = null;
+  };
 };

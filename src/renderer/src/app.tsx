@@ -621,7 +621,7 @@ const App = () => {
     }
   }, [dark, settings.accent, settings.font, settings.theme]);
 
-  useSlipHotkeys({
+  const clearRangeAnchor = useSlipHotkeys({
     binding,
     editing: editingId !== null,
     focused,
@@ -1055,6 +1055,7 @@ const App = () => {
             apply(marked, { section: name }).catch(() => undefined);
           }}
           onFocus={(id) => {
+            clearRangeAnchor();
             setFocused(id);
             setMarked([]);
           }}
@@ -1064,7 +1065,10 @@ const App = () => {
           onMenu={(slip) => {
             openSlipMenu(slip).catch(() => undefined);
           }}
-          onPick={pick}
+          onPick={(id, mods) => {
+            clearRangeAnchor();
+            pick(id, mods);
+          }}
           onPatch={(id, next) => {
             apply([id], next).catch(() => undefined);
           }}
