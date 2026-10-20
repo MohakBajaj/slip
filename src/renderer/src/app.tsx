@@ -639,19 +639,28 @@ const App = () => {
   let emptyCopy: ReactNode = (
     <div className="flex flex-col items-center gap-1">
       <p>
-        <kbd className="font-medium whitespace-nowrap">{chordName}</kbd> a
-        selection
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {chordName}
+        </kbd>{" "}
+        a selection
       </p>
       <p>
-        <kbd className="font-medium whitespace-nowrap">{noteName}</kbd> for a
-        note
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {noteName}
+        </kbd>{" "}
+        for a note
       </p>
       <p>
-        <kbd className="font-medium whitespace-nowrap">{voiceName}</kbd> to
-        speak
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {voiceName}
+        </kbd>{" "}
+        to speak
       </p>
       <p>
-        <kbd className="font-medium whitespace-nowrap">{drawName}</kbd> to draw
+        <kbd className="font-sans font-medium whitespace-nowrap">
+          {drawName}
+        </kbd>{" "}
+        to draw
       </p>
       <p>Drop images, or type below.</p>
     </div>
@@ -785,8 +794,17 @@ const App = () => {
         </div>
       ) : null}
       {capture === "failed" ? (
-        <div className="bg-card mx-2.5 mb-1.5 flex items-center rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+        <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
           <p>Shortcuts could not start.</p>
+          <Button
+            className="press"
+            onClick={() => {
+              window.slip.openAccess().catch(() => undefined);
+            }}
+            size="xs"
+          >
+            Open Settings
+          </Button>
         </div>
       ) : null}
 
@@ -955,7 +973,7 @@ const App = () => {
             list.filter((slip) => !slip.done).length
           )}
         </span>
-        <span>{captureLabel(capture)}</span>
+        <span>{capture === "failed" ? "" : captureLabel(capture)}</span>
       </footer>
 
       {paletteOpen ? (

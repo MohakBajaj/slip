@@ -1054,8 +1054,8 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
     backgroundColor: windowHex(),
     height,
     minHeight: 400,
-    // Compact header (title and hints hidden) stops scrolling at 797.
-    minWidth: 797,
+    // Compact header fits at 797. 24px of slack for macOS fonts and traffic lights.
+    minWidth: 821,
     show: false,
     title: "Slip Draw",
     titleBarStyle: "hiddenInset",
