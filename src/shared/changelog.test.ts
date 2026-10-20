@@ -58,6 +58,8 @@ describe("changelog", () => {
     expect(current).toContain("never published");
     expect(current).toContain("Dictate anywhere");
     expect(current).toContain("Annotate anywhere");
+    expect(current).toContain("20 words");
+    expect(current).toContain("(#18)");
     const released = changelogSection(changelog, "1.0.5");
     expect(released).toContain("#2");
     expect(released).toContain("#3");

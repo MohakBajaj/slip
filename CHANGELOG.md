@@ -30,11 +30,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The draw window has room for its toolbar. A failed capture is stated once. When a key, a copy, or a shortcut fails, Slip says what happened.
 - Starting a new slip leaves the archive.
 - Speech cleanup only removes filler and fixes punctuation. It does not rewrite what you said.
+- A single sentence of 20 words or fewer, with no correction or command cue, skips cleanup. Dictate pastes that transcript trimmed, as spoken.
 - A voice slip shows what cloud transcription and cleanup cost, next to the time.
 
 ### Fixed
 
-- Dictating into another app no longer quits Slip. Pasting the transcript was crashing the app.
+- Dictating into another app no longer quits Slip. Pasting the transcript was crashing the app (#18).
+- A date in a slip stays the date you wrote, and a quoted "false" does not mark it done.
+- An update no longer removes Slip before the new copy is in place. If the swap fails, Slip puts the old app back and opens it.
+- Undo changes only the slips that action touched.
+- Refreshing the inbox no longer puts older settings back over a change you just made.
+- A page image is not fetched when its name points at this Mac, and a slip cannot copy a file outside its attachments.
+- A markdown file that is not a slip is left alone.
+- A bad message from the window is ignored instead of being saved as a slip.
+- If a release stops after the version bump, running it again adds the tag instead of bumping once more.
+- A blank line at the end of a note is kept.
+- Escape on a new note no longer marks it edited.
 - You can dictate again after a notice, and you can retake an annotation that came out blank.
 - Annotate does not open on top of the draw window.
 - Selecting a range of slips works, and amber text is easier to read.
