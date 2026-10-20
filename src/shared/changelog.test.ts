@@ -43,6 +43,10 @@ describe("changelog", () => {
   test("reads the shipped sections", () => {
     expect(changelogSection(changelog, "1.0.0")).toContain("capture inbox");
     expect(changelogSection(changelog, "1.0.4")).toContain("activation policy");
+    const current = changelogSection(changelog, "1.0.6");
+    expect(current).toContain("never published");
+    expect(current).toContain("Dictate anywhere");
+    expect(current).toContain("Annotate anywhere");
     const released = changelogSection(changelog, "1.0.5");
     expect(released).toContain("#2");
     expect(released).toContain("#3");
