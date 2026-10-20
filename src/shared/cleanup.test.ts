@@ -2,14 +2,20 @@ import { expect, test } from "bun:test";
 
 import {
   CLEANUP_INSTRUCTIONS,
+  CLEANUP_WORD_CAP,
   cleanupPrompt,
   cleanupRequest,
+  isShortTranscript,
   parseCleanupResponse,
   settleCleanup,
 } from "./cleanup";
 import type { CleanupAsk } from "./cleanup";
 
-const RAW = "um I was going to say uh the milk, the eggs, and the bread";
+const RAW =
+  "um I was going to say uh the milk, the eggs, and the bread before I head out the door this afternoon";
+
+const words = (count: number, token = "word"): string =>
+  Array.from({ length: count }, () => token).join(" ");
 
 const reply =
   (text: string): CleanupAsk =>
@@ -74,22 +80,20 @@ test("fences and wrapping quotes unwrap", () => {
 test("the model note is kept, including a short rewrite", async () => {
   const cleaned = "I bought milk.";
   const transcript =
-    "I went to the store and bought milk eggs bread and cheese";
+    "I went to the store and bought milk eggs bread and cheese and then I grabbed yogurt butter and apples on the way home";
   expect(await settleCleanup(transcript, [reply(cleaned)], 1000)).toEqual({
     body: cleaned,
     cleaned: true,
     transcript,
   });
+  const meeting =
+    "the big meeting is tomorrow and we still need the notes the slides and the budget before we leave the office";
   expect(
-    await settleCleanup(
-      "the big meeting is tomorrow",
-      [reply("the large meeting is tomorrow")],
-      1000
-    )
+    await settleCleanup(meeting, [reply("the large meeting is tomorrow")], 1000)
   ).toEqual({
     body: "the large meeting is tomorrow",
     cleaned: true,
-    transcript: "the big meeting is tomorrow",
+    transcript: meeting,
   });
 });
 
@@ -135,6 +139,49 @@ test("when every step fails the transcript is the note", async () => {
     cleaned: false,
     transcript: "",
   });
+});
+
+test("a short transcript is one sentence of at most 20 words", () => {
+  expect(CLEANUP_WORD_CAP).toBe(20);
+  expect(isShortTranscript("")).toBe(true);
+  expect(isShortTranscript("   \n\t")).toBe(true);
+  expect(isShortTranscript(words(20))).toBe(true);
+  expect(isShortTranscript(`${words(20)}.`)).toBe(true);
+  expect(isShortTranscript(words(21))).toBe(false);
+  expect(isShortTranscript("Go now. Stop.")).toBe(false);
+  expect(isShortTranscript("Go now? Stop.")).toBe(false);
+  expect(isShortTranscript("Go now! Stop.")).toBe(false);
+  expect(isShortTranscript("Meet at five.")).toBe(true);
+  expect(isShortTranscript("  Meet at five.  ")).toBe(true);
+  expect(isShortTranscript("आज मौसम काफी अच्छा है")).toBe(true);
+  expect(isShortTranscript("kal subah Priya ko call karna")).toBe(true);
+  expect(isShortTranscript(words(21, "शब्द"))).toBe(false);
+});
+
+test("cleanup is not asked for a short transcript", async () => {
+  let calls = 0;
+  const ask: CleanupAsk = () => {
+    calls += 1;
+    return Promise.resolve("Cleaned.");
+  };
+  expect(await settleCleanup("  meet at five. ", [ask], 1000)).toEqual({
+    body: "meet at five.",
+    cleaned: false,
+    transcript: "meet at five.",
+  });
+  expect(calls).toBe(0);
+  const long = words(21);
+  expect(await settleCleanup(long, [ask], 1000)).toEqual({
+    body: "Cleaned.",
+    cleaned: true,
+    transcript: long,
+  });
+  expect(calls).toBe(1);
+  expect(await settleCleanup("Go now. Then stop.", [ask], 1000)).toMatchObject({
+    body: "Cleaned.",
+    cleaned: true,
+  });
+  expect(calls).toBe(2);
 });
 
 test("an aborted capture does not run a later step", async () => {

@@ -132,6 +132,27 @@ export const parseCleanupResponse = (raw: string): string | null => {
   return text.length > 0 ? text : null;
 };
 
+/** One sentence at or under this many words is left as spoken. */
+export const CLEANUP_WORD_CAP = 20;
+
+/**
+ * `.` `?` or `!` followed by more text. Trailing punctuation (`...`, `?!`)
+ * is still one sentence.
+ */
+const NEXT_SENTENCE = /[.?!](?:\s*[.?!])*\s*\S/u;
+
+/** True when cleanup should not run: one sentence, at most CLEANUP_WORD_CAP words. */
+export const isShortTranscript = (transcript: string): boolean => {
+  const text = transcript.trim();
+  if (NEXT_SENTENCE.test(text)) {
+    return false;
+  }
+  if (text.length === 0) {
+    return true;
+  }
+  return text.split(/\s+/u).length <= CLEANUP_WORD_CAP;
+};
+
 const rawOutcome = (transcript: string): CleanupOutcome => ({
   body: transcript,
   cleaned: false,
@@ -155,6 +176,7 @@ const attempt = async (
 /**
  * The first step that returns text wins. Later steps are fallbacks.
  * Empty output, errors, and timeouts move to the next step, then the raw transcript.
+ * A short transcript is returned trimmed, and no step is called.
  */
 export const settleCleanup = async (
   transcript: string,
@@ -164,8 +186,8 @@ export const settleCleanup = async (
   dictionary = ""
 ): Promise<CleanupOutcome> => {
   const raw = transcript.trim();
-  if (raw.length === 0) {
-    return rawOutcome("");
+  if (isShortTranscript(raw)) {
+    return rawOutcome(raw);
   }
   const request = cleanupRequest(raw, dictionary);
   const stopped = (): boolean => parent?.aborted === true;
