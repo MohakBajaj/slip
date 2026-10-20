@@ -523,6 +523,8 @@ if ! mv "$stage" "$dest"; then
     rm -rf "$dest"
     mv "$aside" "$dest"
     open "$dest" || echo "open failed"
+    rm -rf "$stage"
+    echo "update failed"
     exit 1
   fi
   rm -rf "$stage"

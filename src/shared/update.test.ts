@@ -525,7 +525,8 @@ describe("notes and signing mode", () => {
       "mv",
       '#!/bin/sh\ncase "$1" in *.slip-new) case "$2" in *.slip-new) ;; *) exit 1 ;; esac ;; esac\nexec /bin/mv "$@"\n'
     );
-    run("both");
+    const both = run("both");
+    expect(existsSync(both.stage)).toBe(false);
     rmSync(root, { force: true, recursive: true });
   });
 });

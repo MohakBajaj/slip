@@ -75,7 +75,7 @@ const leadingNewlines = /^\n+/u;
 const trailingNewline = /\n$/u;
 
 export const serializeSlip = (slip: Slip): string =>
-  matter.stringify(slip.content.replace(leadingNewlines, ""), {
+  matter.stringify(`${slip.content.replace(leadingNewlines, "")}\n`, {
     archived: slip.archived,
     ...(slip.audio.length > 0 ? { audio: slip.audio } : {}),
     ...(slip.cost ? { cost: slip.cost } : {}),

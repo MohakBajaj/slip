@@ -91,15 +91,29 @@ test("the file's trailing newline is not part of the note", () => {
     updatedAt: "2026-01-02T00:00:00.000Z",
     url: "",
   };
-  expect(parseSlip(slip.filename, serializeSlip(slip))?.content).toBe("Hello");
+  const roundTrip = (content: string): string | undefined => {
+    const loaded = parseSlip(
+      slip.filename,
+      serializeSlip({ ...slip, content })
+    );
+    if (loaded === null) {
+      return undefined;
+    }
+    return parseSlip(slip.filename, serializeSlip(loaded))?.content;
+  };
+  expect(roundTrip("Hello")).toBe("Hello");
+  expect(roundTrip("Hello\n\n")).toBe("Hello\n\n");
+  expect(roundTrip("one\n\ntwo")).toBe("one\n\ntwo");
   expect(
-    parseSlip(slip.filename, serializeSlip({ ...slip, content: "one\n\ntwo" }))
-      ?.content
-  ).toBe("one\n\ntwo");
+    parseSlip("2026-01-02-aaaaaa.md", "---\nid: aaaaaa\n---\nHello\n")?.content
+  ).toBe("Hello");
   expect(
-    parseSlip(slip.filename, serializeSlip({ ...slip, content: "Hello\n\n" }))
+    parseSlip("2026-01-02-aaaaaa.md", "---\nid: aaaaaa\n---\nHello")?.content
+  ).toBe("Hello");
+  expect(
+    parseSlip("2026-01-02-aaaaaa.md", "---\nid: aaaaaa\n---\n\nHello.\n")
       ?.content
-  ).toBe("Hello\n");
+  ).toBe("Hello.");
 });
 
 test("speech cost round-trips in frontmatter", () => {
