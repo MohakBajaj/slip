@@ -37,6 +37,7 @@ import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
 import { formatCapture, formatHold, sameCapture } from "../shared/capture-bind";
 import { captureLabel } from "../shared/capture-label";
+import { isShortTranscript } from "../shared/cleanup";
 import { bundleHtml } from "../shared/clipboard-html";
 import {
   dictateHold,
@@ -48,6 +49,7 @@ import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
 import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
+import { slipPatch, slipRecord } from "../shared/markdown-file";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
 import { annotatePlan, voicePillWidth } from "../shared/paste-out";
@@ -118,18 +120,19 @@ const SETTINGS_FILE = settingsFile();
 const embedImage = (
   filePath: string
 ): { bytes: Buffer; mime: string } | null => {
-  const native = nativeImage.createFromPath(filePath);
+  const allowed = resolveAttachment(vaultRoot(), filePath);
+  if (allowed === null) {
+    return null;
+  }
+  const native = nativeImage.createFromPath(allowed);
   if (!native.isEmpty()) {
     return { bytes: native.toPNG(), mime: "image/png" };
   }
-  if (!existsSync(filePath)) {
+  const mime = attachmentType(allowed);
+  if (!mime.startsWith("image/")) {
     return null;
   }
-  const mime = attachmentType(filePath);
-  return {
-    bytes: readFileSync(filePath),
-    mime: mime.startsWith("image/") ? mime : "image/png",
-  };
+  return { bytes: readFileSync(allowed), mime };
 };
 
 const writeClipboard = (text: string, paths: string[]): void => {
@@ -1805,7 +1808,7 @@ const boot = async (): Promise<void> => {
       }
       let body = spoken.text;
       let cleanupCost: SpeechStepCost | null = null;
-      if (settings.cleanupRoute !== "off") {
+      if (settings.cleanupRoute !== "off" && !isShortTranscript(spoken.text)) {
         tell({ error: "", phase: "cleaning", received: 0, total: 0 });
         const cleaned = await cleanTranscript(spoken.text, {
           bin: bundledBin("slip-cleanup"),
@@ -2039,22 +2042,36 @@ const boot = async (): Promise<void> => {
     rebuildTray();
     return slip;
   });
-  ipcMain.handle("updateSlip", (_e, id: string, patch: Partial<Slip>) => {
-    if (typeof id !== "string" || patch === null || typeof patch !== "object") {
+  const acceptedPatch = (patch: unknown): Partial<Slip> | null => {
+    const next = slipPatch(patch);
+    if (next === null) {
       return null;
     }
-    const slip = updateSlip(vaultRoot(), id, patch);
+    if (
+      next.images?.some((item) => resolveAttachment(vaultRoot(), item) === null)
+    ) {
+      return null;
+    }
+    return next;
+  };
+  ipcMain.handle("updateSlip", (_e, id: unknown, patch: unknown) => {
+    const next = acceptedPatch(patch);
+    if (typeof id !== "string" || next === null) {
+      return null;
+    }
+    const slip = updateSlip(vaultRoot(), id, next);
     rebuildTray();
     return slip;
   });
-  ipcMain.handle("updateSlips", (_e, ids: string[], patch: Partial<Slip>) => {
-    if (!Array.isArray(ids) || patch === null || typeof patch !== "object") {
+  ipcMain.handle("updateSlips", (_e, ids: unknown, patch: unknown) => {
+    const next = acceptedPatch(patch);
+    if (!Array.isArray(ids) || next === null) {
       return listSlips(vaultRoot());
     }
     const slips = updateSlips(
       vaultRoot(),
       ids.filter((id) => typeof id === "string"),
-      patch
+      next
     );
     rebuildTray();
     return slips;
@@ -2076,19 +2093,20 @@ const boot = async (): Promise<void> => {
       : [];
     await releaseHeld(drop);
   });
-  ipcMain.handle(
-    "restoreSlips",
-    (_e, previous: Slip[], drop: string[] = []) => {
-      if (!Array.isArray(previous)) {
-        return;
-      }
-      const ids = Array.isArray(drop)
-        ? drop.filter((id) => typeof id === "string")
-        : [];
-      restoreSlips(vaultRoot(), previous, ids);
-      rebuildTray();
+  ipcMain.handle("restoreSlips", (_e, previous: unknown, drop: unknown) => {
+    if (!Array.isArray(previous)) {
+      return;
     }
-  );
+    const slips = previous.flatMap((item) => {
+      const slip = slipRecord(item);
+      return slip === null ? [] : [slip];
+    });
+    const ids = Array.isArray(drop)
+      ? drop.filter((id) => typeof id === "string")
+      : [];
+    restoreSlips(vaultRoot(), slips, ids);
+    rebuildTray();
+  });
   ipcMain.handle("setSection", (_e, section: string) => {
     if (typeof section === "string") {
       currentSection = section;

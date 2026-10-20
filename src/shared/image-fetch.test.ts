@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 
 import { fetchPublicBytes, isAllowedImageUrl } from "./image-fetch";
+import type { HostLookup } from "./image-fetch";
+
+const publicLookup: HostLookup = () =>
+  Promise.resolve([{ address: "8.8.8.8", family: 4 }]);
 
 test("public image urls are allowed", () => {
   expect(isAllowedImageUrl("https://example.com/a.png")).toBe(true);
@@ -36,6 +40,7 @@ test("does not request a private url", async () => {
       called = true;
       return new Response();
     },
+    lookup: publicLookup,
     maxBytes: 100,
     maxRedirects: 2,
     timeoutMs: 50,
@@ -54,12 +59,29 @@ test("does not follow a redirect onto a private host", async () => {
         status: 302,
       });
     },
+    lookup: publicLookup,
     maxBytes: 100,
     maxRedirects: 2,
     timeoutMs: 50,
   });
   expect(result).toBeNull();
   expect(seen).toEqual(["https://example.com/a.png"]);
+});
+
+test("does not request a name that resolves to loopback", async () => {
+  let called = false;
+  const result = await fetchPublicBytes("http://127.0.0.1.nip.io/a.png", {
+    fetchImpl: async () => {
+      called = true;
+      return new Response();
+    },
+    lookup: () => Promise.resolve([{ address: "127.0.0.1", family: 4 }]),
+    maxBytes: 100,
+    maxRedirects: 1,
+    timeoutMs: 50,
+  });
+  expect(result).toBeNull();
+  expect(called).toBe(false);
 });
 
 test("stops when the body exceeds the cap", async () => {
@@ -75,6 +97,7 @@ test("stops when the body exceeds the cap", async () => {
         }),
         { headers: { "content-type": "image/png" }, status: 200 }
       ),
+    lookup: publicLookup,
     maxBytes: 100,
     maxRedirects: 0,
     timeoutMs: 200,
@@ -110,6 +133,7 @@ test("aborts a body read that outlives the timeout", async () => {
         })
       );
     },
+    lookup: publicLookup,
     maxBytes: 1000,
     maxRedirects: 0,
     timeoutMs: 30,
@@ -125,6 +149,7 @@ test("returns a small body", async () => {
         headers: { "content-type": "image/png" },
         status: 200,
       }),
+    lookup: publicLookup,
     maxBytes: 10,
     maxRedirects: 1,
     timeoutMs: 50,

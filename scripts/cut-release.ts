@@ -1,7 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { bumpVersion, insertRelease } from "../src/shared/changelog";
+import {
+  bumpVersion,
+  insertRelease,
+  releaseTagPending,
+} from "../src/shared/changelog";
 import type { ReleaseLevel } from "../src/shared/changelog";
 
 const args = process.argv.slice(2);
@@ -49,6 +53,28 @@ if (status.trim().length > 0) {
     "Working tree is dirty. Commit or stash before cutting a release."
   );
   process.exit(1);
+}
+const headSubject = execFileSync("git", ["log", "-1", "--format=%s"], {
+  encoding: "utf-8",
+}).trim();
+let tagExists = true;
+try {
+  execFileSync(
+    "git",
+    ["rev-parse", "-q", "--verify", `refs/tags/v${current}`],
+    {
+      stdio: "ignore",
+    }
+  );
+} catch {
+  tagExists = false;
+}
+if (releaseTagPending(current, headSubject, tagExists)) {
+  execFileSync("git", ["tag", "-a", `v${current}`, "-m", `Slip ${current}`], {
+    stdio: "inherit",
+  });
+  console.log(`git push origin HEAD && git push origin v${current}`);
+  process.exit(0);
 }
 const updated = raw.replace(`"version": "${current}"`, `"version": "${next}"`);
 if (updated === raw) {
