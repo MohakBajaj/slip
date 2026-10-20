@@ -128,6 +128,7 @@ export const SettingsPanel = ({
   onLogin: (next: LoginState) => void;
   settings: Settings;
 }) => {
+  const [advanced, setAdvanced] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
 
   useEffect(() => {
@@ -170,11 +171,108 @@ export const SettingsPanel = ({
     skillLabel = skill.stale ? "Update" : "Installed";
   }
 
+  const zoom = (
+    <SettingsRow label="Zoom">
+      <div className="flex items-center gap-0.5">
+        <Button
+          aria-label="Zoom out"
+          className="press"
+          disabled={settings.zoom <= ZOOM_MIN}
+          onClick={() =>
+            onChange({
+              ...settings,
+              zoom: clampZoom(settings.zoom - 0.1),
+            })
+          }
+          size="xs"
+          variant="ghost"
+        >
+          −
+        </Button>
+        <span className="w-9 text-center text-[12px] tabular-nums">
+          {Math.round(settings.zoom * 100)}%
+        </span>
+        <Button
+          aria-label="Zoom in"
+          className="press"
+          disabled={settings.zoom >= ZOOM_MAX}
+          onClick={() =>
+            onChange({
+              ...settings,
+              zoom: clampZoom(settings.zoom + 0.1),
+            })
+          }
+          size="xs"
+          variant="ghost"
+        >
+          +
+        </Button>
+      </div>
+    </SettingsRow>
+  );
+
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="flex flex-col gap-5 px-2.5 py-2 pb-4">
         <section className="flex flex-col gap-2">
-          <Heading>Look</Heading>
+          <Heading>Capture</Heading>
+          <p className="text-muted-foreground px-0.5 text-[12px]">Selection</p>
+          <CaptureBind
+            hint="Double-tap a modifier, or a chord with one."
+            onBind={onBind}
+            onSequence={onChord("capture")}
+            value={settings.capture}
+          />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Quick note</p>
+          <CaptureBind
+            hint="On this screen, without opening Slip."
+            onBind={onBind}
+            onSequence={onChord("noteCapture")}
+            value={settings.noteCapture}
+          />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Voice</p>
+          <CaptureBind
+            hint="Hold to talk. Double-tap to latch."
+            onBind={onBind}
+            onSequence={onChord("voiceCapture")}
+            value={settings.voiceCapture}
+          />
+          <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
+          <CaptureBind
+            hint="Hold ⌘ and double-tap ⇧."
+            onBind={onBind}
+            onSequence={onChord("drawCapture")}
+            presets={false}
+            value={settings.drawCapture}
+          />
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <Heading>Voice notes</Heading>
+          <Card>
+            <SpeechSettings onChange={onChange} settings={settings} />
+          </Card>
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <Heading>Theme</Heading>
+          <div className="bg-muted/70 flex rounded-xl p-0.5">
+            {schemes.map((scheme) => (
+              <button
+                className={cn(
+                  "press h-7 flex-1 rounded-[10px] text-[12px] capitalize",
+                  settings.scheme === scheme
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                )}
+                key={scheme}
+                onClick={() => onChange({ ...settings, scheme })}
+                type="button"
+              >
+                {scheme}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             {THEMES.map((theme) => (
               <ThemeCard
@@ -209,269 +307,219 @@ export const SettingsPanel = ({
                 ))}
               </div>
             </SettingsRow>
-            <div className="px-1.5 pb-1">
-              <div className="bg-muted/70 flex rounded-xl p-0.5">
-                {schemes.map((scheme) => (
-                  <button
-                    className={cn(
-                      "press h-7 flex-1 rounded-[10px] text-[12px] capitalize",
-                      settings.scheme === scheme
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground"
-                    )}
-                    key={scheme}
-                    onClick={() => onChange({ ...settings, scheme })}
-                    type="button"
+          </Card>
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <button
+            aria-expanded={advanced}
+            className="flex items-center justify-between px-0.5 text-left"
+            onClick={() => {
+              setAdvanced((open) => !open);
+            }}
+            type="button"
+          >
+            <span className="text-foreground text-[13px] font-medium">
+              Advanced
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              {advanced ? "Hide" : "Show"}
+            </span>
+          </button>
+          {advanced ? (
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground px-0.5 text-[12px]">
+                  Inbox
+                </p>
+                <Card>
+                  <SettingsRow
+                    detail="Banner when a capture lands"
+                    label="Notify"
                   >
-                    {scheme}
-                  </button>
-                ))}
+                    <Switch
+                      aria-label="Notify on capture"
+                      checked={settings.notify}
+                      onCheckedChange={(notify) =>
+                        onChange({ ...settings, notify })
+                      }
+                      size="sm"
+                    />
+                  </SettingsRow>
+                  <SettingsRow
+                    detail="Keep finished slips in the list"
+                    label="Show done"
+                  >
+                    <Switch
+                      aria-label="Show done slips"
+                      checked={settings.showDone}
+                      onCheckedChange={(showDone) =>
+                        onChange({ ...settings, showDone })
+                      }
+                      size="sm"
+                    />
+                  </SettingsRow>
+                  {zoom}
+                </Card>
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground px-0.5 text-[12px]">Type</p>
+                <Card>
+                  {FONTS.map((font) => (
+                    <FontRow
+                      font={font}
+                      key={font.id}
+                      on={settings.font === font.id}
+                      onPick={() => {
+                        pickFont(font.id);
+                      }}
+                    />
+                  ))}
+                </Card>
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground px-0.5 text-[12px]">
+                  Menu bar
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {TRAY_ICONS.map((icon) => (
+                    <button
+                      aria-label={icon.label}
+                      aria-pressed={settings.trayIcon === icon.id}
+                      className={cn(
+                        "press relative flex flex-col items-center gap-1 rounded-xl py-2 shadow-[0_0_0_1px_rgba(0,0,0,0.08)] after:absolute after:-inset-0.5 after:content-['']",
+                        picked(settings.trayIcon === icon.id)
+                      )}
+                      key={icon.id}
+                      onClick={() => {
+                        pickTray(icon.id);
+                      }}
+                      type="button"
+                    >
+                      <TrayGlyph id={icon.id} />
+                      <span className="text-muted-foreground text-[11px] leading-none">
+                        {icon.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground px-0.5 text-[12px]">
+                  Shortcuts
+                </p>
+                <SettingsKeys
+                  onBind={onBind}
+                  onChange={onChange}
+                  settings={settings}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground px-0.5 text-[12px]">Mac</p>
+                <DockLook dark={dark} />
+                <Card>
+                  <SettingsRow label="Always on top">
+                    <Switch
+                      aria-label="Always on top"
+                      checked={settings.alwaysOnTop}
+                      onCheckedChange={(alwaysOnTop) =>
+                        onChange({ ...settings, alwaysOnTop })
+                      }
+                      size="sm"
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Show in Dock">
+                    <Switch
+                      aria-label="Show in Dock"
+                      checked={settings.dock}
+                      onCheckedChange={(dock) =>
+                        onChange({ ...settings, dock })
+                      }
+                      size="sm"
+                    />
+                  </SettingsRow>
+                  <SettingsRow detail={loginDetail} label="Start at login">
+                    <Switch
+                      aria-label="Start at login"
+                      checked={login === "on"}
+                      disabled={login === "unavailable"}
+                      onCheckedChange={(on) => {
+                        onLogin(on ? "on" : "off");
+                        window.slip
+                          .setLogin(on)
+                          .then(onLogin)
+                          .catch(() => undefined);
+                      }}
+                      size="sm"
+                    />
+                  </SettingsRow>
+                  <SettingsRow
+                    detail={vaultLabel(settings.vaultPath)}
+                    label="Vault"
+                  >
+                    <div className="flex gap-0.5">
+                      <Button
+                        className="press"
+                        onClick={() => {
+                          window.slip
+                            .pickVault()
+                            .then((folder) => {
+                              if (
+                                folder !== null &&
+                                folder !== settings.vaultPath
+                              ) {
+                                onChange({ ...settings, vaultPath: folder });
+                              }
+                            })
+                            .catch(() => undefined);
+                        }}
+                        size="xs"
+                        variant="ghost"
+                      >
+                        Change
+                      </Button>
+                      <Button
+                        className="press"
+                        onClick={() => {
+                          window.slip.openVault().catch(() => undefined);
+                        }}
+                        size="xs"
+                        variant="ghost"
+                      >
+                        <HugeiconsIcon className="size-3" icon={Folder02Icon} />
+                        Open
+                      </Button>
+                    </div>
+                  </SettingsRow>
+                  <SettingsRow detail={skillDetail} label="Skill">
+                    <Button
+                      className="press"
+                      onClick={() => {
+                        window.slip
+                          .installSkill()
+                          .then(setSkill)
+                          .catch(() => undefined);
+                      }}
+                      size="xs"
+                      variant="ghost"
+                    >
+                      {skillLabel}
+                    </Button>
+                  </SettingsRow>
+                  <SettingsRow detail="From GitHub releases" label="Updates">
+                    <Switch
+                      aria-label="Check for updates"
+                      checked={settings.checkUpdates}
+                      onCheckedChange={(checkUpdates) =>
+                        onChange({ ...settings, checkUpdates })
+                      }
+                      size="sm"
+                    />
+                  </SettingsRow>
+                </Card>
               </div>
             </div>
-            <SettingsRow label="Zoom">
-              <div className="flex items-center gap-0.5">
-                <Button
-                  aria-label="Zoom out"
-                  className="press"
-                  disabled={settings.zoom <= ZOOM_MIN}
-                  onClick={() =>
-                    onChange({
-                      ...settings,
-                      zoom: clampZoom(settings.zoom - 0.1),
-                    })
-                  }
-                  size="xs"
-                  variant="ghost"
-                >
-                  −
-                </Button>
-                <span className="w-9 text-center text-[12px] tabular-nums">
-                  {Math.round(settings.zoom * 100)}%
-                </span>
-                <Button
-                  aria-label="Zoom in"
-                  className="press"
-                  disabled={settings.zoom >= ZOOM_MAX}
-                  onClick={() =>
-                    onChange({
-                      ...settings,
-                      zoom: clampZoom(settings.zoom + 0.1),
-                    })
-                  }
-                  size="xs"
-                  variant="ghost"
-                >
-                  +
-                </Button>
-              </div>
-            </SettingsRow>
-          </Card>
-          <Card>
-            {FONTS.map((font) => (
-              <FontRow
-                font={font}
-                key={font.id}
-                on={settings.font === font.id}
-                onPick={() => {
-                  pickFont(font.id);
-                }}
-              />
-            ))}
-          </Card>
-          <p className="text-muted-foreground px-0.5 text-[12px]">Menu bar</p>
-          <div className="grid grid-cols-3 gap-1.5">
-            {TRAY_ICONS.map((icon) => (
-              <button
-                aria-label={icon.label}
-                aria-pressed={settings.trayIcon === icon.id}
-                className={cn(
-                  "press relative flex flex-col items-center gap-1 rounded-xl py-2 shadow-[0_0_0_1px_rgba(0,0,0,0.08)] after:absolute after:-inset-0.5 after:content-['']",
-                  picked(settings.trayIcon === icon.id)
-                )}
-                key={icon.id}
-                onClick={() => {
-                  pickTray(icon.id);
-                }}
-                type="button"
-              >
-                <TrayGlyph id={icon.id} />
-                <span className="text-muted-foreground text-[10px] leading-none">
-                  {icon.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <Heading>Capture</Heading>
-          <p className="text-muted-foreground px-0.5 text-[12px]">Selection</p>
-          <CaptureBind
-            hint="Double-tap a modifier, or a shortcut that includes one"
-            onBind={onBind}
-            onSequence={onChord("capture")}
-            value={settings.capture}
-          />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Quick note</p>
-          <CaptureBind
-            hint="Floating note on this screen, without opening Slip"
-            onBind={onBind}
-            onSequence={onChord("noteCapture")}
-            value={settings.noteCapture}
-          />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Voice</p>
-          <CaptureBind
-            hint="Hold to talk. Double-tap to latch."
-            onBind={onBind}
-            onSequence={onChord("voiceCapture")}
-            value={settings.voiceCapture}
-          />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Draw</p>
-          <CaptureBind
-            hint="Hold ⌘ and double-tap ⇧, or record your own"
-            onBind={onBind}
-            onSequence={onChord("drawCapture")}
-            presets={false}
-            value={settings.drawCapture}
-          />
-          <Card>
-            <SpeechSettings onChange={onChange} settings={settings} />
-          </Card>
-          <Card>
-            <SettingsRow
-              detail="A banner when a selection lands"
-              label="Notify"
-            >
-              <Switch
-                aria-label="Notify on capture"
-                checked={settings.notify}
-                onCheckedChange={(notify) => onChange({ ...settings, notify })}
-                size="sm"
-              />
-            </SettingsRow>
-            <SettingsRow
-              detail="Keep finished slips in the list"
-              label="Show done"
-            >
-              <Switch
-                aria-label="Show done slips"
-                checked={settings.showDone}
-                onCheckedChange={(showDone) =>
-                  onChange({ ...settings, showDone })
-                }
-                size="sm"
-              />
-            </SettingsRow>
-          </Card>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <Heading>Keys</Heading>
-          <SettingsKeys
-            onBind={onBind}
-            onChange={onChange}
-            settings={settings}
-          />
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <Heading>Mac</Heading>
-          <DockLook dark={dark} />
-          <Card>
-            <SettingsRow label="Always on top">
-              <Switch
-                aria-label="Always on top"
-                checked={settings.alwaysOnTop}
-                onCheckedChange={(alwaysOnTop) =>
-                  onChange({ ...settings, alwaysOnTop })
-                }
-                size="sm"
-              />
-            </SettingsRow>
-            <SettingsRow label="Show in Dock">
-              <Switch
-                aria-label="Show in Dock"
-                checked={settings.dock}
-                onCheckedChange={(dock) => onChange({ ...settings, dock })}
-                size="sm"
-              />
-            </SettingsRow>
-            <SettingsRow detail={loginDetail} label="Start at login">
-              <Switch
-                aria-label="Start at login"
-                checked={login === "on"}
-                disabled={login === "unavailable"}
-                onCheckedChange={(on) => {
-                  onLogin(on ? "on" : "off");
-                  window.slip
-                    .setLogin(on)
-                    .then(onLogin)
-                    .catch(() => undefined);
-                }}
-                size="sm"
-              />
-            </SettingsRow>
-            <SettingsRow detail={vaultLabel(settings.vaultPath)} label="Vault">
-              <div className="flex gap-0.5">
-                <Button
-                  className="press"
-                  onClick={() => {
-                    window.slip
-                      .pickVault()
-                      .then((folder) => {
-                        if (folder !== null && folder !== settings.vaultPath) {
-                          onChange({ ...settings, vaultPath: folder });
-                        }
-                      })
-                      .catch(() => undefined);
-                  }}
-                  size="xs"
-                  variant="ghost"
-                >
-                  Change
-                </Button>
-                <Button
-                  className="press"
-                  onClick={() => {
-                    window.slip.openVault().catch(() => undefined);
-                  }}
-                  size="xs"
-                  variant="ghost"
-                >
-                  <HugeiconsIcon className="size-3" icon={Folder02Icon} />
-                  Open
-                </Button>
-              </div>
-            </SettingsRow>
-            <SettingsRow detail={skillDetail} label="Skill">
-              <Button
-                className="press"
-                onClick={() => {
-                  window.slip
-                    .installSkill()
-                    .then(setSkill)
-                    .catch(() => undefined);
-                }}
-                size="xs"
-                variant="ghost"
-              >
-                {skillLabel}
-              </Button>
-            </SettingsRow>
-            <SettingsRow
-              detail="Every few hours, from GitHub releases"
-              label="Check for updates"
-            >
-              <Switch
-                aria-label="Check for updates"
-                checked={settings.checkUpdates}
-                onCheckedChange={(checkUpdates) =>
-                  onChange({ ...settings, checkUpdates })
-                }
-                size="sm"
-              />
-            </SettingsRow>
-          </Card>
+          ) : null}
         </section>
       </div>
     </ScrollArea>
