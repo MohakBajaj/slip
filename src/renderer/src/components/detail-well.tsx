@@ -2,6 +2,7 @@ import { PreviewCard } from "@base-ui/react/preview-card";
 import {
   Archive02Icon,
   ArchiveRestoreIcon,
+  BrushIcon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
   Copy01Icon,
@@ -49,6 +50,27 @@ const storedMemo = (text: string, hasAudio: boolean): string => {
     return text;
   }
   return hasAudio ? "Voice note" : "";
+};
+
+// Reopen plus a labeled Memo button overshoots the 340px window. Below this
+// width Memo/Save stay icon-only so the row keeps at least 8px of slack.
+const NARROW_ACTION_MQ = "(max-width: 355px)";
+
+const useNarrowActions = (): boolean => {
+  const [narrow, setNarrow] = useState(
+    () => window.matchMedia(NARROW_ACTION_MQ).matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_ACTION_MQ);
+    const onChange = (): void => {
+      setNarrow(mq.matches);
+    };
+    mq.addEventListener("change", onChange);
+    return () => {
+      mq.removeEventListener("change", onChange);
+    };
+  }, []);
+  return narrow;
 };
 
 const clock = (secs: number): string => {
@@ -340,6 +362,7 @@ export const DetailWell = ({
 }) => {
   const [tag, setTag] = useState("");
   const [note, setNote] = useState(slip.content);
+  const narrowActions = useNarrowActions();
   const picker = useRef<HTMLInputElement>(null);
   const drop = useFileDrop(onAddImages);
   const noteRef = useRef(note);
@@ -587,7 +610,7 @@ export const DetailWell = ({
         </Button>
       </div>
 
-      <footer className="flex items-center gap-1 px-2.5 pt-1 pb-1.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)]">
+      <footer className="flex min-w-0 items-center gap-1 px-2.5 pt-1 pb-1.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)]">
         <ButtonGroup>
           <Action
             icon={slip.done ? ReloadIcon : CheckmarkCircle02Icon}
@@ -613,7 +636,7 @@ export const DetailWell = ({
           <Action
             icon={PencilEdit01Icon}
             label={editing ? "Save" : "Memo"}
-            named
+            named={!narrowActions}
             on={editing}
             onClick={() => {
               if (editing) {
@@ -623,26 +646,22 @@ export const DetailWell = ({
               startEdit();
             }}
           />
+          {slip.images.length > 0 ? (
+            <Action
+              icon={BrushIcon}
+              label="Annotate"
+              onClick={() => {
+                const [imagePath] = slip.images;
+                if (imagePath === undefined) {
+                  return;
+                }
+                window.slip
+                  .openDraw({ imagePath, slipId: slip.id })
+                  .catch(() => undefined);
+              }}
+            />
+          ) : null}
         </ButtonGroup>
-        {slip.images.length > 0 ? (
-          <Button
-            className="press"
-            onClick={() => {
-              const [imagePath] = slip.images;
-              if (imagePath === undefined) {
-                return;
-              }
-              window.slip
-                .openDraw({ imagePath, slipId: slip.id })
-                .catch(() => undefined);
-            }}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            Annotate
-          </Button>
-        ) : null}
         <CopyGroup slip={slip} />
       </footer>
     </section>
