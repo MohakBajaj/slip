@@ -1113,6 +1113,16 @@ const App = () => {
 
       {helpOpen ? (
         <Cheatsheet
+          anywhere={[
+            {
+              keys: formatCapture(settings.annotateOut),
+              label: "Annotate anywhere",
+            },
+            {
+              keys: formatCapture(settings.dictateCapture),
+              label: "Dictate anywhere",
+            },
+          ]}
           onClose={() => {
             setHelpOpen(false);
           }}

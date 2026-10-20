@@ -43,11 +43,16 @@ import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
+import { annotatePlan } from "../shared/paste-out";
 import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
 import { VOICE_SOURCE } from "../shared/speech";
 import type { VoiceStatus } from "../shared/speech";
-import { slipSpeechCost, transcriptionSpend } from "../shared/speech-cost";
+import {
+  formatUsd,
+  slipSpeechCost,
+  transcriptionSpend,
+} from "../shared/speech-cost";
 import type { SpeechStepCost } from "../shared/speech-cost";
 import { localTranscribers } from "../shared/speech-engines";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
@@ -91,6 +96,7 @@ import {
   primeGatewayModels,
   refreshGatewayModels,
 } from "./gateway-catalog";
+import { grabRegion, pasteOutText } from "./paste-out";
 import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
 import type { VoiceTranscript } from "./transcribe";
 import { startUpdater } from "./updater";
@@ -497,6 +503,8 @@ const trayTemplate = (): MenuItemConstructorOptions[] => {
     { click: () => showNote(), label: "Quick Note" },
     { click: () => showVoice(), label: "Voice Slip" },
     { click: () => showDraw(), label: "Draw" },
+    { click: () => showAnnotateOut(), label: "Annotate" },
+    { click: () => toggleDictate(), label: "Dictate" },
     {
       click: () => {
         shell.openPath(vaultRoot()).catch(() => undefined);
@@ -747,13 +755,39 @@ const ingest = (event: CaptureEvent): void => {
   })();
 };
 
+const chordsChanged = (prev: Settings, next: Settings): boolean =>
+  !(
+    sameCapture(next.annotateOut, prev.annotateOut) &&
+    sameCapture(next.capture, prev.capture) &&
+    sameCapture(next.dictateCapture, prev.dictateCapture) &&
+    sameCapture(next.drawCapture, prev.drawCapture) &&
+    sameCapture(next.noteCapture, prev.noteCapture) &&
+    sameCapture(next.voiceCapture, prev.voiceCapture)
+  );
+
 const bootCapture = (): void => {
   captureCtl?.stop();
   try {
     captureCtl = startCapture({
+      annotateSequence: settings.annotateOut,
+      dictateOpen,
+      dictateSequence: settings.dictateCapture,
       drawSequence: settings.drawCapture,
       imageDir: path.join(vaultRoot(), "attachments", "inbox"),
       noteSequence: settings.noteCapture,
+      onAnnotate: showAnnotateOut,
+      onDictateCancel: () => {
+        hideVoice();
+      },
+      onDictateHold: () => {
+        holdDictate();
+      },
+      onDictateRelease: () => {
+        releaseVoice();
+      },
+      onDictateTap: () => {
+        toggleDictate();
+      },
       onDraw: showDraw,
       onEvent: ingest,
       onNote: showNote,
@@ -899,14 +933,17 @@ const askMic = async (): Promise<boolean> => {
   return await systemPreferences.askForMediaAccess("microphone");
 };
 
+let voiceOut = false;
+
 const placeVoice = (target: BrowserWindow): void => {
   const area = screen.getDisplayNearestPoint(
     screen.getCursorScreenPoint()
   ).workArea;
   const [width, height] = target.getSize();
+  const top = voiceOut ? 28 : area.height - height - 56;
   target.setPosition(
     Math.round(area.x + (area.width - width) / 2),
-    Math.round(area.y + area.height - height - 56)
+    Math.round(area.y + top)
   );
 };
 
@@ -916,6 +953,7 @@ let voiceReady = false;
 let voiceJob: AbortController | null = null;
 
 const hideVoice = (): void => {
+  voiceOut = false;
   voiceJob?.abort();
   voiceJob = null;
   voiceGen += 1;
@@ -957,7 +995,31 @@ const releaseVoice = (): void => {
   flushVoice();
 };
 
+const dictateOpen = (): boolean =>
+  voiceOut && voiceWin !== null && !voiceWin.isDestroyed();
+
+const toggleDictate = (): void => {
+  if (dictateOpen()) {
+    releaseVoice();
+    return;
+  }
+  if (voiceWin && !voiceWin.isDestroyed()) {
+    return;
+  }
+  voiceOut = true;
+  showVoice("open");
+};
+
+const holdDictate = (): void => {
+  if (voiceWin && !voiceWin.isDestroyed() && !voiceOut) {
+    return;
+  }
+  voiceOut = true;
+  showVoice("hold");
+};
+
 const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
+  const out = voiceOut;
   voiceGen += 1;
   const gen = voiceGen;
   voiceCtx = startFrontContext([app.getName(), "Electron"]);
@@ -976,7 +1038,7 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
     voiceWin = new BrowserWindow({
       alwaysOnTop: true,
       backgroundColor: windowHex(),
-      focusable: true,
+      focusable: !out,
       frame: false,
       height: 52,
       maximizable: false,
@@ -995,6 +1057,9 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
         webgl: false,
       },
       width: 280,
+      ...(out && process.platform === "darwin"
+        ? { type: "panel" as const }
+        : {}),
     });
     pinWorkspace(voiceWin);
     voiceWin.on("ready-to-show", () => {
@@ -1004,12 +1069,20 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
       voiceWin = null;
       applyDock(settings.dock);
     });
-    loadHashPage(voiceWin, "voice");
+    loadHashPage(voiceWin, out ? "voice-out" : "voice");
   })();
 };
 
 let drawAttach = false;
+let drawLoose = "";
 let drawTarget: DrawTarget | null = null;
+
+const drawMode = (): "attach" | "out" | "slip" => {
+  if (drawLoose.length > 0) {
+    return "out";
+  }
+  return drawAttach ? "attach" : "slip";
+};
 
 const hideDraw = (): void => {
   if (drawWin && !drawWin.isDestroyed()) {
@@ -1017,11 +1090,12 @@ const hideDraw = (): void => {
   }
   drawWin = null;
   drawAttach = false;
+  drawLoose = "";
   drawTarget = null;
 };
 
 const tellDrawMode = (): void => {
-  drawWin?.webContents.send("draw-mode", drawAttach ? "attach" : "slip");
+  drawWin?.webContents.send("draw-mode", drawMode());
 };
 
 const tellDrawTarget = (): void => {
@@ -1051,10 +1125,41 @@ const parseDrawOpen = (
   return { attach, target: { imagePath, slipId } };
 };
 
-const showDraw = (attach = false, target: DrawTarget | null = null): void => {
+const showAnnotateOut = (): void => {
+  const image = clipboard.readImage();
+  const png = image.isEmpty() ? null : image.toPNG();
+  const hasImage = png !== null && png.byteLength > 0;
+  if (annotatePlan(hasImage) === "clipboard" && png) {
+    const file = path.join(
+      app.getPath("temp"),
+      `slip-annotate-${Date.now()}.png`
+    );
+    writeFileSync(file, png);
+    showDraw(false, null, file);
+    return;
+  }
+  void grabRegion().then((file) => {
+    if (file) {
+      showDraw(false, null, file);
+    }
+  });
+};
+
+const showDraw = (
+  attach = false,
+  target: DrawTarget | null = null,
+  loose = ""
+): void => {
   drawAttach = attach;
   drawTarget = target;
+  drawLoose = loose;
+  const out = loose.length > 0;
   if (drawWin && !drawWin.isDestroyed()) {
+    drawWin.setAlwaysOnTop(out || settings.alwaysOnTop);
+    if (out) {
+      drawWin.setMinimumSize(520, 360);
+      drawWin.setSize(640, 480);
+    }
     tellDrawMode();
     tellDrawTarget();
     tellSettings();
@@ -1065,17 +1170,21 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
   const area = screen.getDisplayNearestPoint(
     screen.getCursorScreenPoint()
   ).workArea;
-  const width = Math.min(880, Math.round(area.width * 0.58));
-  const height = Math.min(620, Math.round(area.height * 0.68));
+  const width = out
+    ? Math.min(640, Math.max(520, area.width - 48))
+    : Math.min(880, Math.round(area.width * 0.58));
+  const height = out
+    ? Math.min(480, Math.max(360, area.height - 80))
+    : Math.min(620, Math.round(area.height * 0.68));
   drawWin = new BrowserWindow({
-    alwaysOnTop: settings.alwaysOnTop,
+    alwaysOnTop: out || settings.alwaysOnTop,
     backgroundColor: windowHex(),
     height,
-    minHeight: 400,
+    minHeight: out ? 360 : 400,
     // Compact header fits at 797. 24px of slack for macOS fonts and traffic lights.
-    minWidth: 821,
+    minWidth: out ? 520 : 821,
     show: false,
-    title: "Slip Draw",
+    title: out ? "Annotate" : "Slip Draw",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
@@ -1086,6 +1195,7 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
       webgl: false,
     },
     width,
+    ...(out && process.platform === "darwin" ? { type: "panel" as const } : {}),
   });
   pinWorkspace(drawWin);
   drawWin.on("ready-to-show", () => {
@@ -1107,6 +1217,7 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
   drawWin.on("closed", () => {
     drawWin = null;
     drawAttach = false;
+    drawLoose = "";
     drawTarget = null;
     applyDock(settings.dock);
   });
@@ -1415,11 +1526,7 @@ const boot = async (): Promise<void> => {
     const prevBg = windowHex();
     const prevDark = isDark();
     saveSettings(next);
-    const captureChanged =
-      !sameCapture(settings.capture, prev.capture) ||
-      !sameCapture(settings.voiceCapture, prev.voiceCapture) ||
-      !sameCapture(settings.drawCapture, prev.drawCapture) ||
-      !sameCapture(settings.noteCapture, prev.noteCapture);
+    const captureChanged = chordsChanged(prev, settings);
     const vaultChanged = settings.vaultPath !== prev.vaultPath;
     if (settings.dock !== prev.dock) {
       applyDock(settings.dock);
@@ -1432,7 +1539,7 @@ const boot = async (): Promise<void> => {
     if (settings.alwaysOnTop !== prev.alwaysOnTop) {
       win?.setAlwaysOnTop(settings.alwaysOnTop);
       previewWin?.setAlwaysOnTop(settings.alwaysOnTop);
-      drawWin?.setAlwaysOnTop(settings.alwaysOnTop);
+      drawWin?.setAlwaysOnTop(drawLoose.length > 0 || settings.alwaysOnTop);
     }
     if (settings.scheme !== prev.scheme) {
       applyThemeSource();
@@ -1455,6 +1562,8 @@ const boot = async (): Promise<void> => {
         captureCtl.setVoiceSequence(settings.voiceCapture);
         captureCtl.setDrawSequence(settings.drawCapture);
         captureCtl.setNoteSequence(settings.noteCapture);
+        captureCtl.setAnnotateSequence(settings.annotateOut);
+        captureCtl.setDictateSequence(settings.dictateCapture);
       } else {
         bootCapture();
       }
@@ -1503,10 +1612,17 @@ const boot = async (): Promise<void> => {
           },
     });
   };
+  const voiceReply = (
+    error: string,
+    slip: Slip | null,
+    notice = "",
+    costLabel = ""
+  ) => ({ costLabel, error, notice, slip });
   ipcMain.handle("createVoiceSlip", async (event, wav: unknown) => {
+    const out = voiceOut;
     const bytes = asBytes(wav);
     if (bytes === undefined) {
-      return { error: "", slip: null };
+      return voiceReply("", null);
     }
     voiceJob?.abort();
     const job = new AbortController();
@@ -1520,7 +1636,7 @@ const boot = async (): Promise<void> => {
       ? await voiceCtx.ready.catch(() => emptyContext())
       : emptyContext();
     if (job.signal.aborted) {
-      return { error: "", slip: null };
+      return voiceReply("", null);
     }
     try {
       const spoken = await transcribeVoice({
@@ -1539,7 +1655,7 @@ const boot = async (): Promise<void> => {
       });
       if (spoken === null || job.signal.aborted) {
         hideVoice();
-        return { error: "", slip: null };
+        return voiceReply("", null);
       }
       let body = spoken.text;
       let cleanupCost: SpeechStepCost | null = null;
@@ -1557,37 +1673,70 @@ const boot = async (): Promise<void> => {
           signal: job.signal,
         });
         if (job.signal.aborted) {
-          return { error: "", slip: null };
+          return voiceReply("", null);
         }
         const { cost, outcome } = cleaned;
         ({ body } = outcome);
         cleanupCost = cost;
       }
-      ensureVault(vaultRoot());
-      const slip = createSlip(vaultRoot(), {
-        content: body,
-        cost: voiceSlipCost(spoken, cleanupCost),
-        page: ctx.page,
-        section: currentSection,
-        source: VOICE_SOURCE,
-        transcript: spoken.text,
-        url: ctx.url,
-      });
-      if (settings.notify && Notification.isSupported()) {
-        new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
+      const spent = voiceSlipCost(spoken, cleanupCost);
+      const costLabel = spent.total > 0 ? formatUsd(spent.total) : "";
+      const keep = (): Slip => {
+        ensureVault(vaultRoot());
+        const slip = createSlip(vaultRoot(), {
+          content: body,
+          cost: spent,
+          page: ctx.page,
+          section: currentSection,
+          source: VOICE_SOURCE,
+          transcript: spoken.text,
+          url: ctx.url,
+        });
+        if (settings.notify && Notification.isSupported()) {
+          new Notification({
+            body: titleOf(slip.content),
+            title: "Slip",
+          }).show();
+        }
+        send("slips-changed");
+        rebuildTray();
+        return slip;
+      };
+      const finishOut = async () => {
+        const outcome = await pasteOutText(body);
+        if (job.signal.aborted) {
+          return voiceReply("", null);
+        }
+        const slip =
+          settings.keepDictations && body.trim().length > 0 ? keep() : null;
+        if (outcome === "copied") {
+          return voiceReply(
+            "",
+            slip,
+            "Copied. Allow Accessibility to paste.",
+            costLabel
+          );
+        }
+        if (outcome === "empty") {
+          hideVoice();
+          return voiceReply("", slip);
+        }
+        return voiceReply("", slip, "", costLabel);
+      };
+      if (out) {
+        return await finishOut();
       }
-      send("slips-changed");
-      rebuildTray();
+      const slip = keep();
       hideVoice();
-      return { error: "", slip };
+      return voiceReply("", slip);
     } catch (error) {
       if (job.signal.aborted || error instanceof SpeechAbortedError) {
-        return { error: "", slip: null };
+        return voiceReply("", null);
       }
       const message =
         error instanceof Error ? error.message : "Could not transcribe";
       tell({ error: message, phase: "error", received: 0, total: 0 });
-      return { error: message, slip: null };
+      return voiceReply(message, null);
     } finally {
       if (voiceJob === job) {
         voiceJob = null;
@@ -1638,9 +1787,27 @@ const boot = async (): Promise<void> => {
     showDraw(open.attach, open.target);
   });
   ipcMain.handle("drawSession", () => ({
-    mode: drawAttach ? "attach" : "slip",
+    mode: drawMode(),
     target: drawTarget,
   }));
+  ipcMain.handle("readOutImage", () => {
+    if (drawLoose.length === 0) {
+      return null;
+    }
+    const temp = path.resolve(app.getPath("temp"));
+    const resolved = path.resolve(drawLoose);
+    const base = path.basename(resolved);
+    const named =
+      base.startsWith("slip-annotate-") || base.startsWith("slip-region-");
+    if (
+      !named ||
+      !resolved.startsWith(`${temp}${path.sep}`) ||
+      !existsSync(resolved)
+    ) {
+      return null;
+    }
+    return new Uint8Array(readFileSync(resolved));
+  });
   ipcMain.handle("readAttachment", (_e, filePath: unknown) => {
     if (typeof filePath !== "string") {
       return null;
@@ -1950,6 +2117,14 @@ const boot = async (): Promise<void> => {
           {
             click: () => showDraw(),
             label: "Draw",
+          },
+          {
+            click: () => showAnnotateOut(),
+            label: "Annotate",
+          },
+          {
+            click: () => toggleDictate(),
+            label: "Dictate",
           },
           {
             click: () => {

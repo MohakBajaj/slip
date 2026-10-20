@@ -16,7 +16,7 @@ export interface DrawTarget {
 }
 
 export interface DrawSession {
-  mode: "attach" | "slip";
+  mode: "attach" | "out" | "slip";
   target: DrawTarget | null;
 }
 

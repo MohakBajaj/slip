@@ -39,6 +39,23 @@ describe("voice hold", () => {
     expect(hold.push({ flags: FLAG_OPTION | 0x01, type: "flags" })).toBe("arm");
   });
 
+  test("Option Space releases on keyup", () => {
+    const hold = createVoiceHold(["Option+Space"]);
+    expect(hold.push({ code: 0x31, flags: FLAG_OPTION, type: "key" })).toBe(
+      "arm"
+    );
+    expect(hold.push({ code: 0x31, flags: FLAG_OPTION, type: "up" })).toBe(
+      "tap"
+    );
+    expect(hold.push({ code: 0x31, flags: FLAG_OPTION, type: "key" })).toBe(
+      "arm"
+    );
+    hold.markStarted();
+    expect(hold.push({ code: 0x31, flags: FLAG_OPTION, type: "up" })).toBe(
+      "end"
+    );
+  });
+
   test("a key chord arms on the key", () => {
     const hold = createVoiceHold(["Mod+Shift+V"]);
     expect(

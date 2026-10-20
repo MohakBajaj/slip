@@ -12,7 +12,7 @@ import type { MatchInput } from "./capture-match";
 
 export const HOLD_MS = 180;
 
-export type HoldAction = "arm" | "cancel" | "disarm" | "end";
+export type HoldAction = "arm" | "cancel" | "disarm" | "end" | "tap";
 
 type HoldTarget =
   | { code: number; kind: "key"; mask: number }
@@ -94,6 +94,17 @@ export const createVoiceHold = (seq: string[]) => {
       return null;
     }
     const flags = event.flags & MOD_FLAGS;
+    if (event.type === "up") {
+      if (target.kind === "key" && down && event.code === target.code) {
+        down = false;
+        if (live) {
+          live = false;
+          return "end";
+        }
+        return "tap";
+      }
+      return null;
+    }
     if (event.type === "key") {
       if (target.kind === "key") {
         if (event.code === target.code && flags === target.mask) {

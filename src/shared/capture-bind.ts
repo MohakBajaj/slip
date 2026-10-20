@@ -82,17 +82,25 @@ export const defaultDrawCapture = (): string[] => ["Mod+Shift", "Mod+Shift"];
 export const defaultNoteCapture = (): string[] =>
   unusedCapture(defaultCapture(), defaultVoiceCapture());
 
+export const defaultAnnotateOut = (): string[] => ["Control+Option+A"];
+
+export const defaultDictateCapture = (): string[] => ["Option+Space"];
+
 export const CAPTURE_FIELDS = [
   "capture",
   "voiceCapture",
   "drawCapture",
   "noteCapture",
+  "annotateOut",
+  "dictateCapture",
 ] as const;
 
 export type CaptureField = (typeof CAPTURE_FIELDS)[number];
 
 export interface CaptureChords {
+  annotateOut: string[];
   capture: string[];
+  dictateCapture: string[];
   drawCapture: string[];
   noteCapture: string[];
   voiceCapture: string[];
@@ -105,7 +113,10 @@ export const assignCapture = (
 ): CaptureChords => {
   const chosen = [...next];
   const out: CaptureChords = {
+    annotateOut: field === "annotateOut" ? chosen : [...current.annotateOut],
     capture: field === "capture" ? chosen : [...current.capture],
+    dictateCapture:
+      field === "dictateCapture" ? chosen : [...current.dictateCapture],
     drawCapture: field === "drawCapture" ? chosen : [...current.drawCapture],
     noteCapture: field === "noteCapture" ? chosen : [...current.noteCapture],
     voiceCapture: field === "voiceCapture" ? chosen : [...current.voiceCapture],
@@ -168,6 +179,16 @@ export const sanitizeNoteCapture = (
   raw: unknown,
   ...taken: string[][]
 ): string[] => sanitizeFreeCapture(raw, defaultNoteCapture(), taken);
+
+export const sanitizeAnnotateOut = (
+  raw: unknown,
+  ...taken: string[][]
+): string[] => sanitizeFreeCapture(raw, defaultAnnotateOut(), taken);
+
+export const sanitizeDictateCapture = (
+  raw: unknown,
+  ...taken: string[][]
+): string[] => sanitizeFreeCapture(raw, defaultDictateCapture(), taken);
 
 export const sanitizeCapture = (
   raw: unknown,

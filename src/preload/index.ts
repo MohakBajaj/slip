@@ -45,7 +45,9 @@ const api = {
     ipcRenderer.invoke("createSlip", content, images) as Promise<Slip | null>,
   createVoiceSlip: (wav: Uint8Array) =>
     ipcRenderer.invoke("createVoiceSlip", wav) as Promise<{
+      costLabel: string;
       error: string;
+      notice: string;
       slip: Slip | null;
     }>,
   deleteSlips: (ids: string[]) =>
@@ -91,8 +93,8 @@ const api = {
       ipcRenderer.removeListener("draw-attach", listener);
     };
   },
-  onDrawMode: (fn: (mode: "attach" | "slip") => void) => {
-    const listener = (_: unknown, mode: "attach" | "slip") => fn(mode);
+  onDrawMode: (fn: (mode: "attach" | "out" | "slip") => void) => {
+    const listener = (_: unknown, mode: "attach" | "out" | "slip") => fn(mode);
     ipcRenderer.on("draw-mode", listener);
     return () => {
       ipcRenderer.removeListener("draw-mode", listener);
@@ -183,6 +185,8 @@ const api = {
       "readAttachment",
       filePath
     ) as Promise<Uint8Array | null>,
+  readOutImage: () =>
+    ipcRenderer.invoke("readOutImage") as Promise<Uint8Array | null>,
   restoreSlips: (slips: Slip[], drop: string[] = []) =>
     ipcRenderer.invoke("restoreSlips", slips, drop),
   saveNote: (content: string) =>

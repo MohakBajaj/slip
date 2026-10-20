@@ -269,6 +269,8 @@ export const DrawApp = () => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [attach, setAttach] = useState(false);
+  const [out, setOut] = useState(false);
+  const outRef = useRef(false);
   const [plate, setPlate] = useState<{ slipId: string; url: string } | null>(
     null
   );
@@ -514,9 +516,14 @@ export const DrawApp = () => {
       return;
     }
     const ok = await window.slip.copyImage(bytes);
-    if (ok) {
-      showFlash("Copied");
+    if (!ok) {
+      return;
     }
+    if (outRef.current) {
+      await window.slip.closeDraw();
+      return;
+    }
+    showFlash("Copied");
   };
 
   const save = async (): Promise<void> => {
@@ -612,9 +619,38 @@ export const DrawApp = () => {
       if (gone) {
         return;
       }
+      const loose = session.mode === "out";
+      outRef.current = loose;
       setAttach(session.mode === "attach");
+      setOut(loose);
       if (session.target) {
         openTarget(session.target);
+        return;
+      }
+      if (loose) {
+        const bytes = await window.slip.readOutImage();
+        if (gone) {
+          return;
+        }
+        if (bytes === null) {
+          showFlash("Couldn't read image");
+          return;
+        }
+        const copyBytes = Uint8Array.from(bytes);
+        const url = URL.createObjectURL(
+          new Blob([copyBytes], { type: "image/png" })
+        );
+        const img = await loadImage(url);
+        if (gone) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        if (img === null) {
+          URL.revokeObjectURL(url);
+          showFlash("Couldn't read image");
+          return;
+        }
+        placePlate(img, url, "");
         return;
       }
       if (offeredRef.current) {
@@ -633,7 +669,10 @@ export const DrawApp = () => {
     };
     boot().catch(() => undefined);
     const offMode = window.slip.onDrawMode((mode) => {
+      const loose = mode === "out";
+      outRef.current = loose;
       setAttach(mode === "attach");
+      setOut(loose);
     });
     const offTarget = window.slip.onDrawTarget((target) => {
       if (!target) {
@@ -904,6 +943,18 @@ export const DrawApp = () => {
   };
 
   const slipId = plate?.slipId ?? "";
+  let saveLabel = "Slip";
+  if (out) {
+    saveLabel = "Inbox";
+  } else if (attach || slipId.length > 0) {
+    saveLabel = "Add";
+  }
+  let heading = "Slip Draw";
+  if (flash.length > 0) {
+    heading = flash;
+  } else if (out || plate !== null) {
+    heading = "Annotate";
+  }
 
   return (
     <div
@@ -921,7 +972,7 @@ export const DrawApp = () => {
             src={dark ? darkIcon : lightIcon}
           />
           <p className="draw-chrome truncate text-[13px] font-medium">
-            {flash || (plate === null ? "Slip Draw" : "Annotate")}
+            {heading}
           </p>
         </div>
         <div
@@ -1054,7 +1105,7 @@ export const DrawApp = () => {
               onMouseDown={keepFocus}
               size="xs"
             >
-              {attach || slipId.length > 0 ? "Add" : "Slip"}
+              {saveLabel}
               <kbd className="draw-chrome text-[11px] font-medium opacity-70">
                 ⌘↵
               </kbd>

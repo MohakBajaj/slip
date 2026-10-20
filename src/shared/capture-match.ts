@@ -103,7 +103,8 @@ export type Compiled =
 
 export type MatchInput =
   | { flags: number; type: "flags" }
-  | { code: number; flags: number; type: "key" };
+  | { code: number; flags: number; type: "key" }
+  | { code: number; flags: number; type: "up" };
 
 const MASK: Record<CaptureMod, number> = {
   command: FLAG_COMMAND,
@@ -244,6 +245,9 @@ export const createCaptureMatcher = (
   };
 
   const push = (event: MatchInput): boolean => {
+    if (event.type === "up") {
+      return false;
+    }
     if (event.type === "flags") {
       return onFlags(event.flags & MOD_FLAGS);
     }

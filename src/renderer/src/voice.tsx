@@ -74,6 +74,16 @@ const blobToWav = async (blob: Blob): Promise<Uint8Array | null> => {
   }
 };
 
+const sideLabel = (out: boolean, status: string, secs: number): string => {
+  if (out) {
+    return "Esc";
+  }
+  if (status === "working") {
+    return "";
+  }
+  return clock(secs);
+};
+
 const problemCopy = (
   kind: "denied" | "error" | "failed",
   detail: string
@@ -119,10 +129,16 @@ const statusLabel = (status: VoiceStatus): string => {
   return "Downloading model";
 };
 
-export const VoiceApp = () => {
+export const VoiceApp = ({ out = false }: { out?: boolean }) => {
   const [settings, setSettings] = useState(defaultSettings);
   const [status, setStatus] = useState<
-    "asking" | "denied" | "error" | "failed" | "listening" | "working"
+    | "asking"
+    | "denied"
+    | "error"
+    | "failed"
+    | "listening"
+    | "notice"
+    | "working"
   >("asking");
   const [label, setLabel] = useState("");
   const [bars, setBars] = useState<number[]>(() =>
@@ -177,6 +193,19 @@ export const VoiceApp = () => {
       if (result.error) {
         setStatus("error");
         setLabel(result.error);
+        return;
+      }
+      if (result.notice.length > 0) {
+        setStatus("notice");
+        setLabel(result.notice);
+        return;
+      }
+      if (result.costLabel.length > 0) {
+        setStatus("working");
+        setLabel(result.costLabel);
+        window.setTimeout(() => {
+          void window.slip.closeVoice();
+        }, 900);
         return;
       }
       void window.slip.closeVoice();
@@ -435,6 +464,10 @@ export const VoiceApp = () => {
   }, [dark, settings.accent, settings.font, settings.theme]);
 
   const live = status === "listening";
+  let problem: "denied" | "error" | "failed" | null = null;
+  if (status === "denied" || status === "failed" || status === "error") {
+    problem = status;
+  }
 
   return (
     <div
@@ -443,13 +476,44 @@ export const VoiceApp = () => {
         dark && "dark"
       )}
     >
-      {status === "denied" || status === "failed" || status === "error" ? (
+      {status === "notice" ? (
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <p
             className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]"
-            title={problemCopy(status, label)}
+            title={label}
           >
-            {problemCopy(status, label)}
+            {label}
+          </p>
+          <Button
+            className="press"
+            onClick={() => {
+              void window.slip.openAccess();
+            }}
+            size="xs"
+          >
+            Open Settings
+          </Button>
+          <Button
+            aria-label="Dismiss"
+            className="press"
+            onClick={() => {
+              drop();
+              void window.slip.closeVoice();
+            }}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      ) : null}
+      {problem ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p
+            className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]"
+            title={problemCopy(problem, label)}
+          >
+            {problemCopy(problem, label)}
           </p>
           <Button
             className="press"
@@ -481,7 +545,8 @@ export const VoiceApp = () => {
             <X className="size-3.5" />
           </Button>
         </div>
-      ) : (
+      ) : null}
+      {status === "notice" || problem !== null ? null : (
         <>
           <span
             aria-hidden
@@ -497,8 +562,13 @@ export const VoiceApp = () => {
           ) : (
             <Wave bars={bars} live={live} />
           )}
-          <span className="text-muted-foreground w-8 shrink-0 text-right text-[11px] tabular-nums">
-            {status === "working" ? "" : clock(secs)}
+          <span
+            className={cn(
+              "text-muted-foreground shrink-0 text-[11px]",
+              out ? "font-mono" : "w-8 text-right tabular-nums"
+            )}
+          >
+            {sideLabel(out, status, secs)}
           </span>
           <Button
             aria-label="Discard"
