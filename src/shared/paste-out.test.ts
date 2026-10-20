@@ -51,6 +51,35 @@ test("paste saves the clipboard, posts paste, then restores", async () => {
   expect(restored).toBe(before);
 });
 
+test("no accessibility never calls pasteboard or key injection", async () => {
+  let ffi = 0;
+  const touch = (): void => {
+    ffi += 1;
+  };
+  const outcome = await pasteIntoFocus("hello", {
+    paste: () => {
+      touch();
+      return true;
+    },
+    read: () => {
+      touch();
+      return snap("old");
+    },
+    restore: () => {
+      touch();
+    },
+    trusted: false,
+    wait: async () => {
+      touch();
+    },
+    writeText: (text) => {
+      expect(text).toBe("hello");
+    },
+  });
+  expect(outcome).toBe("copied");
+  expect(ffi).toBe(0);
+});
+
 test("no accessibility copies the text and does not paste", async () => {
   const order: string[] = [];
   const outcome = await pasteIntoFocus("hello", {
