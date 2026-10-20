@@ -6,6 +6,7 @@ import {
   annotatePlan,
   pasteIntoFocus,
   regionFileOk,
+  voicePillWidth,
 } from "./paste-out";
 
 const snap = (label: string): PasteSnap => ({
@@ -112,6 +113,17 @@ test("blank text does nothing", async () => {
   });
   expect(outcome).toBe("empty");
   expect(writes).toBe(0);
+});
+
+test("paste waits long enough for the focused app to read the clipboard", () => {
+  expect(PASTE_SETTLE_MS).toBe(350);
+});
+
+test("a dictate notice widens the pill enough for the full sentence", () => {
+  expect(voicePillWidth("")).toBe(280);
+  expect(
+    voicePillWidth("Copied. Allow Accessibility to paste.")
+  ).toBeGreaterThan(280);
 });
 
 test("annotate uses the clipboard image, otherwise a region", () => {

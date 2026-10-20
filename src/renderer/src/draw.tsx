@@ -35,6 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
+  ANNOTATE_INK,
   blankExportScale,
   cameraForFrame,
   EXPORT_MARGIN,
@@ -623,6 +624,10 @@ export const DrawApp = () => {
       outRef.current = loose;
       setAttach(session.mode === "attach");
       setOut(loose);
+      if (loose) {
+        setColor(ANNOTATE_INK);
+        editorRef.current?.setStyle("color", ANNOTATE_INK);
+      }
       if (session.target) {
         openTarget(session.target);
         return;
@@ -901,6 +906,9 @@ export const DrawApp = () => {
 
   const mount = (editor: Editor): void => {
     editorRef.current = editor;
+    if (outRef.current) {
+      editor.setStyle("color", ANNOTATE_INK);
+    }
     installPlateLayer(editor, () => {
       const { current } = plateRef;
       if (!current || current.frame.w <= 0 || current.frame.h <= 0) {
@@ -963,7 +971,7 @@ export const DrawApp = () => {
       data-font={settings.font}
       data-theme={settings.theme}
     >
-      <header className="drag flex h-9.5 shrink-0 items-center gap-2 pr-2.5">
+      <header className="drag flex min-h-9.5 shrink-0 flex-wrap items-center gap-2 py-1 pr-2.5">
         <div className="flex min-w-28 shrink-0 items-center gap-1.5 pl-20">
           <img
             alt=""
@@ -975,11 +983,8 @@ export const DrawApp = () => {
             {heading}
           </p>
         </div>
-        <div
-          className="flex min-w-0 flex-1 overflow-x-auto"
-          style={{ justifyContent: "safe center" }}
-        >
-          <div className="bg-card/92 no-drag flex items-center gap-0.5 rounded-xl px-1 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
+        <div className="flex min-w-0 flex-1 justify-center">
+          <div className="bg-card/92 no-drag flex flex-wrap items-center justify-center gap-0.5 rounded-xl px-1 py-0.5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
             {TOOLS.map((item) => (
               <Tip hint={item.hint} key={item.id} label={item.label}>
                 <Chip

@@ -101,7 +101,7 @@ describe("note capture bind", () => {
     expect(new Set(chords).size).toBe(4);
     expect(next.noteCapture).toEqual(["Control", "Control"]);
     expect(next.annotateOut).toEqual(["Control+Option+A"]);
-    expect(next.dictateCapture).toEqual(["Option+Space"]);
+    expect(next.dictateCapture).toEqual(["Control+Option+Space"]);
     expect(next.keepDictations).toBe(false);
     const collided = sanitizeSettings({
       capture: ["Control", "Control"],
@@ -117,7 +117,7 @@ describe("note capture bind", () => {
       {
         annotateOut: ["Control+Option+A"],
         capture: ["Shift", "Shift"],
-        dictateCapture: ["Option+Space"],
+        dictateCapture: ["Control+Option+Space"],
         drawCapture: ["Mod+Shift", "Mod+Shift"],
         noteCapture: ["Control", "Control"],
         voiceCapture: ["Option", "Option"],

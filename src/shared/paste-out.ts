@@ -1,7 +1,13 @@
 import type { PasteSnap } from "./capture-clip";
 
 /** Time for the focused app to read the clipboard before we put the old one back. */
-export const PASTE_SETTLE_MS = 120;
+export const PASTE_SETTLE_MS = 350;
+
+export const VOICE_PILL_W = 280;
+export const VOICE_NOTICE_W = 520;
+
+export const voicePillWidth = (notice: string): number =>
+  notice.length > 0 ? VOICE_NOTICE_W : VOICE_PILL_W;
 
 export interface PastePorts {
   paste: () => boolean;

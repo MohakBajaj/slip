@@ -31,6 +31,7 @@ import {
 } from "electron";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
+import { annotateWindowSize } from "../shared/annotate";
 import type { DrawTarget } from "../shared/annotate";
 import { THEMES } from "../shared/appearance";
 import type { TrayIconId } from "../shared/appearance";
@@ -43,7 +44,7 @@ import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
-import { annotatePlan } from "../shared/paste-out";
+import { annotatePlan, voicePillWidth } from "../shared/paste-out";
 import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
 import { VOICE_SOURCE } from "../shared/speech";
@@ -194,6 +195,7 @@ let preview: PreviewState | null = null;
 let voiceCtx: ReturnType<typeof startFrontContext> | null = null;
 let voiceWin: BrowserWindow | null = null;
 let drawWin: BrowserWindow | null = null;
+let annotateWin: BrowserWindow | null = null;
 let noteWin: BrowserWindow | null = null;
 let noteReady = false;
 let noteOpen = false;
@@ -275,6 +277,7 @@ const paintWindows = (): void => {
   previewWin?.setBackgroundColor(hex);
   voiceWin?.setBackgroundColor(hex);
   drawWin?.setBackgroundColor(hex);
+  annotateWin?.setBackgroundColor(hex);
   noteWin?.setBackgroundColor(hex);
 };
 
@@ -283,6 +286,7 @@ const tellSettings = (): void => {
   previewWin?.webContents.send("settings-changed", settings);
   voiceWin?.webContents.send("settings-changed", settings);
   drawWin?.webContents.send("settings-changed", settings);
+  annotateWin?.webContents.send("settings-changed", settings);
   noteWin?.webContents.send("settings-changed", settings);
 };
 
@@ -351,7 +355,7 @@ const applyLogin = (on: boolean): LoginState => {
 };
 
 const visibleWindows = (): boolean =>
-  [win, previewWin, voiceWin, drawWin].some(
+  [win, previewWin, voiceWin, drawWin, annotateWin].some(
     (target) => target !== null && !target.isDestroyed() && target.isVisible()
   );
 
@@ -1056,7 +1060,7 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
         spellcheck: false,
         webgl: false,
       },
-      width: 280,
+      width: voicePillWidth(""),
       ...(out && process.platform === "darwin"
         ? { type: "panel" as const }
         : {}),
@@ -1074,15 +1078,38 @@ const showVoice = (mode: "hold" | "open" | "tap" = "open"): void => {
 };
 
 let drawAttach = false;
-let drawLoose = "";
 let drawTarget: DrawTarget | null = null;
+let annotateLoose = "";
 
-const drawMode = (): "attach" | "out" | "slip" => {
-  if (drawLoose.length > 0) {
-    return "out";
+const drawMode = (): "attach" | "slip" => (drawAttach ? "attach" : "slip");
+
+const annotateTemp = (file: string): string | null => {
+  if (file.length === 0) {
+    return null;
   }
-  return drawAttach ? "attach" : "slip";
+  const temp = path.resolve(app.getPath("temp"));
+  const resolved = path.resolve(file);
+  const base = path.basename(resolved);
+  const named =
+    base.startsWith("slip-annotate-") || base.startsWith("slip-region-");
+  if (!named || !resolved.startsWith(`${temp}${path.sep}`)) {
+    return null;
+  }
+  return resolved;
 };
+
+const deleteAnnotateTemp = (file: string): void => {
+  const resolved = annotateTemp(file);
+  if (resolved === null) {
+    return;
+  }
+  rmSync(resolved, { force: true });
+};
+
+const fromAnnotate = (sender: WebContents): boolean =>
+  annotateWin !== null &&
+  !annotateWin.isDestroyed() &&
+  sender.id === annotateWin.webContents.id;
 
 const hideDraw = (): void => {
   if (drawWin && !drawWin.isDestroyed()) {
@@ -1090,8 +1117,17 @@ const hideDraw = (): void => {
   }
   drawWin = null;
   drawAttach = false;
-  drawLoose = "";
   drawTarget = null;
+};
+
+const hideAnnotate = (): void => {
+  const file = annotateLoose;
+  annotateLoose = "";
+  if (annotateWin && !annotateWin.isDestroyed()) {
+    annotateWin.close();
+  }
+  annotateWin = null;
+  deleteAnnotateTemp(file);
 };
 
 const tellDrawMode = (): void => {
@@ -1125,6 +1161,65 @@ const parseDrawOpen = (
   return { attach, target: { imagePath, slipId } };
 };
 
+const showAnnotateFile = (file: string): void => {
+  if (annotateWin && !annotateWin.isDestroyed()) {
+    deleteAnnotateTemp(file);
+    annotateWin.show();
+    annotateWin.focus();
+    return;
+  }
+  annotateLoose = file;
+  const area = screen.getDisplayNearestPoint(
+    screen.getCursorScreenPoint()
+  ).workArea;
+  const sized = annotateWindowSize({ height: area.height, width: area.width });
+  annotateWin = new BrowserWindow({
+    alwaysOnTop: true,
+    backgroundColor: windowHex(),
+    height: sized.height,
+    minHeight: Math.min(420, sized.height),
+    minWidth: sized.width,
+    show: false,
+    title: "Annotate",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 12, y: 12 },
+    webPreferences: {
+      contextIsolation: true,
+      preload: path.join(__dirname, "../preload/index.js"),
+      sandbox: true,
+      spellcheck: false,
+      webgl: false,
+    },
+    width: sized.width,
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+  });
+  pinWorkspace(annotateWin);
+  annotateWin.on("ready-to-show", () => {
+    if (!annotateWin || annotateWin.isDestroyed()) {
+      return;
+    }
+    const next = screen.getDisplayNearestPoint(
+      screen.getCursorScreenPoint()
+    ).workArea;
+    const [w, h] = annotateWin.getSize();
+    annotateWin.setPosition(
+      Math.round(next.x + (next.width - w) / 2),
+      Math.round(next.y + (next.height - h) / 2)
+    );
+    annotateWin.show();
+    annotateWin.focus();
+    applyDock(settings.dock);
+  });
+  annotateWin.on("closed", () => {
+    const shot = annotateLoose;
+    annotateWin = null;
+    annotateLoose = "";
+    deleteAnnotateTemp(shot);
+    applyDock(settings.dock);
+  });
+  loadHashPage(annotateWin, "draw");
+};
+
 const showAnnotateOut = (): void => {
   const image = clipboard.readImage();
   const png = image.isEmpty() ? null : image.toPNG();
@@ -1135,31 +1230,21 @@ const showAnnotateOut = (): void => {
       `slip-annotate-${Date.now()}.png`
     );
     writeFileSync(file, png);
-    showDraw(false, null, file);
+    showAnnotateFile(file);
     return;
   }
   void grabRegion().then((file) => {
     if (file) {
-      showDraw(false, null, file);
+      showAnnotateFile(file);
     }
   });
 };
 
-const showDraw = (
-  attach = false,
-  target: DrawTarget | null = null,
-  loose = ""
-): void => {
+const showDraw = (attach = false, target: DrawTarget | null = null): void => {
   drawAttach = attach;
   drawTarget = target;
-  drawLoose = loose;
-  const out = loose.length > 0;
   if (drawWin && !drawWin.isDestroyed()) {
-    drawWin.setAlwaysOnTop(out || settings.alwaysOnTop);
-    if (out) {
-      drawWin.setMinimumSize(520, 360);
-      drawWin.setSize(640, 480);
-    }
+    drawWin.setAlwaysOnTop(settings.alwaysOnTop);
     tellDrawMode();
     tellDrawTarget();
     tellSettings();
@@ -1170,21 +1255,17 @@ const showDraw = (
   const area = screen.getDisplayNearestPoint(
     screen.getCursorScreenPoint()
   ).workArea;
-  const width = out
-    ? Math.min(640, Math.max(520, area.width - 48))
-    : Math.min(880, Math.round(area.width * 0.58));
-  const height = out
-    ? Math.min(480, Math.max(360, area.height - 80))
-    : Math.min(620, Math.round(area.height * 0.68));
+  const width = Math.min(880, Math.round(area.width * 0.58));
+  const height = Math.min(620, Math.round(area.height * 0.68));
   drawWin = new BrowserWindow({
-    alwaysOnTop: out || settings.alwaysOnTop,
+    alwaysOnTop: settings.alwaysOnTop,
     backgroundColor: windowHex(),
     height,
-    minHeight: out ? 360 : 400,
+    minHeight: 400,
     // Compact header fits at 797. 24px of slack for macOS fonts and traffic lights.
-    minWidth: out ? 520 : 821,
+    minWidth: 821,
     show: false,
-    title: out ? "Annotate" : "Slip Draw",
+    title: "Slip Draw",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
@@ -1195,7 +1276,6 @@ const showDraw = (
       webgl: false,
     },
     width,
-    ...(out && process.platform === "darwin" ? { type: "panel" as const } : {}),
   });
   pinWorkspace(drawWin);
   drawWin.on("ready-to-show", () => {
@@ -1217,7 +1297,6 @@ const showDraw = (
   drawWin.on("closed", () => {
     drawWin = null;
     drawAttach = false;
-    drawLoose = "";
     drawTarget = null;
     applyDock(settings.dock);
   });
@@ -1539,7 +1618,7 @@ const boot = async (): Promise<void> => {
     if (settings.alwaysOnTop !== prev.alwaysOnTop) {
       win?.setAlwaysOnTop(settings.alwaysOnTop);
       previewWin?.setAlwaysOnTop(settings.alwaysOnTop);
-      drawWin?.setAlwaysOnTop(drawLoose.length > 0 || settings.alwaysOnTop);
+      drawWin?.setAlwaysOnTop(settings.alwaysOnTop);
     }
     if (settings.scheme !== prev.scheme) {
       applyThemeSource();
@@ -1710,12 +1789,13 @@ const boot = async (): Promise<void> => {
         const slip =
           settings.keepDictations && body.trim().length > 0 ? keep() : null;
         if (outcome === "copied") {
-          return voiceReply(
-            "",
-            slip,
-            "Copied. Allow Accessibility to paste.",
-            costLabel
-          );
+          const notice = "Copied. Allow Accessibility to paste.";
+          if (voiceWin && !voiceWin.isDestroyed()) {
+            const [, height] = voiceWin.getSize();
+            voiceWin.setSize(voicePillWidth(notice), height);
+            placeVoice(voiceWin);
+          }
+          return voiceReply("", slip, notice, costLabel);
         }
         if (outcome === "empty") {
           hideVoice();
@@ -1779,31 +1859,29 @@ const boot = async (): Promise<void> => {
     dismissNote();
     return slip;
   });
-  ipcMain.handle("closeDraw", () => {
+  ipcMain.handle("closeDraw", (e) => {
+    if (fromAnnotate(e.sender)) {
+      hideAnnotate();
+      return;
+    }
     hideDraw();
   });
   ipcMain.handle("openDraw", (_e, mode: unknown) => {
     const open = parseDrawOpen(mode);
     showDraw(open.attach, open.target);
   });
-  ipcMain.handle("drawSession", () => ({
-    mode: drawMode(),
-    target: drawTarget,
-  }));
-  ipcMain.handle("readOutImage", () => {
-    if (drawLoose.length === 0) {
+  ipcMain.handle("drawSession", (e) => {
+    if (fromAnnotate(e.sender)) {
+      return { mode: "out" as const, target: null };
+    }
+    return { mode: drawMode(), target: drawTarget };
+  });
+  ipcMain.handle("readOutImage", (e) => {
+    if (!fromAnnotate(e.sender)) {
       return null;
     }
-    const temp = path.resolve(app.getPath("temp"));
-    const resolved = path.resolve(drawLoose);
-    const base = path.basename(resolved);
-    const named =
-      base.startsWith("slip-annotate-") || base.startsWith("slip-region-");
-    if (
-      !named ||
-      !resolved.startsWith(`${temp}${path.sep}`) ||
-      !existsSync(resolved)
-    ) {
+    const resolved = annotateTemp(annotateLoose);
+    if (resolved === null || !existsSync(resolved)) {
       return null;
     }
     return new Uint8Array(readFileSync(resolved));
@@ -1841,10 +1919,24 @@ const boot = async (): Promise<void> => {
     clipboard.writeImage(native);
     return true;
   });
-  ipcMain.handle("createDrawSlip", (_e, image: unknown) => {
+  ipcMain.handle("createDrawSlip", (e, image: unknown) => {
     const [file] = parseImageInputs(image === null ? [] : [image]);
     if (file === undefined) {
       return null;
+    }
+    if (fromAnnotate(e.sender)) {
+      const slip = createSlip(vaultRoot(), {
+        content: "Annotation",
+        images: [file],
+        section: currentSection,
+      });
+      if (settings.notify && Notification.isSupported()) {
+        new Notification({ body: "Annotation", title: "Slip" }).show();
+      }
+      send("slips-changed");
+      rebuildTray();
+      hideAnnotate();
+      return slip;
     }
     if (drawAttach) {
       if (file.bytes && file.bytes.byteLength > 0) {
@@ -2037,7 +2129,8 @@ const boot = async (): Promise<void> => {
 
   const updates = startUpdater({
     autoCheck: () => settings.checkUpdates,
-    busy: () => noteOpen || voiceWin !== null || drawWin !== null,
+    busy: () =>
+      noteOpen || voiceWin !== null || drawWin !== null || annotateWin !== null,
   });
 
   Menu.setApplicationMenu(
@@ -2211,6 +2304,7 @@ app.on("before-quit", (event) => {
   stopWatch?.();
   hideVoice();
   hideDraw();
+  hideAnnotate();
 });
 
 app.on("window-all-closed", () => undefined);

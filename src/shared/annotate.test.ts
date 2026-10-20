@@ -5,6 +5,9 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { drawShape, pageBounds, Store, themeOf } from "@quickdrawjs/core";
 
 import {
+  ANNOTATE_INK,
+  ANNOTATE_TOOLBAR_W,
+  annotateWindowSize,
   appendAnnotatedImage,
   blankExportScale,
   cameraForFrame,
@@ -470,4 +473,13 @@ test("a Quickdraw snapshot export flattens onto native image pixels", async () =
   } catch {
     // Pixel asserts above are the check.
   }
+});
+
+test("annotate window fits the toolbar and stays on the screen", () => {
+  expect(ANNOTATE_INK).toBe("red");
+  expect(annotateWindowSize({ height: 900, width: 1400 })).toEqual({
+    height: 680,
+    width: ANNOTATE_TOOLBAR_W,
+  });
+  expect(annotateWindowSize({ height: 500, width: 700 }).width).toBe(700);
 });

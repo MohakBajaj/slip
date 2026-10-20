@@ -84,7 +84,7 @@ export const defaultNoteCapture = (): string[] =>
 
 export const defaultAnnotateOut = (): string[] => ["Control+Option+A"];
 
-export const defaultDictateCapture = (): string[] => ["Option+Space"];
+export const defaultDictateCapture = (): string[] => ["Control+Option+Space"];
 
 export const CAPTURE_FIELDS = [
   "capture",

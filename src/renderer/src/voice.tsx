@@ -479,7 +479,7 @@ export const VoiceApp = ({ out = false }: { out?: boolean }) => {
       {status === "notice" ? (
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <p
-            className="text-muted-foreground min-w-0 flex-1 truncate text-[12px]"
+            className="text-muted-foreground shrink-0 text-[12px] whitespace-nowrap"
             title={label}
           >
             {label}
