@@ -455,6 +455,22 @@ dest="$3"
 workdir="$4"
 aside="\${dest}.slip-old"
 stage="\${dest}.slip-new"
+abort() {
+  trap - ERR
+  echo "update failed"
+  rm -rf "$stage"
+  if [[ ! -d "$dest" && -d "$aside" ]]; then
+    mv "$aside" "$dest" || true
+  fi
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 0.2
+  done
+  if [[ -d "$dest" ]]; then
+    open "$dest" || echo "open failed"
+  fi
+  exit 1
+}
+trap abort ERR
 if [[ ! -d "$dest" && -d "$stage" ]]; then
   mv "$stage" "$dest"
   rm -rf "$aside"
@@ -471,20 +487,20 @@ if [[ ! -d "$dest" && -d "$aside" ]]; then
 fi
 case "$src" in
   "$workdir"/*) ;;
-  *) echo "source is outside the work directory"; exit 1 ;;
+  *) echo "source is outside the work directory"; abort ;;
 esac
 case "$workdir" in
   *slip-update-*) ;;
-  *) echo "refusing to delete $workdir"; exit 1 ;;
+  *) echo "refusing to delete $workdir"; abort ;;
 esac
 if [[ ! -d "$src" ]]; then
   echo "missing $src"
-  exit 1
+  abort
 fi
 for bin in parakeet-cli slip-cleanup; do
   if [[ ! -f "$src/Contents/Resources/bin/$bin" ]]; then
     echo "refusing to replace $dest: missing $bin"
-    exit 1
+    abort
   fi
 done
 while kill -0 "$pid" 2>/dev/null; do
@@ -496,17 +512,22 @@ ditto "$src" "$stage"
 for bin in parakeet-cli slip-cleanup; do
   if [[ ! -f "$stage/Contents/Resources/bin/$bin" ]]; then
     echo "staged app is missing $bin"
-    rm -rf "$stage"
-    exit 1
+    abort
   fi
 done
 xattr -dr com.apple.quarantine "$stage" || true
 rm -rf "$aside"
 mv "$dest" "$aside"
 if ! mv "$stage" "$dest"; then
-  ditto "$stage" "$dest"
+  if ! ditto "$stage" "$dest"; then
+    rm -rf "$dest"
+    mv "$aside" "$dest"
+    open "$dest" || echo "open failed"
+    exit 1
+  fi
   rm -rf "$stage"
 fi
+trap - ERR
 rm -rf "$aside"
 xattr -dr com.apple.quarantine "$dest" || true
 open "$dest" || echo "open failed"

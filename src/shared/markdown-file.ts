@@ -72,6 +72,7 @@ const asPaths = (value: unknown): string[] => {
 };
 
 const leadingNewlines = /^\n+/u;
+const trailingNewline = /\n$/u;
 
 export const serializeSlip = (slip: Slip): string =>
   matter.stringify(slip.content.replace(leadingNewlines, ""), {
@@ -105,7 +106,9 @@ export const parseSlip = (filename: string, raw: string): Slip | null => {
     return {
       archived: asFlag(data.archived),
       audio: asPaths(data.audio),
-      content: asString(parsed.content, "").replace(leadingNewlines, ""),
+      content: asString(parsed.content, "")
+        .replace(leadingNewlines, "")
+        .replace(trailingNewline, ""),
       ...(cost ? { cost } : {}),
       createdAt: created,
       done: asFlag(data.done),

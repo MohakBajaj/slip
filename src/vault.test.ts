@@ -137,7 +137,7 @@ describe("voice", () => {
     });
     expect(slip.audio).toEqual([]);
     const saved = listSlips(root).find((item) => item.id === slip.id);
-    expect(saved?.content).toBe("Hello there.\n");
+    expect(saved?.content).toBe("Hello there.");
     expect(saved?.transcript).toBe("um hello there");
     expect(saved?.source).toBe("voice");
   });

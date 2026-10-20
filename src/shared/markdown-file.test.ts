@@ -68,8 +68,38 @@ test("transcript is kept beside the note", () => {
     "2026-01-01-aaaaaa.md",
     "---\nid: aaaaaa\ntranscript: um hello\n---\n\nHello.\n"
   );
-  expect(slip?.content).toBe("Hello.\n");
+  expect(slip?.content).toBe("Hello.");
   expect(slip?.transcript).toBe("um hello");
+});
+
+test("the file's trailing newline is not part of the note", () => {
+  const slip: Slip = {
+    archived: false,
+    audio: [],
+    content: "Hello",
+    createdAt: "2026-01-02T00:00:00.000Z",
+    done: false,
+    filename: "2026-01-02-aaaaaa.md",
+    id: "aaaaaa",
+    images: [],
+    page: "",
+    pin: false,
+    section: "",
+    source: "",
+    tags: [],
+    transcript: "",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+    url: "",
+  };
+  expect(parseSlip(slip.filename, serializeSlip(slip))?.content).toBe("Hello");
+  expect(
+    parseSlip(slip.filename, serializeSlip({ ...slip, content: "one\n\ntwo" }))
+      ?.content
+  ).toBe("one\n\ntwo");
+  expect(
+    parseSlip(slip.filename, serializeSlip({ ...slip, content: "Hello\n\n" }))
+      ?.content
+  ).toBe("Hello\n");
 });
 
 test("speech cost round-trips in frontmatter", () => {
