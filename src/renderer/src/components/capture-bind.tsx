@@ -46,7 +46,7 @@ const CapturePreset = ({
       {preset.glyph}
       {preset.glyph}
     </span>
-    <span className="text-muted-foreground text-[10px]">{preset.label}</span>
+    <span className="text-muted-foreground text-[11px]">{preset.label}</span>
   </button>
 );
 
@@ -186,7 +186,7 @@ export const CaptureBind = ({
       <button
         aria-label="Record capture sequence"
         className={cn(
-          "press rounded-[16px] px-2.5 py-2.5 text-left shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
+          "press rounded-xl px-2.5 py-2.5 text-left shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
           recording && "bg-primary/15 shadow-[inset_0_0_0_1.5px_var(--primary)]"
         )}
         onClick={() => {

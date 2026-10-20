@@ -852,6 +852,9 @@ export const DrawApp = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "geist") {
+      void import("@fontsource-variable/geist/wght.css");
+    }
     if (settings.font === "news") {
       void import("@fontsource-variable/newsreader/wght.css");
     }
@@ -1037,7 +1040,7 @@ export const DrawApp = () => {
               variant="ghost"
             >
               Copy
-              <kbd className="draw-chrome text-muted-foreground text-[10px] font-medium">
+              <kbd className="draw-chrome text-muted-foreground text-[11px] font-medium">
                 ⌘C
               </kbd>
             </Button>
@@ -1052,7 +1055,7 @@ export const DrawApp = () => {
               size="xs"
             >
               {attach || slipId.length > 0 ? "Add" : "Slip"}
-              <kbd className="draw-chrome text-[10px] font-medium opacity-70">
+              <kbd className="draw-chrome text-[11px] font-medium opacity-70">
                 ⌘↵
               </kbd>
             </Button>
@@ -1139,7 +1142,7 @@ export const DrawApp = () => {
             </Chip>
           </Tip>
         </div>
-        <p className="text-muted-foreground pointer-events-none absolute right-3 bottom-3 text-[10px] tracking-wide">
+        <p className="text-muted-foreground pointer-events-none absolute right-3 bottom-3 text-[11px] tracking-wide">
           Space to pan
         </p>
       </div>

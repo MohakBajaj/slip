@@ -104,7 +104,7 @@ export const defaultSettings = (): Settings => {
     cleanupRoute: speech.cleanupRoute,
     dock: true,
     drawCapture: defaultDrawCapture(),
-    font: "geist",
+    font: "system",
     noteCapture: defaultNoteCapture(),
     notify: false,
     scheme: "system",
@@ -143,7 +143,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     next.theme = "paper";
   }
   if (!isFontId(next.font)) {
-    next.font = "geist";
+    next.font = "system";
   }
   if (!isTrayIconId(next.trayIcon)) {
     next.trayIcon = "slip";

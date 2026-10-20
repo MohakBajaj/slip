@@ -1,9 +1,4 @@
-import {
-  Cancel01Icon,
-  Search01Icon,
-  Settings02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Search, Settings as SettingsIcon, X } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -618,6 +613,9 @@ const App = () => {
     root.dataset.accent = settings.accent;
     root.dataset.theme = settings.theme;
     root.dataset.font = settings.font;
+    if (settings.font === "geist") {
+      void import("@fontsource-variable/geist/wght.css");
+    }
     if (settings.font === "news") {
       void import("@fontsource-variable/newsreader/wght.css");
     }
@@ -843,10 +841,7 @@ const App = () => {
             </p>
           ) : (
             <div className="no-drag relative min-w-0 flex-1">
-              <HugeiconsIcon
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
-                icon={Search01Icon}
-              />
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2" />
               <Input
                 autoComplete="off"
                 autoCorrect="off"
@@ -867,7 +862,7 @@ const App = () => {
                   type="button"
                   variant="ghost"
                 >
-                  <HugeiconsIcon className="size-3" icon={Cancel01Icon} />
+                  <X className="size-3" />
                 </Button>
               ) : null}
             </div>
@@ -880,7 +875,7 @@ const App = () => {
             size="icon-sm"
             variant="ghost"
           >
-            <span className="text-[10px] font-medium">⌘K</span>
+            <span className="text-[11px] font-medium">⌘K</span>
           </Button>
           <Button
             aria-label={settingsOpen ? "Close settings" : "Settings"}
@@ -900,7 +895,7 @@ const App = () => {
             {settingsOpen ? (
               <span className="text-[11px]">Done</span>
             ) : (
-              <HugeiconsIcon className="size-3.5" icon={Settings02Icon} />
+              <SettingsIcon className="size-3.5" />
             )}
           </Button>
         </div>
@@ -1105,7 +1100,7 @@ const App = () => {
         />
       )}
 
-      <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[10px] tabular-nums">
+      <footer className="text-muted-foreground flex items-center justify-between px-2.5 pb-1.5 text-[11px] tabular-nums">
         <span>
           {statusLine(
             flash,

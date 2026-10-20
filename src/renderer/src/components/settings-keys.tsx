@@ -87,7 +87,7 @@ export const SettingsKeys = ({
   }, [onBind, recorder.isRecording]);
 
   return (
-    <div className="bg-card flex flex-col gap-0.5 rounded-[16px] py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+    <div className="bg-card flex flex-col gap-0.5 rounded-xl py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
       {SHORTCUT_META.map((item) => {
         let hint = shortcutLabel(settings.shortcuts[item.id]);
         if (editing === item.id) {

@@ -1,7 +1,5 @@
-import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Mic } from "lucide-react";
+import { ImagePlus, Mic } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -227,7 +225,7 @@ const SlipRow = ({
         >
           {titleOf(slip.content)}
         </span>
-        <span className="text-muted-foreground block truncate text-[10px] tabular-nums">
+        <span className="text-muted-foreground block truncate text-[11px] tabular-nums">
           {whenLabel(slip.createdAt)}
           {from ? ` · ${from}` : ""}
           {slip.cost ? (
@@ -255,7 +253,7 @@ const SectionHeader = ({
   onUse: () => void;
 }) => (
   <button
-    className="text-muted-foreground flex w-full items-center gap-2 px-1.5 pt-2 pb-0.5 text-left text-[10px] tracking-wide"
+    className="text-muted-foreground flex w-full items-center gap-2 px-1.5 pt-2 pb-0.5 text-left text-[11px] tracking-wide"
     onClick={onUse}
     onContextMenu={(event) => {
       event.preventDefault();
@@ -468,7 +466,7 @@ export const InboxPane = ({
           </div>
         )}
         {dragging && list.length > 0 ? (
-          <p className="text-muted-foreground pointer-events-none sticky bottom-0 px-4 py-1.5 text-center text-[10px]">
+          <p className="text-muted-foreground pointer-events-none sticky bottom-0 px-4 py-1.5 text-center text-[11px]">
             Drop on a slip to attach, or on empty space to start one
           </p>
         ) : null}
@@ -520,7 +518,7 @@ export const InboxPane = ({
         />
         <div
           className={cn(
-            "bg-card flex flex-col gap-1.5 rounded-[16px] p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
+            "bg-card flex flex-col gap-1.5 rounded-xl p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
             composeDrop.over && "shadow-[0_0_0_1px_var(--primary)]"
           )}
           {...composeDrop.props}
@@ -655,7 +653,7 @@ export const InboxPane = ({
                       />
                     }
                   >
-                    <HugeiconsIcon className="size-3.5" icon={ImageAdd01Icon} />
+                    <ImagePlus className="size-3.5" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-28">
                     <DropdownMenuItem

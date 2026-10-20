@@ -1,6 +1,4 @@
-import { Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Pencil } from "lucide-react";
+import { ImagePlus, Pencil, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, RefObject } from "react";
 
@@ -70,7 +68,7 @@ export const ImageStrip = ({
         type="button"
         variant="ghost"
       >
-        <HugeiconsIcon className="size-3" icon={ImageAdd01Icon} />
+        <ImagePlus className="size-3" />
         Add images
       </Button>
     );
@@ -173,7 +171,7 @@ export const ImageStrip = ({
               type="button"
               variant="secondary"
             >
-              <HugeiconsIcon className="size-2.5" icon={Cancel01Icon} />
+              <X className="size-2.5" />
             </Button>
           ) : null}
         </div>
@@ -187,7 +185,7 @@ export const ImageStrip = ({
           type="button"
           variant="ghost"
         >
-          <HugeiconsIcon className="size-3.5" icon={ImageAdd01Icon} />
+          <ImagePlus className="size-3.5" />
         </Button>
       ) : null}
     </div>

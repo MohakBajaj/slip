@@ -1,6 +1,6 @@
+import "@fontsource-variable/geist/wght.css";
 import "@fontsource-variable/newsreader/wght.css";
-import { Folder02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Folder } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -37,7 +37,7 @@ const Heading = ({ children }: { children: string }) => (
 );
 
 const Card = ({ children }: { children: ReactNode }) => (
-  <div className="bg-card flex flex-col gap-0.5 rounded-[16px] py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+  <div className="bg-card flex flex-col gap-0.5 rounded-xl py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
     {children}
   </div>
 );
@@ -456,6 +456,7 @@ export const SettingsPanel = ({
                   <SettingsRow
                     detail={vaultLabel(settings.vaultPath)}
                     label="Vault"
+                    mono
                   >
                     <div className="flex gap-0.5">
                       <Button
@@ -486,12 +487,16 @@ export const SettingsPanel = ({
                         size="xs"
                         variant="ghost"
                       >
-                        <HugeiconsIcon className="size-3" icon={Folder02Icon} />
+                        <Folder className="size-3" />
                         Open
                       </Button>
                     </div>
                   </SettingsRow>
-                  <SettingsRow detail={skillDetail} label="Skill">
+                  <SettingsRow
+                    detail={skillDetail}
+                    label="Skill"
+                    mono={skill?.installed === true}
+                  >
                     <Button
                       className="press"
                       onClick={() => {
