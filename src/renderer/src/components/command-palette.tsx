@@ -14,9 +14,11 @@ import type { Shortcuts } from "../../../shared/shortcuts";
 import type { Slip } from "../../../shared/types";
 
 export const CommandPalette = ({
+  onAnnotate,
   onCheatsheet,
   onCopyList,
   onCopyPrompt,
+  onDictate,
   onDraw,
   onInbox,
   onVoice,
@@ -33,9 +35,11 @@ export const CommandPalette = ({
   subjectCount,
   undoLabel,
 }: {
+  onAnnotate: () => void;
   onCheatsheet: () => void;
   onCopyList: () => void;
   onCopyPrompt: () => void;
+  onDictate: () => void;
   onDraw: () => void;
   onInbox: () => void;
   onVoice: () => void;
@@ -96,7 +100,9 @@ export const CommandPalette = ({
         </CommandItem>
         <CommandItem onSelect={onOpenVault}>Open vault</CommandItem>
         <CommandItem onSelect={onDraw}>Draw</CommandItem>
+        <CommandItem onSelect={onAnnotate}>Annotate anywhere</CommandItem>
         <CommandItem onSelect={onVoice}>Voice</CommandItem>
+        <CommandItem onSelect={onDictate}>Dictate anywhere</CommandItem>
       </CommandGroup>
       <CommandGroup heading="Slips">
         {slips

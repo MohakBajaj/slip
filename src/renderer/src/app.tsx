@@ -1147,6 +1147,14 @@ const App = () => {
               copyPrompt().catch(() => undefined);
               setPaletteOpen(false);
             }}
+            onAnnotate={() => {
+              void window.slip.openAnnotate();
+              setPaletteOpen(false);
+            }}
+            onDictate={() => {
+              void window.slip.openDictate();
+              setPaletteOpen(false);
+            }}
             onDraw={() => {
               window.slip.openDraw().catch(() => undefined);
               setPaletteOpen(false);

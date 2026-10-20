@@ -2005,6 +2005,12 @@ const boot = async (): Promise<void> => {
   ipcMain.handle("openVoice", () => {
     showVoice();
   });
+  ipcMain.handle("openAnnotate", () => {
+    showAnnotateOut();
+  });
+  ipcMain.handle("openDictate", () => {
+    toggleDictate();
+  });
   ipcMain.handle("askMic", () => askMic());
   ipcMain.handle("setLogin", (_e, on: boolean) => applyLogin(on));
   ipcMain.handle(

@@ -166,6 +166,8 @@ const api = {
     };
   },
   openAccess: () => ipcRenderer.invoke("openAccess"),
+  openAnnotate: () => ipcRenderer.invoke("openAnnotate"),
+  openDictate: () => ipcRenderer.invoke("openDictate"),
   openDraw: (
     mode?:
       | "attach"
