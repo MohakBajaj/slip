@@ -6,6 +6,7 @@ import {
   defaultDrawCapture,
   defaultNoteCapture,
   defaultVoiceCapture,
+  finishCapture,
   formatDrawHint,
   formatHold,
   sanitizeDrawCapture,
@@ -13,11 +14,13 @@ import {
   sanitizeVoiceCapture,
   unusedCapture,
 } from "./capture-bind";
+import { createVoiceHold } from "./capture-hold";
+import { FLAG_CONTROL, FLAG_OPTION, KEYCODES } from "./capture-match";
 import { sanitizeSettings } from "./types";
 
 describe("voice capture bind", () => {
-  test("default voice chord is the first unused preset", () => {
-    expect(defaultVoiceCapture()).toEqual(["Option", "Option"]);
+  test("voice starts off, and the first free preset is still Option", () => {
+    expect(defaultVoiceCapture()).toEqual([]);
     expect(unusedCapture(defaultCapture())).toEqual(["Option", "Option"]);
   });
 
@@ -36,7 +39,9 @@ describe("voice capture bind", () => {
   });
 
   test("draw hint explains the double-tap instead of four keys", () => {
-    expect(formatDrawHint(defaultDrawCapture())).toBe("hold ⌘, double-tap ⇧");
+    expect(formatDrawHint(["Mod+Shift", "Mod+Shift"])).toBe(
+      "hold ⌘, double-tap ⇧"
+    );
     expect(formatDrawHint(["Mod+K"])).toBe("⌘ K");
   });
 
@@ -51,18 +56,18 @@ describe("voice capture bind", () => {
 });
 
 describe("draw capture bind", () => {
-  test("default draw chord is command plus shift twice", () => {
-    expect(defaultDrawCapture()).toEqual(["Mod+Shift", "Mod+Shift"]);
+  test("draw starts off", () => {
+    expect(defaultDrawCapture()).toEqual([]);
   });
 
-  test("draw chord yields when it matches capture", () => {
+  test("a colliding draw chord turns off", () => {
     expect(
       sanitizeDrawCapture(
         ["Shift", "Shift"],
         ["Shift", "Shift"],
         ["Option", "Option"]
       )
-    ).toEqual(["Mod+Shift", "Mod+Shift"]);
+    ).toEqual([]);
   });
 
   test("settings keep a distinct draw chord", () => {
@@ -75,11 +80,11 @@ describe("draw capture bind", () => {
 });
 
 describe("note capture bind", () => {
-  test("default note chord is the next free double modifier", () => {
-    expect(defaultNoteCapture()).toEqual(["Control", "Control"]);
+  test("note starts off", () => {
+    expect(defaultNoteCapture()).toEqual([]);
   });
 
-  test("note chord yields when it matches another", () => {
+  test("a colliding note chord turns off", () => {
     expect(
       sanitizeNoteCapture(
         ["Control", "Control"],
@@ -87,21 +92,18 @@ describe("note capture bind", () => {
         ["Option", "Option"],
         ["Control", "Control"]
       )
-    ).toEqual(["Command", "Command"]);
+    ).toEqual([]);
   });
 
-  test("settings keep four distinct chords", () => {
+  test("new settings keep selection and annotate, and the rest off", () => {
     const next = sanitizeSettings({});
-    const chords = [
-      next.capture,
-      next.voiceCapture,
-      next.drawCapture,
-      next.noteCapture,
-    ].map((seq) => seq.join("|"));
-    expect(new Set(chords).size).toBe(4);
-    expect(next.noteCapture).toEqual(["Control", "Control"]);
+    expect(next.capture).toEqual(["Shift", "Shift"]);
+    expect(next.voiceCapture).toEqual([]);
+    expect(next.drawCapture).toEqual([]);
+    expect(next.noteCapture).toEqual([]);
     expect(next.annotateOut).toEqual(["Control+Option+A"]);
-    expect(next.dictateCapture).toEqual(["Control+Option+D"]);
+    expect(next.dictateCapture).toEqual([]);
+    expect(next.cleanTranscripts).toBe(true);
     expect(
       sanitizeSettings({ dictateCapture: ["Control+Option+Space"] })
         .dictateCapture
@@ -111,9 +113,8 @@ describe("note capture bind", () => {
       capture: ["Control", "Control"],
       noteCapture: ["Control", "Control"],
     });
-    expect(collided.noteCapture).not.toEqual(collided.capture);
-    expect(collided.noteCapture).not.toEqual(collided.voiceCapture);
-    expect(collided.noteCapture).not.toEqual(collided.drawCapture);
+    expect(collided.capture).toEqual(["Control", "Control"]);
+    expect(collided.noteCapture).toEqual([]);
   });
 
   test("editing one chord keeps the others distinct", () => {
@@ -137,5 +138,27 @@ describe("note capture bind", () => {
       next.noteCapture,
     ].map((seq) => seq.join("|"));
     expect(new Set(chords).size).toBe(4);
+  });
+});
+
+describe("clear a capture chord", () => {
+  const chord = ["Control+Option+D"];
+  const down = {
+    code: KEYCODES.D,
+    flags: FLAG_CONTROL | FLAG_OPTION,
+    type: "key" as const,
+  };
+
+  test("backspace or delete on an empty draft, then enter, saves nothing armed", () => {
+    expect(finishCapture(chord, false)).toEqual(chord);
+    const hold = createVoiceHold(chord);
+    expect(hold.push(down)).toBe("arm");
+    expect(finishCapture([], false)).toBeNull();
+    const cleared = finishCapture([], true);
+    expect(cleared).toEqual([]);
+    hold.setSequence(cleared ?? chord);
+    expect(hold.needsKeys()).toBe(false);
+    expect(hold.push(down)).toBeNull();
+    expect(finishCapture(["not-a-chord"], true)).toBeNull();
   });
 });

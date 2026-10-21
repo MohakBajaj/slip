@@ -258,7 +258,8 @@ export const settleCleanup = async (
   parent?: AbortSignal
 ): Promise<CleanupOutcome> => {
   const raw = transcript.trim();
-  if (isShortTranscript(raw)) {
+  // No steps means cleanup is off: same trimmed raw path as a short transcript.
+  if (steps.length === 0 || isShortTranscript(raw)) {
     return rawOutcome(raw);
   }
   const request = cleanupRequest(raw);

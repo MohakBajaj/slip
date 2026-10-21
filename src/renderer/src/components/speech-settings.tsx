@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 import { catalogChoices } from "../../../shared/gateway-models";
@@ -30,8 +32,10 @@ const transcribeRoutes = [
 const cleanupRoutes = [
   { id: "device", label: "On-device" },
   { id: "cloud", label: "Cloud" },
-  { id: "off", label: "Off" },
-] as const satisfies readonly { id: CleanupRoute; label: string }[];
+] as const satisfies readonly {
+  id: Exclude<CleanupRoute, "off">;
+  label: string;
+}[];
 
 const selectClass =
   "border-input bg-background text-foreground h-7 w-full rounded-lg border px-2 text-[12px] outline-none";
@@ -111,38 +115,47 @@ const LocalMenu = ({
 );
 
 const RouteSwitch = <T extends string>({
+  body = true,
   label,
   onPick,
   options,
+  trailing,
   value,
 }: {
+  body?: boolean;
   label: string;
   onPick: (next: T) => void;
   options: readonly { id: T; label: string }[];
+  trailing?: ReactNode;
   value: T;
 }) => (
   <div className="flex flex-col gap-1">
-    <p className="text-[13px] leading-none">{label}</p>
-    <div className="bg-muted/70 flex rounded-xl p-0.5">
-      {options.map((option) => (
-        <button
-          aria-pressed={value === option.id}
-          className={cn(
-            "press h-7 flex-1 rounded-[10px] text-[12px]",
-            value === option.id
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground"
-          )}
-          key={option.id}
-          onClick={() => {
-            onPick(option.id);
-          }}
-          type="button"
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-[13px] leading-none">{label}</p>
+      {trailing}
     </div>
+    {body ? (
+      <div className="bg-muted/70 flex rounded-xl p-0.5">
+        {options.map((option) => (
+          <button
+            aria-pressed={value === option.id}
+            className={cn(
+              "press h-7 flex-1 rounded-[10px] text-[12px]",
+              value === option.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            )}
+            key={option.id}
+            onClick={() => {
+              onPick(option.id);
+            }}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ) : null}
   </div>
 );
 
@@ -263,7 +276,7 @@ export const SpeechSettings = ({
       .catch(() => undefined);
   }, []);
   useEffect(() => {
-    if (settings.cleanupRoute !== "device") {
+    if (!settings.cleanTranscripts || settings.cleanupRoute !== "device") {
       return undefined;
     }
     let live = true;
@@ -278,7 +291,7 @@ export const SpeechSettings = ({
     return () => {
       live = false;
     };
-  }, [settings.cleanupRoute]);
+  }, [settings.cleanTranscripts, settings.cleanupRoute]);
 
   const transcribePrice = priceOf(
     catalog.transcription,
@@ -291,20 +304,22 @@ export const SpeechSettings = ({
   if (settings.transcribeRoute === "cloud") {
     transcribeHint = cloudDetail(transcribePrice, keySet);
   }
-  let cleanupHint = "The transcript is the note.";
-  if (settings.cleanupRoute === "device") {
+  let cleanupHint = "";
+  if (settings.cleanTranscripts && settings.cleanupRoute === "device") {
     cleanupHint = appleCleanupDetail(apple);
-  } else if (settings.cleanupRoute === "cloud") {
+  } else if (settings.cleanTranscripts && settings.cleanupRoute === "cloud") {
     cleanupHint = cloudDetail(
       priceOf(catalog.cleanup, settings.cleanupModel),
       keySet
     );
+  } else if (settings.cleanTranscripts) {
+    cleanupHint = "Kept as spoken.";
   }
 
   const showKey =
     keySet ||
     settings.transcribeRoute === "cloud" ||
-    settings.cleanupRoute === "cloud";
+    (settings.cleanTranscripts && settings.cleanupRoute === "cloud");
 
   return (
     <div className="flex flex-col gap-3 px-2.5 py-2">
@@ -337,14 +352,27 @@ export const SpeechSettings = ({
       )}
       <p className="text-muted-foreground text-[11px]">{transcribeHint}</p>
       <RouteSwitch
+        body={settings.cleanTranscripts}
         label="Cleanup"
         onPick={(cleanupRoute) => {
           onChange({ ...settings, cleanupRoute });
         }}
         options={cleanupRoutes}
-        value={settings.cleanupRoute}
+        trailing={
+          <Switch
+            aria-label="Clean up transcripts"
+            checked={settings.cleanTranscripts}
+            onCheckedChange={(cleanTranscripts) => {
+              onChange({ ...settings, cleanTranscripts });
+            }}
+            size="sm"
+          />
+        }
+        value={
+          settings.cleanupRoute === "off" ? "device" : settings.cleanupRoute
+        }
       />
-      {settings.cleanupRoute === "device" ? (
+      {settings.cleanTranscripts && settings.cleanupRoute === "device" ? (
         <LocalMenu
           engines={localCleanups}
           label="Cleanup model"
@@ -354,7 +382,7 @@ export const SpeechSettings = ({
           value={settings.cleanupDevice}
         />
       ) : null}
-      {settings.cleanupRoute === "cloud" ? (
+      {settings.cleanTranscripts && settings.cleanupRoute === "cloud" ? (
         <ModelMenu
           choices={catalog.cleanup}
           label="Cleanup model"
@@ -364,7 +392,9 @@ export const SpeechSettings = ({
           value={settings.cleanupModel}
         />
       ) : null}
-      <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
+      {cleanupHint.length > 0 ? (
+        <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
+      ) : null}
       {showKey ? <GatewayKey keySet={keySet} onSet={setKeySet} /> : null}
     </div>
   );

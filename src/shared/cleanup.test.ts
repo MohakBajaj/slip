@@ -11,6 +11,7 @@ import {
   settleCleanup,
 } from "./cleanup";
 import type { CleanupAsk } from "./cleanup";
+import { slipSpeechCost } from "./speech-cost";
 
 const RAW =
   "um I was going to say uh the milk, the eggs, and the bread before I head out the door this afternoon";
@@ -319,6 +320,32 @@ test("cleanup is not asked for a short transcript", async () => {
     cleaned: true,
   });
   expect(calls).toBe(2);
+});
+
+test("cleanup off makes no call and keeps the trimmed transcript", async () => {
+  let calls = 0;
+  const ask: CleanupAsk = () => {
+    calls += 1;
+    return Promise.resolve("Should not be used.");
+  };
+  const spoken = `  ${words(21)}  `;
+  const outcome = await settleCleanup(spoken, [], 1000);
+  expect(calls).toBe(0);
+  expect(outcome).toEqual({
+    body: spoken.trim(),
+    cleaned: false,
+    transcript: spoken.trim(),
+  });
+  const cost = slipSpeechCost({
+    transcription: { cost: 0.012, model: "mai-transcribe-2" },
+  });
+  expect(cost.cleanup).toBeUndefined();
+  expect(cost.transcription?.cost).toBe(0.012);
+  expect(cost.total).toBe(0.012);
+  expect(await settleCleanup(spoken, [ask], 1000)).toMatchObject({
+    body: "Should not be used.",
+  });
+  expect(calls).toBe(1);
 });
 
 test("an aborted capture does not run a later step", async () => {

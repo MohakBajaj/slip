@@ -58,6 +58,21 @@ export const isSafeCapture = (seq: string[]): boolean =>
   seq.length <= 4 &&
   seq.every((step) => isModName(step) || hasModPrefix(step));
 
+/**
+ * Enter commits a non-empty safe chord. An empty draft commits [] only after
+ * Backspace or Delete marked it for clearing. Anything else is left as it was.
+ */
+export const finishCapture = (
+  draft: readonly string[],
+  cleared: boolean
+): string[] | null => {
+  if (draft.length === 0) {
+    return cleared ? [] : null;
+  }
+  const steps = [...draft];
+  return isSafeCapture(steps) ? steps : null;
+};
+
 export const sameCapture = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((step, i) => step === right[i]);
 
@@ -74,17 +89,16 @@ export const unusedCapture = (
   return ["Mod+Shift+V"];
 };
 
-export const defaultVoiceCapture = (): string[] =>
-  unusedCapture(defaultCapture());
+export const defaultVoiceCapture = (): string[] => [];
 
-export const defaultDrawCapture = (): string[] => ["Mod+Shift", "Mod+Shift"];
+export const defaultDrawCapture = (): string[] => [];
 
-export const defaultNoteCapture = (): string[] =>
-  unusedCapture(defaultCapture(), defaultVoiceCapture());
+export const defaultNoteCapture = (): string[] => [];
 
 export const defaultAnnotateOut = (): string[] => ["Control+Option+A"];
 
-export const defaultDictateCapture = (): string[] => ["Control+Option+D"];
+/** Off until someone sets one. Hold fn is the dictate gesture. */
+export const defaultDictateCapture = (): string[] => [];
 
 export const CAPTURE_FIELDS = [
   "capture",
@@ -121,9 +135,9 @@ export const assignCapture = (
     noteCapture: field === "noteCapture" ? chosen : [...current.noteCapture],
     voiceCapture: field === "voiceCapture" ? chosen : [...current.voiceCapture],
   };
-  const placed: string[][] = [chosen];
+  const placed: string[][] = chosen.length > 0 ? [chosen] : [];
   for (const key of CAPTURE_FIELDS) {
-    if (key === field) {
+    if (key === field || out[key].length === 0) {
       continue;
     }
     if (placed.some((seq) => sameCapture(seq, out[key]))) {
@@ -132,7 +146,9 @@ export const assignCapture = (
         out[key] = unusedCapture(first, ...rest);
       }
     }
-    placed.push(out[key]);
+    if (out[key].length > 0) {
+      placed.push(out[key]);
+    }
   }
   return out;
 };
@@ -141,33 +157,46 @@ export const sanitizeVoiceCapture = (
   raw: unknown,
   taken: string[]
 ): string[] => {
-  if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [];
+  }
+  if (raw.every((step) => typeof step === "string")) {
     const seq = raw.filter((step) => step.length > 0 && step.length < 48);
     if (isSafeCapture(seq) && !sameCapture(seq, taken)) {
       return seq;
     }
+    if (isSafeCapture(seq)) {
+      return unusedCapture(taken);
+    }
   }
-  return unusedCapture(taken);
+  return [];
 };
+
+const armed = (taken: string[][]): string[][] =>
+  taken.filter((seq) => seq.length > 0);
 
 const sanitizeFreeCapture = (
   raw: unknown,
   fallback: string[],
   taken: string[][]
 ): string[] => {
+  const blocked = armed(taken);
+  if (Array.isArray(raw) && raw.length === 0) {
+    return [];
+  }
   if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
     const seq = raw.filter((step) => step.length > 0 && step.length < 48);
     if (
       isSafeCapture(seq) &&
-      taken.every((other) => !sameCapture(seq, other))
+      blocked.every((other) => !sameCapture(seq, other))
     ) {
       return seq;
     }
   }
-  if (taken.every((other) => !sameCapture(fallback, other))) {
+  if (blocked.every((other) => !sameCapture(fallback, other))) {
     return fallback;
   }
-  return unusedCapture(taken[0] ?? defaultCapture(), ...taken.slice(1));
+  return unusedCapture(blocked[0] ?? defaultCapture(), ...blocked.slice(1));
 };
 
 export const sanitizeDrawCapture = (
@@ -194,6 +223,9 @@ export const sanitizeCapture = (
   raw: unknown,
   legacyChord?: unknown
 ): string[] => {
+  if (Array.isArray(raw) && raw.length === 0) {
+    return [];
+  }
   if (Array.isArray(raw) && raw.every((step) => typeof step === "string")) {
     const seq = raw.filter((step) => step.length > 0 && step.length < 48);
     if (isSafeCapture(seq)) {
@@ -209,8 +241,11 @@ export const sanitizeCapture = (
   return defaultCapture();
 };
 
-export const formatCapture = (seq: string[]): string =>
-  seq
+export const formatCapture = (seq: string[]): string => {
+  if (seq.length === 0) {
+    return "Off";
+  }
+  return seq
     .map((step) => {
       if (MOD_TOKEN[step] !== undefined) {
         return MOD_TOKEN[step];
@@ -221,6 +256,7 @@ export const formatCapture = (seq: string[]): string =>
         .join(" ");
     })
     .join(" ");
+};
 
 export const parseCapture = (seq: string[]): CaptureStep[] => {
   const steps: CaptureStep[] = [];

@@ -52,8 +52,13 @@ test("an old cleanup endpoint becomes cloud, and off stays off", () => {
     cleanup: false,
     cleanupUrl: "https://api.openai.com/v1",
   });
-  expect(off.cleanupRoute).toBe("off");
+  expect(off.cleanTranscripts).toBe(false);
+  expect(off.cleanupRoute).toBe("device");
   expect("cleanupUrl" in off).toBe(false);
+  expect(sanitizeSettings({}).cleanTranscripts).toBe(true);
+  expect(
+    sanitizeSettings({ cleanTranscripts: false, cleanupRoute: "cloud" })
+  ).toMatchObject({ cleanTranscripts: false, cleanupRoute: "cloud" });
   expect(sanitizeSettings({ cleanup: true, cleanupUrl: "" }).cleanupRoute).toBe(
     "device"
   );

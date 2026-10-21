@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 import { FONTS, THEMES, TRAY_ICONS } from "../../../shared/appearance";
 import type { FontId, ThemeId, TrayIconId } from "../../../shared/appearance";
-import { assignCapture } from "../../../shared/capture-bind";
+import { assignCapture, formatCapture } from "../../../shared/capture-bind";
 import type { CaptureField } from "../../../shared/capture-bind";
 import { ACCENTS, clampZoom, ZOOM_MAX, ZOOM_MIN } from "../../../shared/types";
 import type {
@@ -31,6 +31,9 @@ const schemes = ["system", "light", "dark"] as const;
 
 const vaultLabel = (filePath: string): string =>
   filePath.replace(/^\/Users\/[^/]+/u, "~");
+
+const FN_HINT =
+  "If fn opens something else, set System Settings → Keyboard → Press 🌐 key to Do Nothing.";
 
 const Heading = ({ children }: { children: string }) => (
   <p className="text-foreground px-0.5 text-[13px] font-medium">{children}</p>
@@ -129,14 +132,41 @@ export const SettingsPanel = ({
   settings: Settings;
 }) => {
   const [advanced, setAdvanced] = useState(false);
+  const [dictateOpen, setDictateOpen] = useState(false);
+  const [fnOn, setFnOn] = useState<boolean | null>(null);
   const [moreCapture, setMoreCapture] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
 
   useEffect(() => {
+    let live = true;
+    const readFn = (): void => {
+      window.slip
+        .inputMonitoring()
+        .then((granted) => {
+          if (live) {
+            setFnOn(granted);
+          }
+        })
+        .catch(() => {
+          if (live) {
+            setFnOn(false);
+          }
+        });
+    };
     window.slip
       .skillStatus()
-      .then(setSkill)
+      .then((status) => {
+        if (live) {
+          setSkill(status);
+        }
+      })
       .catch(() => undefined);
+    readFn();
+    window.addEventListener("focus", readFn);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", readFn);
+    };
   }, []);
 
   const pickTheme = (theme: ThemeId): void => {
@@ -232,14 +262,51 @@ export const SettingsPanel = ({
             presets={false}
             value={settings.annotateOut}
           />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Dictate</p>
-          <CaptureBind
-            hint="Hold to talk. Tap to toggle."
-            onBind={onBind}
-            onSequence={onChord("dictateCapture")}
-            presets={false}
-            value={settings.dictateCapture}
-          />
+          <Card>
+            <SettingsRow label="Hold fn to dictate">
+              <span className="flex shrink-0 items-center gap-2 text-[11px] whitespace-nowrap">
+                <button
+                  aria-expanded={dictateOpen}
+                  aria-label="Dictate shortcut"
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    setDictateOpen((open) => !open);
+                  }}
+                  type="button"
+                >
+                  {settings.dictateCapture.length === 0
+                    ? "Shortcut: none"
+                    : formatCapture(settings.dictateCapture)}
+                </button>
+                {fnOn === false ? (
+                  <span className="text-muted-foreground" title={FN_HINT}>
+                    Needs Input Monitoring
+                    {" · "}
+                    <button
+                      className="text-foreground"
+                      onClick={() => {
+                        window.slip.openInput().catch(() => undefined);
+                      }}
+                      type="button"
+                    >
+                      Allow
+                    </button>
+                  </span>
+                ) : null}
+              </span>
+            </SettingsRow>
+            {dictateOpen ? (
+              <div className="px-2.5 pb-2">
+                <CaptureBind
+                  hint="Optional."
+                  onBind={onBind}
+                  onSequence={onChord("dictateCapture")}
+                  presets={false}
+                  value={settings.dictateCapture}
+                />
+              </div>
+            ) : null}
+          </Card>
           <Card>
             <SettingsRow label="Keep dictations in inbox">
               <Switch
