@@ -60,6 +60,10 @@ describe("changelog", () => {
     expect(current).toContain("Annotate anywhere");
     expect(current).toContain("20 words");
     expect(current).toContain("(#18)");
+    const next = changelogSection(changelog, "1.0.7");
+    expect(next).toContain("Hold fn");
+    expect(next).toContain("🌐");
+    expect(next).toContain("Clean up transcripts");
     const released = changelogSection(changelog, "1.0.5");
     expect(released).toContain("#2");
     expect(released).toContain("#3");
@@ -69,7 +73,7 @@ describe("changelog", () => {
     expect(released).toContain("#10");
     expect(released).toContain("#11");
     expect(released).toContain("#12");
-    expect(unreleasedNotes(changelog)).toContain("Hold the fn key");
+    expect(unreleasedNotes(changelog)).toBeNull();
   });
 
   test("moves unreleased notes under the new version", () => {
@@ -88,16 +92,23 @@ describe("changelog", () => {
     );
   });
 
-  test("dry-run prints the next version and does not write", () => {
+  test("dry-run refuses an empty unreleased section and does not write", () => {
     const beforePkg = readFileSync("package.json", "utf8");
     const beforeLog = readFileSync("CHANGELOG.md", "utf8");
-    const stdout = execFileSync(
-      "sh",
-      ["scripts/cut-release.sh", "patch", "--dry-run"],
-      { encoding: "utf8" }
-    );
-    expect(stdout).toContain("next 1.0.7");
-    expect(stdout).toContain("not pushed");
+    let stderr = "";
+    try {
+      execFileSync("sh", ["scripts/cut-release.sh", "patch", "--dry-run"], {
+        encoding: "utf8",
+      });
+      throw new Error("dry-run should fail");
+    } catch (error) {
+      const failed = error as { stderr?: string };
+      if (failed.stderr === undefined) {
+        throw error;
+      }
+      stderr = failed.stderr;
+    }
+    expect(stderr).toContain("Nothing to release");
     expect(readFileSync("package.json", "utf8")).toBe(beforePkg);
     expect(readFileSync("CHANGELOG.md", "utf8")).toBe(beforeLog);
   });
