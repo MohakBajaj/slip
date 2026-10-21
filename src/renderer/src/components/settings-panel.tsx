@@ -129,6 +129,7 @@ export const SettingsPanel = ({
   settings: Settings;
 }) => {
   const [advanced, setAdvanced] = useState(false);
+  const [fnOn, setFnOn] = useState<boolean | null>(null);
   const [moreCapture, setMoreCapture] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
 
@@ -137,6 +138,12 @@ export const SettingsPanel = ({
       .skillStatus()
       .then(setSkill)
       .catch(() => undefined);
+    window.slip
+      .inputMonitoring()
+      .then(setFnOn)
+      .catch(() => {
+        setFnOn(false);
+      });
   }, []);
 
   const pickTheme = (theme: ThemeId): void => {
@@ -233,8 +240,33 @@ export const SettingsPanel = ({
             value={settings.annotateOut}
           />
           <p className="text-muted-foreground px-0.5 text-[12px]">Dictate</p>
+          <Card>
+            <SettingsRow
+              detail={
+                fnOn === false ? "Needs Input Monitoring" : "Hold to talk"
+              }
+              label="Hold fn"
+            >
+              {fnOn === false ? (
+                <Button
+                  className="press"
+                  onClick={() => {
+                    window.slip.openInput().catch(() => undefined);
+                  }}
+                  size="xs"
+                >
+                  Allow
+                </Button>
+              ) : null}
+            </SettingsRow>
+          </Card>
+          <p className="text-muted-foreground px-0.5 text-[11px] leading-snug">
+            If fn opens something else, set System Settings → Keyboard → Press
+            🌐 key to Do Nothing.
+          </p>
+          <p className="text-muted-foreground px-0.5 text-[12px]">Shortcut</p>
           <CaptureBind
-            hint="Hold to talk. Tap to toggle."
+            hint="Optional. Off until you set one."
             onBind={onBind}
             onSequence={onChord("dictateCapture")}
             presets={false}

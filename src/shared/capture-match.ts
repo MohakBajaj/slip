@@ -163,14 +163,19 @@ const compileCapture = (seq: string[]): Compiled[] => {
 
 const fallback = (): Compiled[] => compileCapture(["Shift", "Shift"]);
 
+const stepsFor = (seq: string[]): Compiled[] => {
+  if (seq.length === 0) {
+    return [];
+  }
+  const steps = compileCapture(seq);
+  return steps.length === 0 ? fallback() : steps;
+};
+
 export const createCaptureMatcher = (
   seq: string[],
   opts?: { now?: () => number; windowMs?: number }
 ) => {
-  let steps = compileCapture(seq);
-  if (steps.length === 0) {
-    steps = fallback();
-  }
+  let steps = stepsFor(seq);
   let index = 0;
   let lastAt = 0;
   let modDown = false;
@@ -255,10 +260,7 @@ export const createCaptureMatcher = (
   };
 
   const setSequence = (next: string[]): void => {
-    steps = compileCapture(next);
-    if (steps.length === 0) {
-      steps = fallback();
-    }
+    steps = stepsFor(next);
     reset();
   };
 

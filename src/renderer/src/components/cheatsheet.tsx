@@ -32,27 +32,11 @@ export const Cheatsheet = ({
         <p className="text-[13px] font-medium">Shortcuts</p>
         <p className="text-muted-foreground font-mono text-[11px]">Esc</p>
       </div>
+      <p className="text-muted-foreground mb-3 text-[11px] leading-snug">
+        Hold fn to dictate anywhere. If fn opens something else, set System
+        Settings → Keyboard → Press 🌐 key to Do Nothing.
+      </p>
       <div className="flex flex-col gap-3">
-        {CHEATSHEET.map((group) => (
-          <section className="flex flex-col" key={group.title}>
-            <p className="text-muted-foreground px-0.5 pb-1 text-[11px]">
-              {group.title}
-            </p>
-            {group.rows.map((row) => (
-              <div
-                className="flex items-center justify-between gap-3 py-0.5"
-                key={row.id}
-              >
-                <span className="min-w-0 truncate text-[13px]">
-                  {row.label}
-                </span>
-                <span className="text-muted-foreground shrink-0 font-mono text-[11px]">
-                  {rowKeys(shortcuts[row.id], row.alias)}
-                </span>
-              </div>
-            ))}
-          </section>
-        ))}
         {anywhere.length > 0 ? (
           <section className="flex flex-col">
             <p className="text-muted-foreground px-0.5 pb-1 text-[11px]">
@@ -73,10 +57,27 @@ export const Cheatsheet = ({
             ))}
           </section>
         ) : null}
+        {CHEATSHEET.map((group) => (
+          <section className="flex flex-col" key={group.title}>
+            <p className="text-muted-foreground px-0.5 pb-1 text-[11px]">
+              {group.title}
+            </p>
+            {group.rows.map((row) => (
+              <div
+                className="flex items-center justify-between gap-3 py-0.5"
+                key={row.id}
+              >
+                <span className="min-w-0 truncate text-[13px]">
+                  {row.label}
+                </span>
+                <span className="text-muted-foreground shrink-0 font-mono text-[11px]">
+                  {rowKeys(shortcuts[row.id], row.alias)}
+                </span>
+              </div>
+            ))}
+          </section>
+        ))}
       </div>
-      <p className="text-muted-foreground mt-3 text-[11px]">
-        ⇧⌘C list · ⇧⌘P prompt · ⇧⌘M merge
-      </p>
     </div>
   </div>
 );

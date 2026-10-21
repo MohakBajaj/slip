@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 import { catalogChoices } from "../../../shared/gateway-models";
@@ -30,8 +31,10 @@ const transcribeRoutes = [
 const cleanupRoutes = [
   { id: "device", label: "On-device" },
   { id: "cloud", label: "Cloud" },
-  { id: "off", label: "Off" },
-] as const satisfies readonly { id: CleanupRoute; label: string }[];
+] as const satisfies readonly {
+  id: Exclude<CleanupRoute, "off">;
+  label: string;
+}[];
 
 const selectClass =
   "border-input bg-background text-foreground h-7 w-full rounded-lg border px-2 text-[12px] outline-none";
@@ -263,7 +266,7 @@ export const SpeechSettings = ({
       .catch(() => undefined);
   }, []);
   useEffect(() => {
-    if (settings.cleanupRoute !== "device") {
+    if (!settings.cleanTranscripts || settings.cleanupRoute !== "device") {
       return undefined;
     }
     let live = true;
@@ -278,7 +281,7 @@ export const SpeechSettings = ({
     return () => {
       live = false;
     };
-  }, [settings.cleanupRoute]);
+  }, [settings.cleanTranscripts, settings.cleanupRoute]);
 
   const transcribePrice = priceOf(
     catalog.transcription,
@@ -291,8 +294,8 @@ export const SpeechSettings = ({
   if (settings.transcribeRoute === "cloud") {
     transcribeHint = cloudDetail(transcribePrice, keySet);
   }
-  let cleanupHint = "The transcript is the note.";
-  if (settings.cleanupRoute === "device") {
+  let cleanupHint = "Kept as spoken.";
+  if (settings.cleanTranscripts && settings.cleanupRoute === "device") {
     cleanupHint = appleCleanupDetail(apple);
   } else if (settings.cleanupRoute === "cloud") {
     cleanupHint = cloudDetail(
@@ -304,7 +307,7 @@ export const SpeechSettings = ({
   const showKey =
     keySet ||
     settings.transcribeRoute === "cloud" ||
-    settings.cleanupRoute === "cloud";
+    (settings.cleanTranscripts && settings.cleanupRoute === "cloud");
 
   return (
     <div className="flex flex-col gap-3 px-2.5 py-2">
@@ -336,15 +339,30 @@ export const SpeechSettings = ({
         />
       )}
       <p className="text-muted-foreground text-[11px]">{transcribeHint}</p>
-      <RouteSwitch
-        label="Cleanup"
-        onPick={(cleanupRoute) => {
-          onChange({ ...settings, cleanupRoute });
-        }}
-        options={cleanupRoutes}
-        value={settings.cleanupRoute}
-      />
-      {settings.cleanupRoute === "device" ? (
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] leading-none">Clean up transcripts</p>
+        <Switch
+          aria-label="Clean up transcripts"
+          checked={settings.cleanTranscripts}
+          onCheckedChange={(cleanTranscripts) => {
+            onChange({ ...settings, cleanTranscripts });
+          }}
+          size="sm"
+        />
+      </div>
+      {settings.cleanTranscripts ? (
+        <RouteSwitch
+          label="Cleanup"
+          onPick={(cleanupRoute) => {
+            onChange({ ...settings, cleanupRoute });
+          }}
+          options={cleanupRoutes}
+          value={
+            settings.cleanupRoute === "off" ? "device" : settings.cleanupRoute
+          }
+        />
+      ) : null}
+      {settings.cleanTranscripts && settings.cleanupRoute === "device" ? (
         <LocalMenu
           engines={localCleanups}
           label="Cleanup model"
@@ -354,7 +372,7 @@ export const SpeechSettings = ({
           value={settings.cleanupDevice}
         />
       ) : null}
-      {settings.cleanupRoute === "cloud" ? (
+      {settings.cleanTranscripts && settings.cleanupRoute === "cloud" ? (
         <ModelMenu
           choices={catalog.cleanup}
           label="Cleanup model"

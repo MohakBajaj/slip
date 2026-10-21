@@ -204,6 +204,20 @@ export const CaptureBind = ({
           {hint}
         </span>
       </button>
+      {value.length > 0 ? (
+        <div className="flex justify-end">
+          <button
+            className="text-muted-foreground px-0.5 text-[11px]"
+            onClick={() => {
+              stop(null);
+              onSequence([]);
+            }}
+            type="button"
+          >
+            Turn off
+          </button>
+        </div>
+      ) : null}
       {presets ? (
         <div className="grid grid-cols-4 gap-1.5">
           {CAPTURE_PRESETS.map((preset) => (

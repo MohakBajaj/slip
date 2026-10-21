@@ -55,6 +55,8 @@ const api = {
   drawSession: () => ipcRenderer.invoke("drawSession") as Promise<DrawSession>,
   gatewayCatalog: () =>
     ipcRenderer.invoke("gatewayCatalog") as Promise<GatewayCatalog>,
+  inputMonitoring: () =>
+    ipcRenderer.invoke("inputMonitoring") as Promise<boolean>,
   installSkill: () =>
     ipcRenderer.invoke("installSkill") as Promise<SkillStatus>,
   load: () =>
@@ -181,6 +183,7 @@ const api = {
       | "slip"
       | { imagePath: string; mode?: "attach" | "slip"; slipId: string }
   ) => ipcRenderer.invoke("openDraw", mode),
+  openInput: () => ipcRenderer.invoke("openInput"),
   openMic: () => ipcRenderer.invoke("openMic"),
   openPreview: (slipId: string, index: number) =>
     ipcRenderer.invoke("openPreview", slipId, index),

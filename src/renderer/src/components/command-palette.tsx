@@ -26,6 +26,7 @@ export const CommandPalette = ({
   onOpen,
   onOpenChange,
   onOpenVault,
+  onSelectAll,
   onSettings,
   onUndo,
   open,
@@ -47,6 +48,7 @@ export const CommandPalette = ({
   onOpen: (id: string) => void;
   onOpenChange: (open: boolean) => void;
   onOpenVault: () => void;
+  onSelectAll: () => void;
   onSettings: () => void;
   onUndo: () => void;
   open: boolean;
@@ -97,6 +99,9 @@ export const CommandPalette = ({
         </CommandItem>
         <CommandItem disabled={subjectCount < 2} onSelect={onMerge}>
           Merge
+        </CommandItem>
+        <CommandItem disabled={subjectCount === 0} onSelect={onSelectAll}>
+          Select all
         </CommandItem>
         <CommandItem onSelect={onOpenVault}>Open vault</CommandItem>
         <CommandItem onSelect={onDraw}>Draw</CommandItem>

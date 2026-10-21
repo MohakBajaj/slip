@@ -1,6 +1,6 @@
 # Slip
 
-A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`. Hold **Option** to speak, and Slip transcribes it on this Mac. **⌘⇧ ⌘⇧** opens a draw overlay.
+A local capture inbox. Select text anywhere, press **Shift Shift**, and it becomes a markdown file in `~/Documents/Slip`. Hold **fn** to dictate into the app you are using. **⌃⌥A** annotates the screen.
 
 No account, no sync, no telemetry. Agents read the folder.
 
@@ -10,7 +10,7 @@ Download the latest macOS archive from [Releases](https://github.com/MohakBajaj/
 
 The build is not notarized. Right-click **Slip** and choose Open the first time. Slip needs macOS 12 or newer.
 
-Grant **Accessibility** the first time you capture, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing. **Check for Updates…** replaces the app in place. An ad-hoc signature changes every build, so macOS asks for Accessibility again after that kind of update.
+Grant **Accessibility** the first time you capture, **Input Monitoring** to dictate with fn, and **Microphone** the first time you speak a slip. Closing the window hides it. The menu-bar item keeps capturing. **Check for Updates…** replaces the app in place. An ad-hoc signature changes every build, so macOS asks for Accessibility again after that kind of update.
 
 The first spoken slip downloads the speech model (about 200 MB) into Application Support. Transcription defaults to [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Cleanup defaults to Apple Intelligence on this Mac: fillers and false starts come out, and the wording stays. The original transcript is kept on the slip. Settings can send transcription, cleanup, or both to a cloud model through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). The gateway key is stored with the macOS keychain, not in the settings file. If a cloud transcription fails, Slip uses Parakeet. If a cloud cleanup fails, Slip uses Apple Intelligence, then the raw transcript.
 
@@ -19,11 +19,10 @@ The first spoken slip downloads the speech model (about 200 MB) into Application
 Defaults, remappable in Settings:
 
 - **⇧ ⇧** — the current selection, including images in it, or a screenshot on the clipboard
-- **⌃ ⌃** — a quick note, without bringing Slip forward
-- **⌥** hold — speak; the text is saved. **⌥ ⌥** latches the recorder
-- **⌘⇧ ⌘⇧** — draw on a transparent overlay. Annotate draws on a slip image and saves a new png next to the original
+- **fn** hold — dictate into the focused app. A short tap is ignored. Another key cancels. If fn opens the emoji picker, set Keyboard → Press 🌐 key to Do Nothing
 - **⌃⌥A** — annotate a screenshot, or a region when the clipboard has no image. A drawing that is already open stays open
-- **⌃⌥D** — dictate into the focused app. Hold to talk, tap to start and stop
+- **⌃ ⌃**, **⌥** hold, and **⌘⇧ ⌘⇧** — quick note, voice, and draw. Off until you set them. The Inbox menu opens each one
+- Dictate's old **⌃⌥D** chord is off until you set a shortcut in Settings
 
 Drop images onto a slip. Merge selected slips from the command palette.
 

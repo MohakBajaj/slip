@@ -27,26 +27,26 @@ export type ShortcutId = (typeof SHORTCUT_IDS)[number];
 export type Shortcuts = Record<ShortcutId, string>;
 
 export const defaultShortcuts = (): Shortcuts => ({
-  annotate: "A",
+  annotate: "",
   archive: "E",
   cheatsheet: "Shift+Slash",
   compose: "Mod+N",
-  copy: "C",
+  copy: "",
   delete: "Mod+Backspace",
   dismiss: "Escape",
-  done: "Space",
-  edit: "I",
+  done: "",
+  edit: "",
   extendNext: "Shift+ArrowDown",
   extendPrev: "Shift+ArrowUp",
   focusNext: "ArrowDown",
   focusPrev: "ArrowUp",
   open: "Enter",
   palette: "Mod+K",
-  pin: "P",
+  pin: "",
   search: "Mod+F",
   selectAll: "Mod+A",
   settings: "Mod+Comma",
-  toggleMark: "X",
+  toggleMark: "",
   undo: "Mod+Z",
 });
 
@@ -65,6 +65,30 @@ const LEGACY_SHORTCUTS: Partial<Shortcuts> = {
   copy: "Enter",
 };
 
+/** Old single-key defaults. A custom binding is kept. */
+const RETIRED_SHORTCUTS: Partial<Shortcuts> = {
+  annotate: "A",
+  copy: "C",
+  done: "Space",
+  edit: "I",
+  pin: "P",
+  toggleMark: "X",
+};
+
+export const SHORTCUT_CORE: readonly ShortcutId[] = [
+  "focusNext",
+  "focusPrev",
+  "extendNext",
+  "extendPrev",
+  "open",
+  "dismiss",
+  "archive",
+  "delete",
+  "compose",
+  "undo",
+  "cheatsheet",
+];
+
 export const SHORTCUT_META: {
   id: ShortcutId;
   label: string;
@@ -75,21 +99,11 @@ export const SHORTCUT_META: {
   { id: "extendPrev", label: "Extend up" },
   { id: "open", label: "Open" },
   { id: "dismiss", label: "Close" },
-  { id: "done", label: "Done" },
-  { id: "pin", label: "Pin" },
   { id: "archive", label: "Archive" },
-  { id: "edit", label: "Edit" },
-  { id: "annotate", label: "Annotate" },
-  { id: "copy", label: "Copy" },
   { id: "delete", label: "Delete" },
-  { id: "toggleMark", label: "Select" },
   { id: "compose", label: "New slip" },
-  { id: "search", label: "Search" },
-  { id: "palette", label: "Commands" },
-  { id: "settings", label: "Settings" },
-  { id: "cheatsheet", label: "Shortcuts" },
   { id: "undo", label: "Undo" },
-  { id: "selectAll", label: "Select all" },
+  { id: "cheatsheet", label: "Shortcuts" },
 ];
 
 export interface CheatRow {
@@ -112,26 +126,16 @@ export const CHEATSHEET: { rows: CheatRow[]; title: string }[] = [
   },
   {
     rows: [
-      { id: "done", label: "Done" },
-      { id: "pin", label: "Pin" },
       { id: "archive", label: "Archive" },
-      { id: "edit", label: "Edit" },
-      { id: "annotate", label: "Annotate" },
-      { id: "copy", label: "Copy" },
       { id: "delete", label: "Delete" },
-      { id: "toggleMark", label: "Select" },
     ],
     title: "Slip",
   },
   {
     rows: [
       { id: "compose", label: "New slip" },
-      { id: "search", label: "Search" },
-      { id: "palette", label: "Commands" },
-      { id: "settings", label: "Settings" },
-      { alias: "Mod+Slash", id: "cheatsheet", label: "This list" },
       { id: "undo", label: "Undo" },
-      { id: "selectAll", label: "Select all" },
+      { alias: "Mod+Slash", id: "cheatsheet", label: "This list" },
     ],
     title: "App",
   },
@@ -191,7 +195,7 @@ export const shortcutLabel = (hotkey: string): string => {
 };
 
 export const shortcutTip = (label: string, hotkey: string): string =>
-  `${label} · ${shortcutLabel(hotkey)}`;
+  hotkey.length === 0 ? label : `${label} · ${shortcutLabel(hotkey)}`;
 
 // Text-editing chords stay with the field. Other ⌘ chords work while typing.
 const FIELD_KEYS = new Set(["A", "Backspace", "C", "V", "X", "Z"]);
@@ -250,11 +254,16 @@ export const sanitizeShortcuts = (raw: unknown): Shortcuts => {
   const next = { ...defaults };
   for (const id of SHORTCUT_IDS) {
     const value = input[id];
-    if (typeof value !== "string" || value.length === 0 || value.length >= 48) {
+    if (typeof value !== "string" || value.length >= 48) {
+      continue;
+    }
+    if (value.length === 0) {
+      next[id] = "";
       continue;
     }
     const legacy = LEGACY_SHORTCUTS[id];
-    next[id] = legacy === value ? defaults[id] : value;
+    const chosen = legacy === value ? defaults[id] : value;
+    next[id] = RETIRED_SHORTCUTS[id] === chosen ? "" : chosen;
   }
   return next;
 };

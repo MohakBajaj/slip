@@ -60,10 +60,10 @@ export const runMenuCommand = (
   run[name]?.();
 };
 
-const keysFor = (id: ShortcutId, shortcuts: Shortcuts): string[] => [
-  shortcuts[id],
-  ...(SHORTCUT_ALIASES[id] ?? []),
-];
+const keysFor = (id: ShortcutId, shortcuts: Shortcuts): string[] =>
+  [shortcuts[id], ...(SHORTCUT_ALIASES[id] ?? [])].filter(
+    (hotkey) => hotkey.length > 0
+  );
 
 export const useSlipHotkeys = ({
   binding,

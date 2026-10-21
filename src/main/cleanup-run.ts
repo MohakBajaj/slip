@@ -194,15 +194,11 @@ export const appleCleanupStatus = (bin: string): Promise<AppleCleanupStatus> =>
     });
   });
 
-const rawNote = (transcript: string): CleanupOutcome => {
-  const raw = transcript.trim();
-  return { body: raw, cleaned: false, transcript: raw };
-};
-
 export const cleanTranscript = async (
   transcript: string,
   opts: {
     bin: string;
+    clean: boolean;
     key: string;
     model: string;
     models: readonly GatewayModel[];
@@ -210,8 +206,14 @@ export const cleanTranscript = async (
     signal?: AbortSignal;
   }
 ): Promise<{ cost: SpeechStepCost | null; outcome: CleanupOutcome }> => {
-  if (opts.route === "off") {
-    return { cost: null, outcome: rawNote(transcript) };
+  if (!opts.clean || opts.route === "off") {
+    const outcome = await settleCleanup(
+      transcript,
+      [],
+      CLEANUP_TIMEOUT_MS,
+      opts.signal
+    );
+    return { cost: null, outcome };
   }
   const cloud = opts.route === "cloud" && opts.key.trim().length > 0;
   let cloudUsage: MeasuredUsage | undefined;

@@ -20,10 +20,13 @@ import {
   isTinyHtmlImage,
   parseDataImage,
 } from "../shared/clipboard-html";
+import { createFnHold, FN_TAP_MS } from "../shared/fn-hold";
+import type { FnEvent } from "../shared/fn-hold";
 import { fetchPublicBytes } from "../shared/image-fetch";
 import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
 import type { CaptureState } from "../shared/types";
 import { startFrontContext } from "./front-context";
+import { inputMonitoringGranted } from "./input-monitor";
 import { createMacPasteboard } from "./pasteboard";
 
 const COPY_POLL_MS = 20;
@@ -146,25 +149,23 @@ const install = (opts: {
   voiceSequence?: string[];
 }): CaptureHandle => {
   const matcher = createCaptureMatcher(opts.sequence ?? ["Shift", "Shift"]);
-  const voiceMatcher = createCaptureMatcher(
-    opts.voiceSequence ?? ["Option", "Option"]
-  );
-  const drawMatcher = createCaptureMatcher(
-    opts.drawSequence ?? ["Mod+Shift", "Mod+Shift"]
-  );
+  const voiceMatcher = createCaptureMatcher(opts.voiceSequence ?? []);
+  const drawMatcher = createCaptureMatcher(opts.drawSequence ?? []);
   const noteMatcher = createCaptureMatcher(
     opts.noteSequence ?? defaultNoteCapture()
   );
   const annotateMatcher = createCaptureMatcher(
     opts.annotateSequence ?? ["Control+Option+A"]
   );
-  const voiceHold = createVoiceHold(opts.voiceSequence ?? ["Option", "Option"]);
-  const dictateHold = createVoiceHold(
-    opts.dictateSequence ?? ["Control+Option+D"]
-  );
+  const voiceHold = createVoiceHold(opts.voiceSequence ?? []);
+  const dictateHold = createVoiceHold(opts.dictateSequence ?? []);
+  const fnHold = createFnHold();
+  let fnOn = inputMonitoringGranted();
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  let fnTimer: ReturnType<typeof setTimeout> | null = null;
   let holdLive = false;
-  let listenKeys =
+  const keysNeeded = (): boolean =>
+    fnOn ||
     matcher.needsKeys() ||
     voiceMatcher.needsKeys() ||
     drawMatcher.needsKeys() ||
@@ -172,6 +173,7 @@ const install = (opts: {
     annotateMatcher.needsKeys() ||
     voiceHold.needsKeys() ||
     dictateHold.needsKeys();
+  let listenKeys = keysNeeded();
   const pasteboard = createMacPasteboard();
   mkdirSync(opts.imageDir, { recursive: true });
   const cg = koffi.load(
@@ -293,6 +295,14 @@ const install = (opts: {
     dictateTimer = null;
   };
 
+  const clearFnTimer = (): void => {
+    if (fnTimer === null) {
+      return;
+    }
+    clearTimeout(fnTimer);
+    fnTimer = null;
+  };
+
   const safeDictate = (fn: (() => void) | undefined): void => {
     if (!fn) {
       return;
@@ -301,6 +311,31 @@ const install = (opts: {
       fn();
     } catch {
       // Overlay must not kill the tap.
+    }
+  };
+
+  const takeFn = (event: FnEvent): void => {
+    if (!fnOn) {
+      return;
+    }
+    const action = fnHold.push(event);
+    if (action === "arm") {
+      clearFnTimer();
+      fnTimer = setTimeout(() => {
+        fnTimer = null;
+        if (fnHold.tick(Date.now()) === "start") {
+          safeDictate(opts.onDictateHold);
+        }
+      }, FN_TAP_MS);
+      return;
+    }
+    if (!fnHold.pending()) {
+      clearFnTimer();
+    }
+    if (action === "end") {
+      safeDictate(opts.onDictateRelease);
+    } else if (action === "cancel") {
+      safeDictate(opts.onDictateCancel);
     }
   };
 
@@ -656,7 +691,8 @@ const install = (opts: {
         if (grabbing) {
           return event;
         }
-        const flags = Number(CGEventGetFlags(event)) & MOD_FLAGS;
+        const rawFlags = Number(CGEventGetFlags(event));
+        const flags = rawFlags & MOD_FLAGS;
         let input: MatchInput | null = null;
         if (type === kCGEventFlagsChanged) {
           input = { flags, type: "flags" };
@@ -676,9 +712,22 @@ const install = (opts: {
             opts.dictateOpen?.() === true
           ) {
             clearDictateTimer();
+            clearFnTimer();
             dictateHold.reset();
+            fnHold.reset();
             safeDictate(opts.onDictateCancel);
             return event;
+          }
+          const now = Date.now();
+          if (input.type === "flags") {
+            takeFn({ flags: rawFlags, now, type: "flags" });
+          } else {
+            takeFn({
+              code: input.code,
+              flags: rawFlags,
+              now,
+              type: input.type,
+            });
           }
           onInput(input);
         }
@@ -706,7 +755,21 @@ const install = (opts: {
     return true;
   };
 
+  const syncFn = (): void => {
+    const next = inputMonitoringGranted();
+    if (next === fnOn) {
+      return;
+    }
+    fnOn = next;
+    if (!fnOn) {
+      clearFnTimer();
+      fnHold.reset();
+    }
+    syncListenKeys();
+  };
+
   const syncTrust = (): void => {
+    syncFn();
     try {
       const ok = trusted();
       if (ok === lastTrusted) {
@@ -732,14 +795,7 @@ const install = (opts: {
 
   const syncListenKeys = (): void => {
     const prevKeys = listenKeys;
-    listenKeys =
-      matcher.needsKeys() ||
-      voiceMatcher.needsKeys() ||
-      drawMatcher.needsKeys() ||
-      noteMatcher.needsKeys() ||
-      annotateMatcher.needsKeys() ||
-      voiceHold.needsKeys() ||
-      dictateHold.needsKeys();
+    listenKeys = keysNeeded();
     if (listenKeys === prevKeys) {
       return;
     }
@@ -793,6 +849,8 @@ const install = (opts: {
     stop: () => {
       clearHoldTimer();
       clearDictateTimer();
+      clearFnTimer();
+      fnHold.reset();
       clearInterval(poll);
       dropTap();
     },

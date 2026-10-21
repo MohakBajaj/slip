@@ -774,32 +774,34 @@ const App = () => {
   const noteName = formatCapture(settings.noteCapture);
   const voiceName = formatHold(settings.voiceCapture);
   const drawName = formatDrawHint(settings.drawCapture);
+  const emptyHints = [
+    settings.capture.length > 0
+      ? { keys: chordName, text: "a selection" }
+      : null,
+    { keys: "fn", text: "to dictate" },
+    settings.annotateOut.length > 0
+      ? { keys: formatCapture(settings.annotateOut), text: "to annotate" }
+      : null,
+    settings.noteCapture.length > 0
+      ? { keys: noteName, text: "for a note" }
+      : null,
+    settings.voiceCapture.length > 0
+      ? { keys: voiceName, text: "to speak" }
+      : null,
+    settings.drawCapture.length > 0
+      ? { keys: drawName, text: "to draw" }
+      : null,
+  ].filter((hint) => hint !== null);
   let emptyCopy: ReactNode = (
     <div className="flex flex-col items-center gap-1">
-      <p>
-        <kbd className="font-sans font-medium whitespace-nowrap">
-          {chordName}
-        </kbd>{" "}
-        a selection
-      </p>
-      <p>
-        <kbd className="font-sans font-medium whitespace-nowrap">
-          {noteName}
-        </kbd>{" "}
-        for a note
-      </p>
-      <p>
-        <kbd className="font-sans font-medium whitespace-nowrap">
-          {voiceName}
-        </kbd>{" "}
-        to speak
-      </p>
-      <p>
-        <kbd className="font-sans font-medium whitespace-nowrap">
-          {drawName}
-        </kbd>{" "}
-        to draw
-      </p>
+      {emptyHints.map((hint) => (
+        <p key={hint.text}>
+          <kbd className="font-sans font-medium whitespace-nowrap">
+            {hint.keys}
+          </kbd>{" "}
+          {hint.text}
+        </p>
+      ))}
       <p>Drop images, or type below.</p>
     </div>
   );
@@ -1138,14 +1140,23 @@ const App = () => {
       {helpOpen ? (
         <Cheatsheet
           anywhere={[
-            {
-              keys: formatCapture(settings.annotateOut),
-              label: "Annotate anywhere",
-            },
-            {
-              keys: formatCapture(settings.dictateCapture),
-              label: "Dictate anywhere",
-            },
+            { keys: "hold fn", label: "Dictate anywhere" },
+            ...(settings.annotateOut.length > 0
+              ? [
+                  {
+                    keys: formatCapture(settings.annotateOut),
+                    label: "Annotate anywhere",
+                  },
+                ]
+              : []),
+            ...(settings.dictateCapture.length > 0
+              ? [
+                  {
+                    keys: formatCapture(settings.dictateCapture),
+                    label: "Dictate shortcut",
+                  },
+                ]
+              : []),
           ]}
           onClose={() => {
             setHelpOpen(false);
@@ -1200,6 +1211,10 @@ const App = () => {
             onOpenChange={setPaletteOpen}
             onOpenVault={() => {
               window.slip.openVault().catch(() => undefined);
+              setPaletteOpen(false);
+            }}
+            onSelectAll={() => {
+              setMarked(listIds);
               setPaletteOpen(false);
             }}
             onSettings={() => {

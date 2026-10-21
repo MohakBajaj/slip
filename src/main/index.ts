@@ -106,6 +106,7 @@ import {
   primeGatewayModels,
   refreshGatewayModels,
 } from "./gateway-catalog";
+import { INPUT_SETTINGS, inputMonitoringGranted } from "./input-monitor";
 import { grabRegion, pasteOutText } from "./paste-out";
 import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
 import type { VoiceTranscript } from "./transcribe";
@@ -1808,26 +1809,30 @@ const boot = async (): Promise<void> => {
       }
       let body = spoken.text;
       let cleanupCost: SpeechStepCost | null = null;
-      if (settings.cleanupRoute !== "off" && !isShortTranscript(spoken.text)) {
+      if (
+        settings.cleanTranscripts &&
+        settings.cleanupRoute !== "off" &&
+        !isShortTranscript(spoken.text)
+      ) {
         tell({ error: "", phase: "cleaning", received: 0, total: 0 });
-        const cleaned = await cleanTranscript(spoken.text, {
-          bin: bundledBin("slip-cleanup"),
-          key: readCleanupKey(),
-          model:
-            settings.cleanupRoute === "cloud"
-              ? settings.cleanupModel
-              : settings.cleanupDevice,
-          models: gatewayModels(),
-          route: settings.cleanupRoute,
-          signal: job.signal,
-        });
-        if (job.signal.aborted) {
-          return voiceReply("", null);
-        }
-        const { cost, outcome } = cleaned;
-        ({ body } = outcome);
-        cleanupCost = cost;
       }
+      const cleaned = await cleanTranscript(spoken.text, {
+        bin: bundledBin("slip-cleanup"),
+        clean: settings.cleanTranscripts,
+        key: readCleanupKey(),
+        model:
+          settings.cleanupRoute === "cloud"
+            ? settings.cleanupModel
+            : settings.cleanupDevice,
+        models: gatewayModels(),
+        route: settings.cleanupRoute,
+        signal: job.signal,
+      });
+      if (job.signal.aborted) {
+        return voiceReply("", null);
+      }
+      ({ body } = cleaned.outcome);
+      cleanupCost = cleaned.cost;
       const spent = voiceSlipCost(spoken, cleanupCost);
       const costLabel = spent.total > 0 ? formatUsd(spent.total) : "";
       const keep = (): Slip => {
@@ -2184,6 +2189,8 @@ const boot = async (): Promise<void> => {
     return folder;
   });
   ipcMain.handle("openAccess", () => shell.openExternal(ACCESS));
+  ipcMain.handle("openInput", () => shell.openExternal(INPUT_SETTINGS));
+  ipcMain.handle("inputMonitoring", () => inputMonitoringGranted());
   ipcMain.handle("openMic", () => shell.openExternal(MIC));
   ipcMain.handle("openVoice", () => {
     showVoice();

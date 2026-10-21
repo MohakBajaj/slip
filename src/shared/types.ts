@@ -51,6 +51,7 @@ export interface Settings {
   annotateOut: string[];
   capture: string[];
   checkUpdates: boolean;
+  cleanTranscripts: boolean;
   cleanupDevice: string;
   cleanupModel: string;
   cleanupRoute: CleanupRoute;
@@ -108,6 +109,7 @@ export const defaultSettings = (): Settings => {
     annotateOut: defaultAnnotateOut(),
     capture: defaultCapture(),
     checkUpdates: true,
+    cleanTranscripts: true,
     cleanupDevice: speech.cleanupDevice,
     cleanupModel: speech.cleanupModel,
     cleanupRoute: speech.cleanupRoute,
@@ -147,6 +149,14 @@ const isAccent = (value: unknown): value is Accent =>
 
 const isScheme = (value: unknown): value is Scheme =>
   value === "system" || value === "light" || value === "dark";
+
+const migrateCleanupSwitch = (
+  stored: unknown,
+  route: CleanupRoute
+): { cleanTranscripts: boolean; cleanupRoute: CleanupRoute } => ({
+  cleanTranscripts: typeof stored === "boolean" ? stored : route !== "off",
+  cleanupRoute: route === "off" ? "device" : route,
+});
 
 export const fontMigrationPending = (raw: unknown): boolean => {
   if (raw === null || typeof raw !== "object") {
@@ -234,6 +244,12 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   if (typeof next.checkUpdates !== "boolean") {
     next.checkUpdates = true;
   }
+  const cleanup = migrateCleanupSwitch(
+    (input as { cleanTranscripts?: unknown }).cleanTranscripts,
+    next.cleanupRoute
+  );
+  next.cleanTranscripts = cleanup.cleanTranscripts;
+  next.cleanupRoute = cleanup.cleanupRoute;
   if (typeof next.dock !== "boolean") {
     next.dock = true;
   }
@@ -257,6 +273,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     annotateOut: next.annotateOut,
     capture: next.capture,
     checkUpdates: next.checkUpdates,
+    cleanTranscripts: next.cleanTranscripts,
     cleanupDevice: next.cleanupDevice,
     cleanupModel: next.cleanupModel,
     cleanupRoute: next.cleanupRoute,

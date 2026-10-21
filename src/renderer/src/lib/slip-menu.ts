@@ -49,7 +49,10 @@ export const slipMenuEntries = ({
     archiveLabel = setArchived ? "Restore Selected" : "Archive Selected";
   }
 
-  const key = (id: keyof Shortcuts): string => menuAccelerator(shortcuts[id]);
+  const key = (id: keyof Shortcuts): string | undefined => {
+    const hotkey = shortcuts[id];
+    return hotkey.length === 0 ? undefined : menuAccelerator(hotkey);
+  };
 
   return [
     { accelerator: key("copy"), id: copyId, label: copyLabel },

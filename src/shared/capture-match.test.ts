@@ -143,6 +143,14 @@ describe("capture matcher", () => {
     ).toBe(true);
   });
 
+  test("an empty sequence stays off", () => {
+    const matcher = createCaptureMatcher([]);
+    expect(matcher.needsKeys()).toBe(false);
+    expect(doubleTap(matcher, FLAG_SHIFT)).toBe(false);
+    matcher.setSequence(["Shift", "Shift"]);
+    expect(doubleTap(matcher, FLAG_SHIFT)).toBe(true);
+  });
+
   test("unknown key falls back to Shift Shift", () => {
     const matcher = createCaptureMatcher(["Mod+F20"]);
     expect(matcher.needsKeys()).toBe(false);

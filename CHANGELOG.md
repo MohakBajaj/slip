@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Hold the fn key to dictate into the app you are using. Releasing transcribes, cleans up when that is on, and pastes. A tap shorter than 200ms is ignored, and another key while fn is held cancels. If Input Monitoring is off, fn-hold stays quiet and Settings says so.
+- Clean up transcripts, on by default. Off skips cleanup for every dictation, keeps the trimmed transcript, and shows transcription cost only.
+
+### Changed
+
+- Dictate's Control-Option-D chord is off until you set one. Annotate stays Control-Option-A. Voice, draw, and quick note start off; the Inbox menu still opens them. Selection stays Shift Shift.
+- The shortcut list is move, open, archive, delete, undo, new, and ?. The old single-key extras start off. Done, pin, edit, copy, annotate, and select stay on the buttons and menus.
+
 ## [1.0.6] - 2026-10-20
 
 1.0.5 was tagged on October 19 and never published. This is the first release since 1.0.4.

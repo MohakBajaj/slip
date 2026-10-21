@@ -10,8 +10,10 @@ import {
   sanitizeShortcuts,
   searchEscape,
   SHORTCUT_ALIASES,
+  SHORTCUT_CORE,
   shortcutInField,
   shortcutLabel,
+  shortcutTip,
 } from "./shortcuts";
 
 if (typeof globalThis.KeyboardEvent !== "function") {
@@ -58,6 +60,9 @@ describe("shortcuts", () => {
     const own = Object.entries(defaultShortcuts());
     for (const [id, hotkey] of own) {
       const key = hotkey.toLowerCase();
+      if (key.length === 0) {
+        continue;
+      }
       expect(seen.has(key)).toBe(false);
       seen.add(key);
       for (const alias of SHORTCUT_ALIASES[
@@ -81,7 +86,8 @@ describe("shortcuts", () => {
     expect(shortcutLabel(shortcuts.cheatsheet)).toBe("?");
     expect(shortcutLabel("Mod+Slash")).toBe("⌘/");
     expect(shortcutLabel(shortcuts.focusNext)).toBe("↓");
-    expect(shortcutLabel(shortcuts.done)).toBe("Space");
+    expect(shortcutLabel("Space")).toBe("Space");
+    expect(shortcutTip("Copy", "")).toBe("Copy");
   });
 
   test("single keys stay out of text fields", () => {
@@ -104,10 +110,27 @@ describe("shortcuts", () => {
       done: "D",
     });
     expect(next.archive).toBe("E");
-    expect(next.copy).toBe("C");
+    expect(next.copy).toBe("");
     expect(next.open).toBe("Enter");
     expect(next.done).toBe("D");
     expect(next.delete).toBe("Mod+Backspace");
+  });
+
+  test("retired single-key defaults unbind and a custom one stays", () => {
+    const next = sanitizeShortcuts({
+      annotate: "A",
+      copy: "C",
+      done: "Space",
+      edit: "Q",
+      pin: "P",
+      toggleMark: "X",
+    });
+    expect(next.annotate).toBe("");
+    expect(next.copy).toBe("");
+    expect(next.done).toBe("");
+    expect(next.pin).toBe("");
+    expect(next.toggleMark).toBe("");
+    expect(next.edit).toBe("Q");
   });
 
   test("menu accelerators use Electron names", () => {
@@ -157,12 +180,12 @@ describe("shortcuts", () => {
     expect(searchEscape("")).toBe("blur");
   });
 
-  test("cheatsheet covers every shortcut", () => {
-    const shown = new Set(
-      CHEATSHEET.flatMap((group) => group.rows.map((row) => row.id))
+  test("cheatsheet is the core set", () => {
+    const shown = CHEATSHEET.flatMap((group) =>
+      group.rows.map((row) => row.id)
     );
-    expect([...shown].toSorted()).toEqual(
-      Object.keys(defaultShortcuts()).toSorted()
-    );
+    expect(shown).toEqual([...SHORTCUT_CORE]);
+    expect(shown).not.toContain("done");
+    expect(shown).not.toContain("pin");
   });
 });
