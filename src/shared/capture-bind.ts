@@ -58,6 +58,21 @@ export const isSafeCapture = (seq: string[]): boolean =>
   seq.length <= 4 &&
   seq.every((step) => isModName(step) || hasModPrefix(step));
 
+/**
+ * Enter commits a non-empty safe chord. An empty draft commits [] only after
+ * Backspace or Delete marked it for clearing. Anything else is left as it was.
+ */
+export const finishCapture = (
+  draft: readonly string[],
+  cleared: boolean
+): string[] | null => {
+  if (draft.length === 0) {
+    return cleared ? [] : null;
+  }
+  const steps = [...draft];
+  return isSafeCapture(steps) ? steps : null;
+};
+
 export const sameCapture = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((step, i) => step === right[i]);
 

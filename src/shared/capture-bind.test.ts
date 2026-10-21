@@ -6,6 +6,7 @@ import {
   defaultDrawCapture,
   defaultNoteCapture,
   defaultVoiceCapture,
+  finishCapture,
   formatDrawHint,
   formatHold,
   sanitizeDrawCapture,
@@ -13,6 +14,8 @@ import {
   sanitizeVoiceCapture,
   unusedCapture,
 } from "./capture-bind";
+import { createVoiceHold } from "./capture-hold";
+import { FLAG_CONTROL, FLAG_OPTION, KEYCODES } from "./capture-match";
 import { sanitizeSettings } from "./types";
 
 describe("voice capture bind", () => {
@@ -135,5 +138,27 @@ describe("note capture bind", () => {
       next.noteCapture,
     ].map((seq) => seq.join("|"));
     expect(new Set(chords).size).toBe(4);
+  });
+});
+
+describe("clear a capture chord", () => {
+  const chord = ["Control+Option+D"];
+  const down = {
+    code: KEYCODES.D,
+    flags: FLAG_CONTROL | FLAG_OPTION,
+    type: "key" as const,
+  };
+
+  test("backspace or delete on an empty draft, then enter, saves nothing armed", () => {
+    expect(finishCapture(chord, false)).toEqual(chord);
+    const hold = createVoiceHold(chord);
+    expect(hold.push(down)).toBe("arm");
+    expect(finishCapture([], false)).toBeNull();
+    const cleared = finishCapture([], true);
+    expect(cleared).toEqual([]);
+    hold.setSequence(cleared ?? chord);
+    expect(hold.needsKeys()).toBe(false);
+    expect(hold.push(down)).toBeNull();
+    expect(finishCapture(["not-a-chord"], true)).toBeNull();
   });
 });

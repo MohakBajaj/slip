@@ -12,20 +12,37 @@ export const ACCESS_DENIED = 1;
 export const ACCESS_UNKNOWN = 2;
 
 type HidCheck = (request: number) => number;
+type HidAsk = (request: number) => void;
 
+let iokit: { func: (signature: string) => unknown } | null = null;
 let nativeCheck: HidCheck | null = null;
+let nativeAsk: HidAsk | null = null;
 let nativeFailed = false;
 
-const hidCheckAccess: HidCheck = (request) => {
+const loadIokit = (): { func: (signature: string) => unknown } | null => {
   if (process.platform !== "darwin" || nativeFailed) {
+    return null;
+  }
+  if (iokit) {
+    return iokit;
+  }
+  try {
+    iokit = koffi.load("/System/Library/Frameworks/IOKit.framework/IOKit");
+    return iokit;
+  } catch {
+    nativeFailed = true;
+    return null;
+  }
+};
+
+const hidCheckAccess: HidCheck = (request) => {
+  const lib = loadIokit();
+  if (!lib) {
     return ACCESS_DENIED;
   }
   if (nativeCheck === null) {
     try {
-      const iokit = koffi.load(
-        "/System/Library/Frameworks/IOKit.framework/IOKit"
-      );
-      nativeCheck = iokit.func(
+      nativeCheck = lib.func(
         "uint32_t IOHIDCheckAccess(uint32_t requestType)"
       ) as HidCheck;
     } catch {
@@ -36,9 +53,26 @@ const hidCheckAccess: HidCheck = (request) => {
   return nativeCheck(request);
 };
 
+const hidRequestAccess: HidAsk = (request) => {
+  const lib = loadIokit();
+  if (!lib) {
+    return;
+  }
+  if (nativeAsk === null) {
+    try {
+      nativeAsk = lib.func(
+        "uint8_t IOHIDRequestAccess(uint32_t requestType)"
+      ) as HidAsk;
+    } catch {
+      nativeFailed = true;
+      return;
+    }
+  }
+  nativeAsk(request);
+};
+
 /**
- * Status only. IOHIDCheckAccess does not prompt. IOHIDRequestAccess stays
- * unused so a status poll cannot raise the system dialog.
+ * Status only. IOHIDCheckAccess does not prompt. Polling and startup use this.
  */
 export const inputMonitoringGranted = (
   check: HidCheck = hidCheckAccess
@@ -47,5 +81,16 @@ export const inputMonitoringGranted = (
     return check(LISTEN_EVENT) === ACCESS_GRANTED;
   } catch {
     return false;
+  }
+};
+
+/** Allow button only. Asks once, then the caller opens the privacy pane. */
+export const requestInputMonitoring = (
+  ask: HidAsk = hidRequestAccess
+): void => {
+  try {
+    ask(LISTEN_EVENT);
+  } catch {
+    // The privacy pane is the fallback when the prompt cannot be raised.
   }
 };

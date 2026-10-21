@@ -6,6 +6,7 @@ import {
   ACCESS_UNKNOWN,
   inputMonitoringGranted,
   LISTEN_EVENT,
+  requestInputMonitoring,
 } from "./input-monitor";
 
 test("IOHIDCheckAccess is asked for listen-event and only granted counts", () => {
@@ -27,6 +28,16 @@ test("a native check that throws is not granted", () => {
       throw new Error("Invalid media type");
     })
   ).toBe(false);
+});
+
+test("allow asks for listen access and the status check does not", () => {
+  const asked: number[] = [];
+  requestInputMonitoring((request) => {
+    asked.push(request);
+  });
+  expect(asked).toEqual([LISTEN_EVENT]);
+  expect(inputMonitoringGranted(() => ACCESS_DENIED)).toBe(false);
+  expect(asked).toEqual([LISTEN_EVENT]);
 });
 
 test.skipIf(process.platform === "darwin")(

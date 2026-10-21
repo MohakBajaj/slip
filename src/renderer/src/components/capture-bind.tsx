@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 
 import {
   CAPTURE_PRESETS,
+  finishCapture,
   formatCapture,
-  isSafeCapture,
   sameCapture,
 } from "../../../shared/capture-bind";
 
@@ -65,20 +65,30 @@ export const CaptureBind = ({
 }) => {
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
+  const [clearing, setClearing] = useState(false);
   const draftRef = useRef(draft);
   const idleRef = useRef<number>(0);
   const ignoreTapRef = useRef(false);
+  const clearingRef = useRef(false);
   const stopRef = useRef<(next: string[] | null) => void>(() => undefined);
 
   draftRef.current = draft;
 
+  const markClearing = (on: boolean): void => {
+    clearingRef.current = on;
+    setClearing(on);
+  };
+
   const stop = (next: string[] | null): void => {
     window.clearTimeout(idleRef.current);
+    const saved =
+      next === null ? null : finishCapture(next, clearingRef.current);
     setRecording(false);
     setDraft([]);
+    markClearing(false);
     ignoreTapRef.current = false;
-    if (next !== null && isSafeCapture(next)) {
-      onSequence(next);
+    if (saved !== null) {
+      onSequence(saved);
     }
   };
   stopRef.current = stop;
@@ -119,9 +129,14 @@ export const CaptureBind = ({
         stopRef.current(draftRef.current);
         return;
       }
-      if (event.key === "Backspace") {
+      if (event.key === "Backspace" || event.key === "Delete") {
+        if (draftRef.current.length === 0) {
+          markClearing(true);
+          return;
+        }
         const next = draftRef.current.slice(0, -1);
         setDraft(next);
+        markClearing(false);
         if (next.length > 0) {
           bumpIdleRef.current(next);
         }
@@ -139,6 +154,7 @@ export const CaptureBind = ({
         return;
       }
       ignoreTapRef.current = true;
+      markClearing(false);
       const next = [...draftRef.current, hotkey].slice(0, 4);
       setDraft(next);
       bumpIdleRef.current(next);
@@ -160,6 +176,7 @@ export const CaptureBind = ({
       if (step === undefined) {
         return;
       }
+      markClearing(false);
       const next = [...draftRef.current, step].slice(0, 4);
       setDraft(next);
       bumpIdleRef.current(next);
@@ -175,35 +192,55 @@ export const CaptureBind = ({
 
   let shown = formatCapture(value);
   if (recording) {
-    shown = "Press keys";
     if (draft.length > 0) {
       shown = formatCapture(draft);
+    } else if (clearing) {
+      shown = "Off";
+    } else {
+      shown = "Press keys";
     }
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        aria-label="Record capture sequence"
+      <div
         className={cn(
-          "press rounded-xl px-2.5 py-2.5 text-left shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
+          "rounded-xl px-2.5 py-2.5 text-left shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
           recording && "bg-primary/15 shadow-[inset_0_0_0_1.5px_var(--primary)]"
         )}
-        onClick={() => {
-          if (recording) {
-            stop(draft);
-            return;
-          }
-          setDraft([]);
-          setRecording(true);
-        }}
-        type="button"
       >
-        <span className="block text-[15px] tracking-wide">{shown}</span>
-        <span className="text-muted-foreground mt-1 block text-[11px]">
-          {hint}
+        <button
+          aria-label="Record capture sequence"
+          className="press block w-full text-left"
+          onClick={() => {
+            if (recording) {
+              stop(draft);
+              return;
+            }
+            setDraft([]);
+            markClearing(false);
+            setRecording(true);
+          }}
+          type="button"
+        >
+          <span className="block text-[15px] tracking-wide">{shown}</span>
+        </button>
+        <span className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+          <span className="text-muted-foreground min-w-0 truncate">{hint}</span>
+          {value.length > 0 ? (
+            <button
+              className="text-muted-foreground shrink-0"
+              onClick={() => {
+                clearingRef.current = true;
+                stop([]);
+              }}
+              type="button"
+            >
+              Clear
+            </button>
+          ) : null}
         </span>
-      </button>
+      </div>
       {presets ? (
         <div className="grid grid-cols-4 gap-1.5">
           {CAPTURE_PRESETS.map((preset) => (

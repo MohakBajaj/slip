@@ -106,7 +106,11 @@ import {
   primeGatewayModels,
   refreshGatewayModels,
 } from "./gateway-catalog";
-import { INPUT_SETTINGS, inputMonitoringGranted } from "./input-monitor";
+import {
+  INPUT_SETTINGS,
+  inputMonitoringGranted,
+  requestInputMonitoring,
+} from "./input-monitor";
 import { grabRegion, pasteOutText } from "./paste-out";
 import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
 import type { VoiceTranscript } from "./transcribe";
@@ -2189,7 +2193,10 @@ const boot = async (): Promise<void> => {
     return folder;
   });
   ipcMain.handle("openAccess", () => shell.openExternal(ACCESS));
-  ipcMain.handle("openInput", () => shell.openExternal(INPUT_SETTINGS));
+  ipcMain.handle("openInput", () => {
+    requestInputMonitoring();
+    return shell.openExternal(INPUT_SETTINGS);
+  });
   ipcMain.handle("inputMonitoring", () => inputMonitoringGranted());
   ipcMain.handle("openMic", () => shell.openExternal(MIC));
   ipcMain.handle("openVoice", () => {

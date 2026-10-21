@@ -274,7 +274,9 @@ export const SettingsPanel = ({
                   }}
                   type="button"
                 >
-                  {formatCapture(settings.dictateCapture)}
+                  {settings.dictateCapture.length === 0
+                    ? "Shortcut: none"
+                    : formatCapture(settings.dictateCapture)}
                 </button>
                 {fnOn === false ? (
                   <span className="text-muted-foreground" title={FN_HINT}>
