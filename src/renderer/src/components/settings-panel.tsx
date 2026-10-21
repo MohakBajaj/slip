@@ -2,7 +2,7 @@ import "@fontsource-variable/geist/wght.css";
 import "@fontsource-variable/newsreader/wght.css";
 import { Folder } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,9 @@ const schemes = ["system", "light", "dark"] as const;
 
 const vaultLabel = (filePath: string): string =>
   filePath.replace(/^\/Users\/[^/]+/u, "~");
+
+const FN_HINT =
+  "If fn opens something else, set System Settings → Keyboard → Press 🌐 key to Do Nothing.";
 
 const Heading = ({ children }: { children: string }) => (
   <p className="text-foreground px-0.5 text-[13px] font-medium">{children}</p>
@@ -130,11 +133,9 @@ export const SettingsPanel = ({
 }) => {
   const [advanced, setAdvanced] = useState(false);
   const [dictateOpen, setDictateOpen] = useState(false);
-  const [fnHint, setFnHint] = useState(false);
   const [fnOn, setFnOn] = useState<boolean | null>(null);
   const [moreCapture, setMoreCapture] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
-  const fnWas = useRef<boolean | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -142,22 +143,14 @@ export const SettingsPanel = ({
       window.slip
         .inputMonitoring()
         .then((granted) => {
-          if (!live) {
-            return;
+          if (live) {
+            setFnOn(granted);
           }
-          if (!granted || fnWas.current === false) {
-            setFnHint(true);
-          }
-          fnWas.current = granted;
-          setFnOn(granted);
         })
         .catch(() => {
-          if (!live) {
-            return;
+          if (live) {
+            setFnOn(false);
           }
-          fnWas.current = false;
-          setFnOn(false);
-          setFnHint(true);
         });
     };
     window.slip
@@ -207,23 +200,6 @@ export const SettingsPanel = ({
   if (skill?.installed === true) {
     skillDetail = vaultLabel(skill.path);
     skillLabel = skill.stale ? "Update" : "Installed";
-  }
-
-  let fnStatus: ReactNode = null;
-  if (fnOn === false) {
-    fnStatus = (
-      <Button
-        className="press"
-        onClick={() => {
-          window.slip.openInput().catch(() => undefined);
-        }}
-        size="xs"
-      >
-        Allow
-      </Button>
-    );
-  } else if (fnOn === true) {
-    fnStatus = <span className="text-muted-foreground text-[11px]">On</span>;
   }
 
   const zoom = (
@@ -287,37 +263,40 @@ export const SettingsPanel = ({
             value={settings.annotateOut}
           />
           <Card>
-            <SettingsRow
-              detail={fnOn === false ? "Needs Input Monitoring" : undefined}
-              label="Hold fn to dictate"
-            >
-              {fnStatus}
+            <SettingsRow label="Hold fn to dictate">
+              <span className="flex shrink-0 items-center gap-2 text-[11px] whitespace-nowrap">
+                <button
+                  aria-expanded={dictateOpen}
+                  aria-label="Dictate shortcut"
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    setDictateOpen((open) => !open);
+                  }}
+                  type="button"
+                >
+                  {formatCapture(settings.dictateCapture)}
+                </button>
+                {fnOn === false ? (
+                  <span className="text-muted-foreground" title={FN_HINT}>
+                    Needs Input Monitoring
+                    {" · "}
+                    <button
+                      className="text-foreground"
+                      onClick={() => {
+                        window.slip.openInput().catch(() => undefined);
+                      }}
+                      type="button"
+                    >
+                      Allow
+                    </button>
+                  </span>
+                ) : null}
+              </span>
             </SettingsRow>
-            {fnHint ? (
-              <p className="text-muted-foreground px-2.5 pb-1 text-[11px] leading-snug">
-                If fn opens something else, set System Settings → Keyboard →
-                Press 🌐 key to Do Nothing.
-              </p>
-            ) : null}
-            <button
-              aria-expanded={dictateOpen}
-              className="flex items-center justify-between px-2.5 py-1 text-left"
-              onClick={() => {
-                setDictateOpen((open) => !open);
-              }}
-              type="button"
-            >
-              <span className="text-muted-foreground text-[12px]">
-                {`Shortcut · ${formatCapture(settings.dictateCapture)}`}
-              </span>
-              <span className="text-muted-foreground text-[11px]">
-                {dictateOpen ? "Hide" : "Show"}
-              </span>
-            </button>
             {dictateOpen ? (
               <div className="px-2.5 pb-2">
                 <CaptureBind
-                  hint="Optional. Off until you set one."
+                  hint="Optional."
                   onBind={onBind}
                   onSequence={onChord("dictateCapture")}
                   presets={false}

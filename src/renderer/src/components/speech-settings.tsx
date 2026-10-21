@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,38 +115,47 @@ const LocalMenu = ({
 );
 
 const RouteSwitch = <T extends string>({
+  body = true,
   label,
   onPick,
   options,
+  trailing,
   value,
 }: {
+  body?: boolean;
   label: string;
   onPick: (next: T) => void;
   options: readonly { id: T; label: string }[];
+  trailing?: ReactNode;
   value: T;
 }) => (
   <div className="flex flex-col gap-1">
-    <p className="text-[13px] leading-none">{label}</p>
-    <div className="bg-muted/70 flex rounded-xl p-0.5">
-      {options.map((option) => (
-        <button
-          aria-pressed={value === option.id}
-          className={cn(
-            "press h-7 flex-1 rounded-[10px] text-[12px]",
-            value === option.id
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground"
-          )}
-          key={option.id}
-          onClick={() => {
-            onPick(option.id);
-          }}
-          type="button"
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-[13px] leading-none">{label}</p>
+      {trailing}
     </div>
+    {body ? (
+      <div className="bg-muted/70 flex rounded-xl p-0.5">
+        {options.map((option) => (
+          <button
+            aria-pressed={value === option.id}
+            className={cn(
+              "press h-7 flex-1 rounded-[10px] text-[12px]",
+              value === option.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            )}
+            key={option.id}
+            onClick={() => {
+              onPick(option.id);
+            }}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ) : null}
   </div>
 );
 
@@ -341,29 +351,27 @@ export const SpeechSettings = ({
         />
       )}
       <p className="text-muted-foreground text-[11px]">{transcribeHint}</p>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] leading-none">Clean up transcripts</p>
-        <Switch
-          aria-label="Clean up transcripts"
-          checked={settings.cleanTranscripts}
-          onCheckedChange={(cleanTranscripts) => {
-            onChange({ ...settings, cleanTranscripts });
-          }}
-          size="sm"
-        />
-      </div>
-      {settings.cleanTranscripts ? (
-        <RouteSwitch
-          label="Cleanup"
-          onPick={(cleanupRoute) => {
-            onChange({ ...settings, cleanupRoute });
-          }}
-          options={cleanupRoutes}
-          value={
-            settings.cleanupRoute === "off" ? "device" : settings.cleanupRoute
-          }
-        />
-      ) : null}
+      <RouteSwitch
+        body={settings.cleanTranscripts}
+        label="Cleanup"
+        onPick={(cleanupRoute) => {
+          onChange({ ...settings, cleanupRoute });
+        }}
+        options={cleanupRoutes}
+        trailing={
+          <Switch
+            aria-label="Clean up transcripts"
+            checked={settings.cleanTranscripts}
+            onCheckedChange={(cleanTranscripts) => {
+              onChange({ ...settings, cleanTranscripts });
+            }}
+            size="sm"
+          />
+        }
+        value={
+          settings.cleanupRoute === "off" ? "device" : settings.cleanupRoute
+        }
+      />
       {settings.cleanTranscripts && settings.cleanupRoute === "device" ? (
         <LocalMenu
           engines={localCleanups}

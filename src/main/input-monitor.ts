@@ -14,18 +14,24 @@ export const ACCESS_UNKNOWN = 2;
 type HidCheck = (request: number) => number;
 
 let nativeCheck: HidCheck | null = null;
+let nativeFailed = false;
 
 const hidCheckAccess: HidCheck = (request) => {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" || nativeFailed) {
     return ACCESS_DENIED;
   }
-  if (!nativeCheck) {
-    const iokit = koffi.load(
-      "/System/Library/Frameworks/IOKit.framework/IOKit"
-    );
-    nativeCheck = iokit.func(
-      "int IOHIDCheckAccess(int requestType)"
-    ) as HidCheck;
+  if (nativeCheck === null) {
+    try {
+      const iokit = koffi.load(
+        "/System/Library/Frameworks/IOKit.framework/IOKit"
+      );
+      nativeCheck = iokit.func(
+        "uint32_t IOHIDCheckAccess(uint32_t requestType)"
+      ) as HidCheck;
+    } catch {
+      nativeFailed = true;
+      return ACCESS_DENIED;
+    }
   }
   return nativeCheck(request);
 };
