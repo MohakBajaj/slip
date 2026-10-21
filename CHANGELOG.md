@@ -6,15 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-10-21
+
 ### Added
 
-- Hold the fn key to dictate into the app you are using. Releasing transcribes, cleans up when that is on, and pastes. A tap shorter than 200ms is ignored, and another key while fn is held cancels. If Input Monitoring is off, fn-hold stays quiet and Settings says so.
-- Clean up transcripts, on by default. Off skips cleanup for every dictation, keeps the trimmed transcript, and shows transcription cost only.
+- Hold fn to dictate anywhere. If fn opens something else, set System Settings → Keyboard → Press 🌐 key to Do Nothing.
+- Clean up transcripts, on by default. Off pastes the trimmed transcript and skips cleanup.
 
 ### Changed
 
-- Dictate's Control-Option-D chord is off until you set one. Annotate stays Control-Option-A. Voice, draw, and quick note start off; the Inbox menu still opens them. Selection stays Shift Shift.
-- The shortcut list is move, open, archive, delete, undo, new, and ?. The old single-key extras start off. Done, pin, edit, copy, annotate, and select stay on the buttons and menus.
+- Fewer shortcuts by default. Less-used actions stay on the buttons and menus. A chord you already saved is kept, and you can clear it.
+- Settings is slimmer.
 
 ## [1.0.6] - 2026-10-20
 
@@ -126,7 +128,8 @@ Tagged on this date and not published. The changes below are included in 1.0.6.
 - CLI shipped inside Slip.app at Contents/Helpers/slip.
 - macOS disk image styled like Slip paper.
 
-[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/MohakBajaj/slip/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/MohakBajaj/slip/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/MohakBajaj/slip/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/MohakBajaj/slip/compare/v1.0.3...v1.0.4
