@@ -20,7 +20,7 @@ import {
   isTinyHtmlImage,
   parseDataImage,
 } from "../shared/clipboard-html";
-import { createFnHold, FN_TAP_MS } from "../shared/fn-hold";
+import { createFnHold, watchFnHold } from "../shared/fn-hold";
 import type { FnEvent } from "../shared/fn-hold";
 import { fetchPublicBytes } from "../shared/image-fetch";
 import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
@@ -163,6 +163,25 @@ const install = (opts: {
   let fnOn = inputMonitoringGranted();
   let holdTimer: ReturnType<typeof setTimeout> | null = null;
   let fnTimer: ReturnType<typeof setTimeout> | null = null;
+  const fnClock = {
+    clear: (): void => {
+      if (fnTimer === null) {
+        return;
+      }
+      clearTimeout(fnTimer);
+      fnTimer = null;
+    },
+    now: (): number => performance.now(),
+    set: (ms: number, fire: () => void): void => {
+      if (fnTimer !== null) {
+        clearTimeout(fnTimer);
+      }
+      fnTimer = setTimeout(() => {
+        fnTimer = null;
+        fire();
+      }, ms);
+    },
+  };
   let holdLive = false;
   const keysNeeded = (): boolean =>
     fnOn ||
@@ -295,14 +314,6 @@ const install = (opts: {
     dictateTimer = null;
   };
 
-  const clearFnTimer = (): void => {
-    if (fnTimer === null) {
-      return;
-    }
-    clearTimeout(fnTimer);
-    fnTimer = null;
-  };
-
   const safeDictate = (fn: (() => void) | undefined): void => {
     if (!fn) {
       return;
@@ -314,24 +325,15 @@ const install = (opts: {
     }
   };
 
+  const fnWatch = watchFnHold(fnHold, fnClock, () => {
+    safeDictate(opts.onDictateHold);
+  });
+
   const takeFn = (event: FnEvent): void => {
     if (!fnOn) {
       return;
     }
-    const action = fnHold.push(event);
-    if (action === "arm") {
-      clearFnTimer();
-      fnTimer = setTimeout(() => {
-        fnTimer = null;
-        if (fnHold.tick(Date.now()) === "start") {
-          safeDictate(opts.onDictateHold);
-        }
-      }, FN_TAP_MS);
-      return;
-    }
-    if (!fnHold.pending()) {
-      clearFnTimer();
-    }
+    const action = fnWatch.push(event);
     if (action === "end") {
       safeDictate(opts.onDictateRelease);
     } else if (action === "cancel") {
@@ -712,13 +714,12 @@ const install = (opts: {
             opts.dictateOpen?.() === true
           ) {
             clearDictateTimer();
-            clearFnTimer();
+            fnWatch.reset();
             dictateHold.reset();
-            fnHold.reset();
             safeDictate(opts.onDictateCancel);
             return event;
           }
-          const now = Date.now();
+          const now = performance.now();
           if (input.type === "flags") {
             takeFn({ flags: rawFlags, now, type: "flags" });
           } else {
@@ -762,8 +763,7 @@ const install = (opts: {
     }
     fnOn = next;
     if (!fnOn) {
-      clearFnTimer();
-      fnHold.reset();
+      fnWatch.reset();
     }
     syncListenKeys();
   };
@@ -849,8 +849,7 @@ const install = (opts: {
     stop: () => {
       clearHoldTimer();
       clearDictateTimer();
-      clearFnTimer();
-      fnHold.reset();
+      fnWatch.reset();
       clearInterval(poll);
       dropTap();
     },

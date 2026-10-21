@@ -22,7 +22,7 @@ jobs:
       - name: Test
         # `bun run test` resolves the npm `bun` package shadowed by @bunli's
         # peer dependency. Call the runtime's test runner directly.
-        run: bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts
+        run: bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts src/main/input-monitor.test.ts
       - name: Build
         run: bun run build
       - name: Transcriber

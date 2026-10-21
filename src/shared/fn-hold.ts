@@ -4,6 +4,13 @@ export const FN_FLAG = 0x00_80_00_00;
 /** Shorter holds are taps: fn plus a function key, or a plain fn press. */
 export const FN_TAP_MS = 200;
 
+/**
+ * A timer set for FN_TAP_MS can fire about a millisecond early. Once the
+ * hold is inside this slack, treat the timer as the window. Earlier than
+ * that, wait out the rest.
+ */
+export const FN_SLACK_MS = 10;
+
 /** kVK_Function. The fn key's own event is not another key. */
 export const FN_KEY = 0x3f;
 
@@ -18,7 +25,22 @@ export interface FnEvent {
 
 type Phase = "down" | "idle" | "live";
 
-export const createFnHold = () => {
+export interface FnTimer {
+  clear: () => void;
+  now: () => number;
+  set: (ms: number, fire: () => void) => void;
+}
+
+export interface FnHold {
+  pending: () => boolean;
+  push: (event: FnEvent) => FnAction;
+  ready: (now: number) => boolean;
+  remain: (now: number) => number;
+  reset: () => void;
+  tick: (now: number) => FnAction;
+}
+
+export const createFnHold = (): FnHold => {
   let phase: Phase = "idle";
   let downAt = 0;
 
@@ -65,10 +87,74 @@ export const createFnHold = () => {
     return "start";
   };
 
+  const ready = (now: number): boolean => {
+    if (phase !== "down" || now - downAt < FN_TAP_MS - FN_SLACK_MS) {
+      return false;
+    }
+    phase = "live";
+    return true;
+  };
+
+  const remain = (now: number): number => {
+    if (phase !== "down") {
+      return 0;
+    }
+    return Math.max(0, FN_TAP_MS - (now - downAt));
+  };
+
   return {
     pending: (): boolean => phase === "down",
     push,
+    ready,
+    remain,
     reset: idle,
     tick,
+  };
+};
+
+/** Schedules the tap window on one clock. The timer and the hold share it. */
+export const watchFnHold = (
+  hold: FnHold,
+  timer: FnTimer,
+  onStart: () => void
+): {
+  push: (event: FnEvent) => FnAction;
+  reset: () => void;
+} => {
+  const fire = (): void => {
+    if (!hold.pending()) {
+      return;
+    }
+    const now = timer.now();
+    if (hold.ready(now)) {
+      onStart();
+      return;
+    }
+    const left = hold.remain(now);
+    if (left <= 0) {
+      return;
+    }
+    timer.set(Math.max(left, 1), fire);
+  };
+
+  const arm = (): void => {
+    timer.clear();
+    timer.set(Math.max(hold.remain(timer.now()), 1), fire);
+  };
+
+  return {
+    push: (event) => {
+      const action = hold.push(event);
+      if (action === "arm") {
+        arm();
+      } else if (!hold.pending()) {
+        timer.clear();
+      }
+      return action;
+    },
+    reset: () => {
+      timer.clear();
+      hold.reset();
+    },
   };
 };

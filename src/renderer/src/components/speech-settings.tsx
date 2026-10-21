@@ -294,14 +294,16 @@ export const SpeechSettings = ({
   if (settings.transcribeRoute === "cloud") {
     transcribeHint = cloudDetail(transcribePrice, keySet);
   }
-  let cleanupHint = "Kept as spoken.";
+  let cleanupHint = "";
   if (settings.cleanTranscripts && settings.cleanupRoute === "device") {
     cleanupHint = appleCleanupDetail(apple);
-  } else if (settings.cleanupRoute === "cloud") {
+  } else if (settings.cleanTranscripts && settings.cleanupRoute === "cloud") {
     cleanupHint = cloudDetail(
       priceOf(catalog.cleanup, settings.cleanupModel),
       keySet
     );
+  } else if (settings.cleanTranscripts) {
+    cleanupHint = "Kept as spoken.";
   }
 
   const showKey =
@@ -382,7 +384,9 @@ export const SpeechSettings = ({
           value={settings.cleanupModel}
         />
       ) : null}
-      <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
+      {cleanupHint.length > 0 ? (
+        <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
+      ) : null}
       {showKey ? <GatewayKey keySet={keySet} onSet={setKeySet} /> : null}
     </div>
   );

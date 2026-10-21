@@ -2,7 +2,7 @@ import "@fontsource-variable/geist/wght.css";
 import "@fontsource-variable/newsreader/wght.css";
 import { Folder } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 import { FONTS, THEMES, TRAY_ICONS } from "../../../shared/appearance";
 import type { FontId, ThemeId, TrayIconId } from "../../../shared/appearance";
-import { assignCapture } from "../../../shared/capture-bind";
+import { assignCapture, formatCapture } from "../../../shared/capture-bind";
 import type { CaptureField } from "../../../shared/capture-bind";
 import { ACCENTS, clampZoom, ZOOM_MAX, ZOOM_MIN } from "../../../shared/types";
 import type {
@@ -129,21 +129,51 @@ export const SettingsPanel = ({
   settings: Settings;
 }) => {
   const [advanced, setAdvanced] = useState(false);
+  const [dictateOpen, setDictateOpen] = useState(false);
+  const [fnHint, setFnHint] = useState(false);
   const [fnOn, setFnOn] = useState<boolean | null>(null);
   const [moreCapture, setMoreCapture] = useState(false);
   const [skill, setSkill] = useState<SkillStatus | null>(null);
+  const fnWas = useRef<boolean | null>(null);
 
   useEffect(() => {
+    let live = true;
+    const readFn = (): void => {
+      window.slip
+        .inputMonitoring()
+        .then((granted) => {
+          if (!live) {
+            return;
+          }
+          if (!granted || fnWas.current === false) {
+            setFnHint(true);
+          }
+          fnWas.current = granted;
+          setFnOn(granted);
+        })
+        .catch(() => {
+          if (!live) {
+            return;
+          }
+          fnWas.current = false;
+          setFnOn(false);
+          setFnHint(true);
+        });
+    };
     window.slip
       .skillStatus()
-      .then(setSkill)
+      .then((status) => {
+        if (live) {
+          setSkill(status);
+        }
+      })
       .catch(() => undefined);
-    window.slip
-      .inputMonitoring()
-      .then(setFnOn)
-      .catch(() => {
-        setFnOn(false);
-      });
+    readFn();
+    window.addEventListener("focus", readFn);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", readFn);
+    };
   }, []);
 
   const pickTheme = (theme: ThemeId): void => {
@@ -177,6 +207,23 @@ export const SettingsPanel = ({
   if (skill?.installed === true) {
     skillDetail = vaultLabel(skill.path);
     skillLabel = skill.stale ? "Update" : "Installed";
+  }
+
+  let fnStatus: ReactNode = null;
+  if (fnOn === false) {
+    fnStatus = (
+      <Button
+        className="press"
+        onClick={() => {
+          window.slip.openInput().catch(() => undefined);
+        }}
+        size="xs"
+      >
+        Allow
+      </Button>
+    );
+  } else if (fnOn === true) {
+    fnStatus = <span className="text-muted-foreground text-[11px]">On</span>;
   }
 
   const zoom = (
@@ -239,39 +286,46 @@ export const SettingsPanel = ({
             presets={false}
             value={settings.annotateOut}
           />
-          <p className="text-muted-foreground px-0.5 text-[12px]">Dictate</p>
           <Card>
             <SettingsRow
-              detail={
-                fnOn === false ? "Needs Input Monitoring" : "Hold to talk"
-              }
-              label="Hold fn"
+              detail={fnOn === false ? "Needs Input Monitoring" : undefined}
+              label="Hold fn to dictate"
             >
-              {fnOn === false ? (
-                <Button
-                  className="press"
-                  onClick={() => {
-                    window.slip.openInput().catch(() => undefined);
-                  }}
-                  size="xs"
-                >
-                  Allow
-                </Button>
-              ) : null}
+              {fnStatus}
             </SettingsRow>
+            {fnHint ? (
+              <p className="text-muted-foreground px-2.5 pb-1 text-[11px] leading-snug">
+                If fn opens something else, set System Settings → Keyboard →
+                Press 🌐 key to Do Nothing.
+              </p>
+            ) : null}
+            <button
+              aria-expanded={dictateOpen}
+              className="flex items-center justify-between px-2.5 py-1 text-left"
+              onClick={() => {
+                setDictateOpen((open) => !open);
+              }}
+              type="button"
+            >
+              <span className="text-muted-foreground text-[12px]">
+                {`Shortcut · ${formatCapture(settings.dictateCapture)}`}
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                {dictateOpen ? "Hide" : "Show"}
+              </span>
+            </button>
+            {dictateOpen ? (
+              <div className="px-2.5 pb-2">
+                <CaptureBind
+                  hint="Optional. Off until you set one."
+                  onBind={onBind}
+                  onSequence={onChord("dictateCapture")}
+                  presets={false}
+                  value={settings.dictateCapture}
+                />
+              </div>
+            ) : null}
           </Card>
-          <p className="text-muted-foreground px-0.5 text-[11px] leading-snug">
-            If fn opens something else, set System Settings → Keyboard → Press
-            🌐 key to Do Nothing.
-          </p>
-          <p className="text-muted-foreground px-0.5 text-[12px]">Shortcut</p>
-          <CaptureBind
-            hint="Optional. Off until you set one."
-            onBind={onBind}
-            onSequence={onChord("dictateCapture")}
-            presets={false}
-            value={settings.dictateCapture}
-          />
           <Card>
             <SettingsRow label="Keep dictations in inbox">
               <Switch
