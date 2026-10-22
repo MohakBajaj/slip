@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import type {
   ModelChoice,
 } from "../../../shared/gateway-models";
 import { bundledGatewayModels } from "../../../shared/gateway-snapshot";
+import { KEY_REENTER } from "../../../shared/key-status";
+import type { KeyStatus } from "../../../shared/key-status";
 import {
   appleCleanupDetail,
   localCleanups,
@@ -171,9 +173,11 @@ const cloudDetail = (price: string, keySet: boolean): string => {
 
 const GatewayKey = ({
   keySet,
+  message,
   onSet,
 }: {
   keySet: boolean;
+  message: string;
   onSet: (set: boolean) => void;
 }) => {
   const [draft, setDraft] = useState("");
@@ -207,9 +211,11 @@ const GatewayKey = ({
       <p className="text-muted-foreground text-[11px]">
         Stored in the keychain.
       </p>
+      {message.length > 0 ? <p className="text-[11px]">{message}</p> : null}
       <div className="flex gap-1">
         <Input
           aria-label="Vercel AI Gateway API key"
+          id="gateway-key"
           className="h-7 text-[12px]"
           onBlur={saveKey}
           onChange={(event) => {
@@ -253,26 +259,46 @@ const GatewayKey = ({
 };
 
 export const SpeechSettings = ({
+  focusKey = 0,
   onChange,
   settings,
 }: {
+  focusKey?: number;
   onChange: (next: Settings) => void;
   settings: Settings;
 }) => {
   const [catalog, setCatalog] = useState<GatewayCatalog>(() =>
     catalogChoices(bundledGatewayModels())
   );
-  const [keySet, setKeySet] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>("absent");
   const [apple, setApple] = useState<AppleCleanupStatus | null>(null);
+  const handledFocus = useRef(0);
 
+  useEffect(() => {
+    if (focusKey < 1 || handledFocus.current === focusKey) {
+      return () => undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      const field = document.querySelector("#gateway-key");
+      if (!(field instanceof HTMLElement)) {
+        return;
+      }
+      handledFocus.current = focusKey;
+      field.scrollIntoView({ block: "center" });
+      field.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [focusKey, keyStatus]);
   useEffect(() => {
     window.slip
       .gatewayCatalog()
       .then(setCatalog)
       .catch(() => undefined);
     window.slip
-      .cleanupKeySet()
-      .then(setKeySet)
+      .cleanupKeyStatus()
+      .then(setKeyStatus)
       .catch(() => undefined);
   }, []);
   useEffect(() => {
@@ -293,6 +319,7 @@ export const SpeechSettings = ({
     };
   }, [settings.cleanTranscripts, settings.cleanupRoute]);
 
+  const keySet = keyStatus === "saved";
   const transcribePrice = priceOf(
     catalog.transcription,
     settings.transcribeModel
@@ -318,6 +345,7 @@ export const SpeechSettings = ({
 
   const showKey =
     keySet ||
+    keyStatus === "reenter" ||
     settings.transcribeRoute === "cloud" ||
     (settings.cleanTranscripts && settings.cleanupRoute === "cloud");
 
@@ -395,7 +423,15 @@ export const SpeechSettings = ({
       {cleanupHint.length > 0 ? (
         <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
       ) : null}
-      {showKey ? <GatewayKey keySet={keySet} onSet={setKeySet} /> : null}
+      {showKey ? (
+        <GatewayKey
+          keySet={keySet}
+          message={keyStatus === "reenter" ? KEY_REENTER : ""}
+          onSet={(set) => {
+            setKeyStatus(set ? "saved" : "absent");
+          }}
+        />
+      ) : null}
     </div>
   );
 };

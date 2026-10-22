@@ -109,7 +109,7 @@ export const CommandPalette = ({
         <CommandItem onSelect={onVoice}>Voice</CommandItem>
         <CommandItem onSelect={onDictate}>Dictate anywhere</CommandItem>
       </CommandGroup>
-      <CommandGroup heading="Slips">
+      <CommandGroup heading="Jots">
         {slips
           .filter((slip) => !slip.archived)
           .slice(0, 16)

@@ -98,7 +98,7 @@ const composerHint = (renaming: string | null, section: string): string => {
   if (section.length > 0) {
     return `Add to ${section}`;
   }
-  return "A new slip";
+  return "A new jot";
 };
 
 let menuAt = 0;
@@ -467,7 +467,7 @@ export const InboxPane = ({
         )}
         {dragging && list.length > 0 ? (
           <p className="text-muted-foreground pointer-events-none sticky bottom-0 px-4 py-1.5 text-center text-[11px]">
-            Drop on a slip to attach, or on empty space to start one
+            Drop on a jot to attach, or on empty space to start one
           </p>
         ) : null}
       </div>
@@ -676,7 +676,7 @@ export const InboxPane = ({
             ) : null}
             {bulk && !isRename ? null : (
               <Button
-                aria-label={isRename ? "Save name" : "Add slip"}
+                aria-label={isRename ? "Save name" : "Add jot"}
                 className="press text-base leading-none"
                 size="icon-sm"
                 type="submit"

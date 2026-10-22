@@ -632,7 +632,7 @@ export const DetailWell = ({
           />
         </form>
         <Button
-          aria-label="Close slip"
+          aria-label="Close jot"
           className="press relative after:absolute after:-inset-2 after:content-['']"
           onClick={() => {
             if (editing) {

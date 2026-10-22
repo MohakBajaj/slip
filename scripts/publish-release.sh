@@ -17,8 +17,8 @@ fi
 version="${tag#v}"
 notes="dist/release-notes.md"
 assets=(
-  "dist/Slip-${version}.dmg"
-  "dist/Slip-${version}-arm64-mac.zip"
+  "dist/Jot-${version}.dmg"
+  "dist/Jot-${version}-arm64-mac.zip"
   "dist/latest.json"
   "dist/SHA256SUMS"
 )
@@ -32,7 +32,7 @@ done
 if ! gh release view "$tag" >/dev/null 2>&1; then
   gh release create "$tag" \
     --draft \
-    --title "Slip ${version}" \
+    --title "Jot ${version}" \
     --notes-file "$notes" \
     --verify-tag
 fi

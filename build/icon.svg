@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
+  <defs>
+    <linearGradient id="tile-gradient" x1="300" y1="100" x2="724" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#414146"/>
+      <stop offset=".52" stop-color="#37383d"/>
+      <stop offset="1" stop-color="#303135"/>
+    </linearGradient>
+    <radialGradient id="tile-soft-light" cx="440" cy="280" r="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4b4b50" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#222327" stop-opacity=".08"/>
+    </radialGradient>
+    <linearGradient id="paper-gradient" x1="275" y1="278" x2="663" y2="695" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f9f0da"/>
+      <stop offset=".57" stop-color="#f8efd9"/>
+      <stop offset="1" stop-color="#f5ead0"/>
+    </linearGradient>
+    <linearGradient id="fold-gradient" x1="592" y1="640" x2="638" y2="675" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e3c799"/>
+      <stop offset=".53" stop-color="#e9d0a6"/>
+      <stop offset="1" stop-color="#f1dfbd"/>
+    </linearGradient>
+    <linearGradient id="nib-gradient" x1="601" y1="393" x2="616" y2="649" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffac21"/>
+      <stop offset=".38" stop-color="#fca015"/>
+      <stop offset="1" stop-color="#e27c09"/>
+    </linearGradient>
+    <linearGradient id="nib-right-glow" x1="594" y1="569" x2="744" y2="519" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffad19" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffb52a" stop-opacity=".67"/>
+    </linearGradient>
+    <linearGradient id="signal-gradient" x1="729" y1="322" x2="834" y2="486" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb937"/>
+      <stop offset="1" stop-color="#ffaa27"/>
+    </linearGradient>
+    <radialGradient id="vent-gradient" cx="642" cy="513" r="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4a3521"/>
+      <stop offset="1" stop-color="#62431f"/>
+    </radialGradient>
+    <filter id="paper-shadow" x="-30%" y="-20%" width="170%" height="165%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="17"/>
+      <feOffset dx="3" dy="25"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".48"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="fold-shadow" x="-70%" y="-50%" width="230%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="-2" dy="3"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".14"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nib-shadow" x="-45%" y="-25%" width="200%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="13"/>
+      <feOffset dx="1" dy="19"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".37"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="signal-shadow" x="-30%" y="-25%" width="170%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".14"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g id="rounded-app-tile">
+    <path id="tile-base" d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z" fill="url(#tile-gradient)"/>
+    <path id="tile-soft-light" d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z" fill="url(#tile-soft-light)"/>
+  </g>
+  <clipPath id="tile-clip"><path d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z"/></clipPath>
+  <g id="artwork" clip-path="url(#tile-clip)">
+  <g transform="translate(-38 27)">
+  <g id="cream-note" filter="url(#paper-shadow)">
+    <path id="paper-sheet" d="M276 283L607 236C625 233 637 243 640 261L690 607C691 615 682 616 672 623C651 650 627 675 605 694C601 698 596 700 589 701L344 735C325 738 312 730 309 711L249 316C246 298 256 286 276 283Z" fill="url(#paper-gradient)" stroke="#fff8e7" stroke-width="1.5"/>
+    <path id="turned-paper-corner" d="M596 697C595 686 590 672 591 658C592 641 600 632 616 628L664 620C648 642 622 674 603 692C600 695 598 696 596 697Z" fill="url(#fold-gradient)" filter="url(#fold-shadow)"/>
+  </g>
+  <g id="wireless-signal" fill="none" stroke-linecap="round" filter="url(#signal-shadow)">
+    <path id="outer-signal" d="M739.5 320.7C808 339.9 853.8 408.1 834.7 483.9" stroke="#ffbd46" stroke-width="21"/>
+    <path d="M739.5 320.7C808 339.9 853.8 408.1 834.7 483.9" stroke="url(#signal-gradient)" stroke-width="18"/>
+    <path id="middle-signal" d="M723.7 365.2C772 377.6 800.7 422.6 790.6 473" stroke="#ffbc43" stroke-width="21"/>
+    <path d="M723.7 365.2C772 377.6 800.7 422.6 790.6 473" stroke="url(#signal-gradient)" stroke-width="18"/>
+    <path id="inner-signal" d="M709.4 407.7C735.5 412 752.6 434.2 748.2 462.2" stroke="#ffba3e" stroke-width="21"/>
+    <path d="M709.4 407.7C735.5 412 752.6 434.2 748.2 462.2" stroke="url(#signal-gradient)" stroke-width="18"/>
+  </g>
+  <g id="gold-fountain-pen-nib" filter="url(#nib-shadow)">
+    <path id="nib-body" d="M544.3 405.6C542.4 397.3 545.3 391.1 550.7 390.7C553.6 390.5 555.5 392.7 558.2 396.6L637.6 508.6L643.5 504.4L562 393.5C557.7 387.7 560 382.2 565.3 380.9C568.7 380 572 381.9 576.7 385.3L703.5 475.1C707.8 478.2 710.3 481.2 711.9 487.6C725.9 537 744.1 585.3 765.5 628.1C770.6 638.4 767.8 645.8 760.3 651.2L731 672.2C723 678 716.7 677.2 710.9 671.7C669 631.6 627 598 589.9 567.3C585.4 563.6 583.1 559.9 581.8 554.4Z" fill="url(#nib-gradient)" stroke="#f5a024" stroke-width="1"/>
+    <path id="nib-surface-glow" d="M544.3 405.6C542.4 397.3 545.3 391.1 550.7 390.7C553.6 390.5 555.5 392.7 558.2 396.6L637.6 508.6L643.5 504.4L562 393.5C557.7 387.7 560 382.2 565.3 380.9C568.7 380 572 381.9 576.7 385.3L703.5 475.1C707.8 478.2 710.3 481.2 711.9 487.6C725.9 537 744.1 585.3 765.5 628.1C770.6 638.4 767.8 645.8 760.3 651.2L731 672.2C723 678 716.7 677.2 710.9 671.7C669 631.6 627 598 589.9 567.3C585.4 563.6 583.1 559.9 581.8 554.4Z" fill="url(#nib-right-glow)"/>
+    <path id="nib-split" d="M557.6 396.2L638.6 509" fill="none" stroke="#5a3c20" stroke-width="7" stroke-linecap="round"/>
+    <circle id="nib-breather-rim" cx="648.3" cy="521.5" r="20.2" fill="#fdb13b"/>
+    <circle id="nib-breather-hole" cx="648.3" cy="520.9" r="19.1" fill="url(#vent-gradient)"/>
+  </g>
+  </g>
+  </g>
+</svg>

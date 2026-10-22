@@ -70,7 +70,7 @@ try {
   tagExists = false;
 }
 if (releaseTagPending(current, headSubject, tagExists)) {
-  execFileSync("git", ["tag", "-a", `v${current}`, "-m", `Slip ${current}`], {
+  execFileSync("git", ["tag", "-a", `v${current}`, "-m", `Jot ${current}`], {
     stdio: "inherit",
   });
   console.log(`git push origin HEAD && git push origin v${current}`);
@@ -89,7 +89,7 @@ execFileSync("git", ["add", "package.json", "CHANGELOG.md"], {
 execFileSync("git", ["commit", "-m", `Bump version to ${next}.`], {
   stdio: "inherit",
 });
-execFileSync("git", ["tag", "-a", `v${next}`, "-m", `Slip ${next}`], {
+execFileSync("git", ["tag", "-a", `v${next}`, "-m", `Jot ${next}`], {
   stdio: "inherit",
 });
 console.log(`git push origin HEAD && git push origin v${next}`);

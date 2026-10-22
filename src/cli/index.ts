@@ -18,7 +18,7 @@ import { createSlip, listSlips, updateSlip } from "../vault";
 const SETTINGS_FILE = settingsFile();
 
 const vaultOption = option(z.string().optional(), {
-  description: "Vault folder (or SLIP_VAULT, or Slip settings)",
+  description: "Vault folder (or SLIP_VAULT, or Jot settings)",
   short: "v",
 });
 
@@ -52,11 +52,11 @@ const find = (root: string, id: string) => {
       return hits[0];
     }
   }
-  throw new Error(`no slip ${id}`);
+  throw new Error(`no jot ${id}`);
 };
 
 const list = defineCommand({
-  description: "List open slips",
+  description: "List open jots",
   handler: ({ flags }) => {
     const root = vaultOf(flags.vault);
     for (const slip of listSlips(root).filter((item) => !item.archived)) {
@@ -70,7 +70,7 @@ const list = defineCommand({
 });
 
 const search = defineCommand({
-  description: "Search slip bodies and tags",
+  description: "Search jot bodies and tags",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     const query = positional.join(" ").toLowerCase();
@@ -89,7 +89,7 @@ const search = defineCommand({
 });
 
 const add = defineCommand({
-  description: "Create a slip from the remaining words",
+  description: "Create a jot from the remaining words",
   handler: ({ flags, positional }) => {
     const slip = createSlip(vaultOf(flags.vault), {
       content: positional.join(" ") || "Untitled",
@@ -102,7 +102,7 @@ const add = defineCommand({
 });
 
 const done = defineCommand({
-  description: "Mark a slip done",
+  description: "Mark a jot done",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     const [id] = positional;
@@ -116,7 +116,7 @@ const done = defineCommand({
 });
 
 const archive = defineCommand({
-  description: "Archive a slip (file stays put)",
+  description: "Archive a jot (file stays put)",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     const [id] = positional;
@@ -130,7 +130,7 @@ const archive = defineCommand({
 });
 
 const tag = defineCommand({
-  description: "Add tags to a slip",
+  description: "Add tags to a jot",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     const [id, ...tags] = positional;
@@ -147,7 +147,7 @@ const tag = defineCommand({
 });
 
 const pathCmd = defineCommand({
-  description: "Print the absolute path of a slip",
+  description: "Print the absolute path of a jot",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     const [id] = positional;
@@ -161,7 +161,7 @@ const pathCmd = defineCommand({
 });
 
 const prompt = defineCommand({
-  description: "Print slips as a prompt block",
+  description: "Print jots as a prompt block",
   handler: ({ flags, positional }) => {
     const root = vaultOf(flags.vault);
     if (positional.length === 0) {
@@ -184,7 +184,7 @@ const vault = defineCommand({
 
 const cli = await createCLI({
   description:
-    "Manage the Slip markdown vault. The app does not need to be running.",
+    "Manage the Jot markdown vault. The app does not need to be running.",
   name: "slip",
   version: "1.0.0",
 });

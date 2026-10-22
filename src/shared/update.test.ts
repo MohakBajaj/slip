@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -29,6 +30,8 @@ import {
   manifestUrl,
   noticeForManifestFailure,
   parseManifest,
+  releaseDmgName,
+  releaseZipName,
   releaseZipUrl,
   signingMode,
   zipEntryAllowed,
@@ -163,7 +166,7 @@ describe("manifest check failure", () => {
   });
 
   test("a network error during a background check stays silent", () => {
-    const detail = `Slip couldn't read ${manifestUrl()} (network error).`;
+    const detail = `Jot couldn't read ${manifestUrl()} (network error).`;
     expect(
       noticeForManifestFailure({
         error: new Error("getaddrinfo ENOTFOUND github.com"),
@@ -195,7 +198,7 @@ describe("manifest check failure", () => {
         url: manifestUrl(),
       })
     ).toEqual({
-      detail: `Slip couldn't read ${manifestUrl()} (HTTP 503).`,
+      detail: `Jot couldn't read ${manifestUrl()} (HTTP 503).`,
       kind: "dialog",
       message: "Couldn't check for updates",
     });
@@ -206,7 +209,7 @@ describe("manifest check failure", () => {
         url: manifestUrl(),
       })
     ).toEqual({
-      detail: `Slip couldn't read ${manifestUrl()} (network error).`,
+      detail: `Jot couldn't read ${manifestUrl()} (network error).`,
       kind: "dialog",
       message: "Couldn't check for updates",
     });
@@ -351,10 +354,10 @@ describe("bundle and install target", () => {
     );
   });
 
-  test("finds Slip.app from the executable path", () => {
+  test("finds Jot.app and an existing Slip.app from the executable path", () => {
     expect(
-      bundleFromExecutable("/Applications/Slip.app/Contents/MacOS/Slip")
-    ).toBe("/Applications/Slip.app");
+      bundleFromExecutable("/Applications/Jot.app/Contents/MacOS/Jot")
+    ).toBe("/Applications/Jot.app");
     expect(
       bundleFromExecutable("/Users/me/Desktop/Slip.app/Contents/MacOS/Slip")
     ).toBe("/Users/me/Desktop/Slip.app");
@@ -364,8 +367,10 @@ describe("bundle and install target", () => {
   });
 
   test("allows a writable copy and explains the ones it cannot replace", () => {
-    expect(describeInstallTarget("/Applications/Slip.app", true).ok).toBe(true);
-    expect(describeInstallTarget("/Users/me/Slip.app", true).ok).toBe(true);
+    expect(describeInstallTarget("/Applications/Jot.app", true).ok).toBe(true);
+    expect(describeInstallTarget("/Users/me/Desktop/Slip.app", true).ok).toBe(
+      true
+    );
     const locked = describeInstallTarget("/Applications/Slip.app", false);
     expect(locked.ok).toBe(false);
     if (!locked.ok) {
@@ -386,13 +391,14 @@ describe("bundle and install target", () => {
     }
   });
 
-  test("keeps zip entries inside Slip.app", () => {
-    expect(zipEntryAllowed("Slip.app/Contents/Info.plist")).toBe(true);
-    expect(zipEntryAllowed("Slip.app/")).toBe(true);
-    expect(zipEntryAllowed("../Slip.app/Contents/Info.plist")).toBe(false);
-    expect(zipEntryAllowed("/Slip.app/Contents/Info.plist")).toBe(false);
-    expect(zipEntryAllowed("__MACOSX/Slip.app")).toBe(false);
-    expect(zipEntryAllowed("Slip.app/../../etc/passwd")).toBe(false);
+  test("keeps zip entries inside Jot.app", () => {
+    expect(zipEntryAllowed("Jot.app/Contents/Info.plist")).toBe(true);
+    expect(zipEntryAllowed("Jot.app/")).toBe(true);
+    expect(zipEntryAllowed("Slip.app/Contents/Info.plist")).toBe(false);
+    expect(zipEntryAllowed("../Jot.app/Contents/Info.plist")).toBe(false);
+    expect(zipEntryAllowed("/Jot.app/Contents/Info.plist")).toBe(false);
+    expect(zipEntryAllowed("__MACOSX/Jot.app")).toBe(false);
+    expect(zipEntryAllowed("Jot.app/../../etc/passwd")).toBe(false);
   });
 });
 
@@ -555,7 +561,8 @@ describe("notes and signing mode", () => {
     const both = run("both");
     expect(existsSync(both.stage)).toBe(false);
     rmSync(root, { force: true, recursive: true });
-  });
+    // Four settle sleeps; the default 5s test limit is tight on macOS runners.
+  }, 20_000);
 
   test("the swap gives up when Slip is still running", () => {
     const root = mkdtempSync(path.join(tmpdir(), "slip-update-wait-"));
@@ -779,6 +786,214 @@ describe("notes and signing mode", () => {
     expect(status).toBe(1);
     expect(existsSync(path.join(work, "keep"))).toBe(true);
     expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    rmSync(root, { force: true, recursive: true });
+  });
+});
+
+const legacyZipUrl = (version: string): string =>
+  `https://github.com/MohakBajaj/slip/releases/download/v${version}/Slip-${version}-arm64-mac.zip`;
+
+describe("Jot assets and a Slip.app to Jot.app swap", () => {
+  test("the new manifest accepts Jot zip names and 1.0.5–1.0.7 would not", () => {
+    const version = "1.1.0";
+    const zip = releaseZipName(version);
+    const dmg = releaseDmgName(version);
+    expect(zip).toBe("Jot-1.1.0-arm64-mac.zip");
+    expect(dmg).toBe("Jot-1.1.0.dmg");
+    const manifest = buildManifest({
+      minimumMacOS: "12.0",
+      notes: "Jot.",
+      sha256: sha256("jot-zip"),
+      size: 64,
+      version,
+    });
+    expect(manifest.zip).toBe(releaseZipUrl(version));
+    expect(parseManifest(manifest).ok).toBe(true);
+    const sums = `${manifest.sha256}  ${zip}\n${sha256("dmg")}  ${dmg}\n`;
+    expect(sums).toContain(`  ${zip}`);
+    expect(manifest.zip).not.toBe(legacyZipUrl(version));
+    expect(parseManifest({ ...manifest, zip: legacyZipUrl(version) }).ok).toBe(
+      false
+    );
+    expect(zipEntryAllowed("Jot.app/Contents/MacOS/Jot")).toBe(true);
+    expect(zipEntryAllowed("Slip.app/Contents/MacOS/Slip")).toBe(false);
+    expect(BUNDLE_ID).toBe("dev.mohak.jot");
+  });
+
+  const stubTool = (bin: string, name: string, body: string): void => {
+    const file = path.join(bin, name);
+    writeFileSync(file, body);
+    chmodSync(file, 0o755);
+  };
+
+  const fillApp = (dir: string, marker: string): void => {
+    const bins = path.join(dir, "Contents", "Resources", "bin");
+    mkdirSync(bins, { recursive: true });
+    writeFileSync(path.join(bins, "parakeet-cli"), marker);
+    writeFileSync(path.join(bins, "slip-cleanup"), marker);
+    writeFileSync(path.join(dir, "marker"), marker);
+  };
+
+  const runSwap = (
+    script: string,
+    args: string[],
+    bin: string
+  ): { status: number } => {
+    try {
+      execFileSync(script, args, {
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+      return { status: 0 };
+    } catch (error) {
+      return { status: (error as { status?: number }).status ?? 1 };
+    }
+  };
+
+  test("replaces Slip.app with Jot.app and a second run stays on Jot.app", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-rename-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    stubTool(bin, "ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stubTool(bin, "xattr", "#!/bin/sh\nexit 0\n");
+    stubTool(bin, "open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    const folder = path.join(root, "Applications");
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Jot.app");
+    const dest = path.join(folder, "Slip.app");
+    fillApp(src, "new");
+    fillApp(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    expect(runSwap(script, ["999999", src, dest, work], bin).status).toBe(0);
+    const final = path.join(folder, "Jot.app");
+    const names = readdirSync(folder).filter(
+      (name) => name.endsWith(".app") || name.includes("slip-")
+    );
+    expect(names).toEqual(["Jot.app"]);
+    expect(readFileSync(path.join(final, "marker"), "utf8")).toBe("new");
+    expect(existsSync(path.join(final, ".opened"))).toBe(true);
+    expect(existsSync(dest)).toBe(false);
+    expect(existsSync(`${final}.slip-new`)).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    const again = path.join(root, "swap-again.sh");
+    writeFileSync(again, applyUpdateScript());
+    chmodSync(again, 0o755);
+    expect(runSwap(again, ["999999", src, dest, work], bin).status).toBe(0);
+    expect(
+      readdirSync(folder).filter(
+        (name) => name.endsWith(".app") || name.includes("slip-")
+      )
+    ).toEqual(["Jot.app"]);
+    expect(existsSync(path.join(final, ".opened"))).toBe(true);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a same-name Jot.app swap replaces that bundle in place", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-same-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    stubTool(bin, "ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stubTool(bin, "xattr", "#!/bin/sh\nexit 0\n");
+    stubTool(bin, "open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Jot.app");
+    const dest = path.join(root, "Jot.app");
+    fillApp(src, "new");
+    fillApp(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    expect(runSwap(script, ["999999", src, dest, work], bin).status).toBe(0);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("new");
+    expect(existsSync(path.join(dest, ".opened"))).toBe(true);
+    expect(existsSync(`${dest}.slip-new`)).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("an existing Jot.app is moved aside instead of nesting the new app", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-both-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    stubTool(bin, "ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stubTool(bin, "xattr", "#!/bin/sh\nexit 0\n");
+    stubTool(bin, "open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    const folder = path.join(root, "Applications");
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Jot.app");
+    const dest = path.join(folder, "Slip.app");
+    const final = path.join(folder, "Jot.app");
+    fillApp(src, "new");
+    fillApp(dest, "slip-old");
+    fillApp(final, "jot-old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    expect(runSwap(script, ["999999", src, dest, work], bin).status).toBe(0);
+    expect(readFileSync(path.join(final, "marker"), "utf8")).toBe("new");
+    expect(existsSync(path.join(final, "Jot.app.slip-new"))).toBe(false);
+    expect(existsSync(path.join(final, ".opened"))).toBe(true);
+    expect(existsSync(dest)).toBe(false);
+    expect(existsSync(`${final}.slip-new`)).toBe(false);
+    expect(existsSync(`${final}.slip-prev`)).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    expect(
+      readdirSync(folder).filter(
+        (name) => name.endsWith(".app") || name.includes("slip-")
+      )
+    ).toEqual(["Jot.app"]);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a failed swap puts back both Slip.app and an existing Jot.app", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-both-fail-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    stubTool(bin, "ditto", "#!/bin/sh\nexit 1\n");
+    stubTool(bin, "xattr", "#!/bin/sh\nexit 0\n");
+    stubTool(bin, "open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    const folder = path.join(root, "Applications");
+    const work = path.join(folder, "slip-update-work");
+    const src = path.join(work, "Jot.app");
+    const dest = path.join(folder, "Slip.app");
+    const final = path.join(folder, "Jot.app");
+    fillApp(src, "new");
+    fillApp(dest, "slip-old");
+    fillApp(final, "jot-old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    expect(runSwap(script, ["999999", src, dest, work], bin).status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("slip-old");
+    expect(readFileSync(path.join(final, "marker"), "utf8")).toBe("jot-old");
+    expect(existsSync(path.join(final, "Jot.app.slip-new"))).toBe(false);
+    expect(existsSync(`${final}.slip-new`)).toBe(false);
+    expect(existsSync(`${final}.slip-prev`)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a failed rename leaves the old Slip.app launchable", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-rename-fail-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    stubTool(bin, "ditto", "#!/bin/sh\nexit 1\n");
+    stubTool(bin, "xattr", "#!/bin/sh\nexit 0\n");
+    stubTool(bin, "open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    const folder = path.join(root, "Applications");
+    const work = path.join(folder, "slip-update-work");
+    const src = path.join(work, "Jot.app");
+    const dest = path.join(folder, "Slip.app");
+    fillApp(src, "new");
+    fillApp(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    expect(runSwap(script, ["999999", src, dest, work], bin).status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(path.join(dest, ".opened"))).toBe(true);
+    expect(existsSync(path.join(folder, "Jot.app"))).toBe(false);
+    expect(existsSync(path.join(folder, "Jot.app.slip-new"))).toBe(false);
     rmSync(root, { force: true, recursive: true });
   });
 });
