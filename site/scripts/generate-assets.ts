@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js"
+import { loadChangelog, repoChangelogPath, sitemapXml } from "../src/changelog"
 import { assertConfig, offerModel, siteConfig, TAGLINE } from "../src/render"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -167,10 +168,8 @@ writeFileSync(
   join(publicDir, "robots.txt"),
   `User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`
 )
-writeFileSync(
-  join(publicDir, "sitemap.xml"),
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${xml(origin)}/</loc>\n  </url>\n</urlset>\n`
-)
+loadChangelog(repoChangelogPath(root))
+writeFileSync(join(publicDir, "sitemap.xml"), sitemapXml(origin))
 
 console.log(
   `assets ready (${hasVideo ? "intro video" : "intro fallback"}, og ${og.width}x${og.height})`
