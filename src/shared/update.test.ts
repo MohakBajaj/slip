@@ -561,7 +561,8 @@ describe("notes and signing mode", () => {
     const both = run("both");
     expect(existsSync(both.stage)).toBe(false);
     rmSync(root, { force: true, recursive: true });
-  });
+    // Four settle sleeps; the default 5s test limit is tight on macOS runners.
+  }, 20_000);
 
   test("the swap gives up when Slip is still running", () => {
     const root = mkdtempSync(path.join(tmpdir(), "slip-update-wait-"));
