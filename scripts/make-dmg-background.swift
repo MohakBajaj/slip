@@ -56,7 +56,7 @@ func drawWordmark(_ ctx: CGContext, scale: CGFloat, width: CGFloat) {
       ?? NSFont.systemFont(ofSize: size, weight: .regular)
   }()
   let text = NSAttributedString(
-    string: "SLIP",
+    string: "JOT",
     attributes: [
       .font: font,
       .foregroundColor: NSColor(srgbRed: 0.11, green: 0.105, blue: 0.098, alpha: 0.28),

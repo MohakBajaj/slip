@@ -56,7 +56,7 @@ import type { DockSnapshot } from "../shared/dock-policy";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
 import { missingGrants } from "../shared/grants";
-import { migrateHome } from "../shared/home-migrate";
+import { migrateHome, preferredVaultPath } from "../shared/home-migrate";
 import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import { slipPatch, slipRecord } from "../shared/markdown-file";
@@ -87,6 +87,7 @@ import { localTranscribers } from "../shared/speech-engines";
 import { trayHead, trayLabel, trayShown, trayTip } from "../shared/tray-menu";
 import {
   defaultSettings,
+  defaultVaultPath,
   fontMigrationPending,
   sanitizeSettings,
   settingsFile,
@@ -145,17 +146,21 @@ const MIC =
 const SCREEN =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 
-try {
-  const migratedHome = migrateHome(process.env.HOME);
-  if (migratedHome.userData.length > 0) {
-    app.setPath("userData", migratedHome.userData);
-  }
-} catch (error) {
-  console.error(error);
+const migratedHome = migrateHome(process.env.HOME);
+if (migratedHome.results.some((item) => item.action === "failed")) {
+  console.error(
+    "Jot could not finish moving Slip data. This launch is still using Slip."
+  );
+}
+if (migratedHome.userData.length > 0) {
+  app.setPath("userData", migratedHome.userData);
 }
 app.setName(PRODUCT_NAME);
 
-const SETTINGS_FILE = settingsFile();
+const SETTINGS_FILE =
+  migratedHome.userData.length > 0
+    ? path.join(migratedHome.userData, "settings.json")
+    : settingsFile();
 
 const embedImage = (
   filePath: string
@@ -265,9 +270,18 @@ let currentSection = "";
 let persistFont = false;
 
 const loadSettings = (): Settings => {
-  mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   if (!existsSync(SETTINGS_FILE)) {
-    return defaultSettings();
+    const next = defaultSettings();
+    const vault = preferredVaultPath(process.env.HOME);
+    if (vault !== defaultVaultPath()) {
+      next.vaultPath = vault;
+      mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+      writeFileSync(
+        SETTINGS_FILE,
+        JSON.stringify({ ...next, vaultPath: path.resolve(vault) }, null, 2)
+      );
+    }
+    return next;
   }
   try {
     const raw: unknown = JSON.parse(readFileSync(SETTINGS_FILE, "utf-8"));
@@ -1716,6 +1730,12 @@ const currentGrants = () => {
 
 const boot = async (): Promise<void> => {
   await app.whenReady();
+  if (migratedHome.notice.length > 0) {
+    await dialog.showMessageBox({
+      message: migratedHome.notice,
+      type: "warning",
+    });
+  }
   app.setAboutPanelOptions({
     applicationName: PRODUCT_NAME,
     applicationVersion: app.getVersion(),

@@ -118,6 +118,7 @@ const App = () => {
   const [flash, setFlash] = useState("");
   const [grants, setGrants] = useState<GrantPrompt[]>([]);
   const [keyNote, setKeyNote] = useState("");
+  const [keyFocus, setKeyFocus] = useState(0);
   const [undo, setUndo] = useState<{
     drop: string[];
     held: string[];
@@ -962,6 +963,7 @@ const App = () => {
             className="press"
             onClick={() => {
               setSettingsOpen(true);
+              setKeyFocus((value) => value + 1);
             }}
             size="xs"
           >
@@ -1038,6 +1040,7 @@ const App = () => {
           <Suspense fallback={null}>
             <SettingsPanel
               dark={dark}
+              focusKey={keyFocus}
               login={login}
               onBind={setBinding}
               onChange={writeSettings}

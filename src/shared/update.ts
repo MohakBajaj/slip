@@ -469,20 +469,38 @@ workdir="$4"
 final="$(dirname "$dest")/$(basename "$src")"
 stage="\${final}.slip-new"
 aside="\${dest}.slip-old"
+final_prev="\${final}.slip-prev"
+applied=0
 restore_dest() {
-  if [[ "$final" != "$dest" ]] && bundle_complete "$final"; then
-    return
-  fi
-  if [[ ! -d "$dest" && -d "$aside" ]]; then
-    mv "$aside" "$dest" || true
+  # No bare return: bash treats return inside an ERR or EXIT trap as
+  # leaving the trap, which skips reopen and cleanup.
+  if [[ "$applied" == "1" ]]; then
+    :
+  elif [[ ! -d "$stage" ]] && bundle_complete "$final" && { [[ -d "$final_prev" ]] || [[ ! -d "$aside" ]]; }; then
+    # The new bundle is already at its final path.
+    rm -rf "$final_prev" || true
+  else
+    if [[ "$final" != "$dest" && -d "$final_prev" ]]; then
+      if [[ -e "$final" ]] && ! bundle_complete "$final"; then
+        rm -rf "$final" || true
+      fi
+      if [[ ! -e "$final" ]]; then
+        mv "$final_prev" "$final" || true
+      fi
+    fi
+    if [[ ! -d "$dest" && -d "$aside" ]]; then
+      mv "$aside" "$dest" || true
+    fi
   fi
 }
 release_workdir() {
   case "$workdir" in
-    *..*) return ;;
-  esac
-  case "$(basename "$(basename "$workdir")")" in
-    slip-update-*) rm -rf "$workdir" || true ;;
+    *..*) ;;
+    *)
+      case "$(basename "$(basename "$workdir")")" in
+        slip-update-*) rm -rf "$workdir" || true ;;
+      esac
+      ;;
   esac
 }
 bundle_complete() {
@@ -536,8 +554,17 @@ abort() {
 }
 trap abort ERR
 if [[ ! -d "$dest" && -d "$stage" ]]; then
+  if [[ "$final" != "$dest" && -e "$final" ]]; then
+    rm -rf "$final_prev"
+    mv "$final" "$final_prev"
+  fi
+  if [[ -e "$final" ]]; then
+    echo "refusing to move into existing $final"
+    exit 1
+  fi
   mv "$stage" "$final"
-  rm -rf "$aside"
+  applied=1
+  rm -rf "$aside" "$final_prev"
   xattr -dr com.apple.quarantine "$final" || true
   open "$final" || echo "open failed"
   if [[ -d "$workdir" ]]; then
@@ -546,8 +573,8 @@ if [[ ! -d "$dest" && -d "$stage" ]]; then
   rm -f "$0"
   exit 0
 fi
-if [[ ! -d "$dest" && -d "$final" && "$final" != "$dest" ]]; then
-  rm -rf "$aside" "$stage"
+if [[ ! -d "$dest" && -d "$final" && "$final" != "$dest" && ! -d "$aside" ]]; then
+  rm -rf "$aside" "$stage" "$final_prev"
   xattr -dr com.apple.quarantine "$final" || true
   open "$final" || echo "open failed"
   if [[ -d "$workdir" ]]; then
@@ -597,21 +624,27 @@ done
 xattr -dr com.apple.quarantine "$stage" || true
 rm -rf "$aside"
 mv "$dest" "$aside"
+if [[ "$final" != "$dest" && -e "$final" ]]; then
+  rm -rf "$final_prev"
+  mv "$final" "$final_prev"
+fi
+if [[ -e "$final" ]]; then
+  echo "refusing to move into existing $final"
+  abort
+fi
 if ! mv "$stage" "$final"; then
-  if ! ditto "$stage" "$final"; then
-    rm -rf "$final"
-    if [[ ! -d "$dest" && -d "$aside" ]]; then
-      mv "$aside" "$dest"
+  if [[ -e "$final" ]] || ! ditto "$stage" "$final"; then
+    if [[ -e "$final" ]] && ! bundle_complete "$final"; then
+      rm -rf "$final"
     fi
-    open "$dest" || echo "open failed"
-    rm -rf "$stage"
     echo "update failed"
-    exit 1
+    abort
   fi
   rm -rf "$stage"
 fi
+applied=1
 trap - ERR
-rm -rf "$aside"
+rm -rf "$aside" "$final_prev"
 xattr -dr com.apple.quarantine "$final" || true
 open "$final" || echo "open failed"
 release_workdir

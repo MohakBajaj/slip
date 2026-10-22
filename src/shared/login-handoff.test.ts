@@ -4,6 +4,7 @@ import {
   actionsForPackaged,
   parseLoginItemNames,
   planLoginHandoff,
+  shouldRunLoginHandoff,
 } from "./login-handoff";
 
 test("an old Slip login item is re-registered only for a packaged app", () => {
@@ -34,4 +35,7 @@ test("an old Slip login item is re-registered only for a packaged app", () => {
   expect(
     planLoginHandoff({ launchAgents: [], loginItemNames: [] }).enableNew
   ).toBe(false);
+  expect(shouldRunLoginHandoff(false, false)).toBe(false);
+  expect(shouldRunLoginHandoff(true, true)).toBe(false);
+  expect(shouldRunLoginHandoff(true, false)).toBe(true);
 });

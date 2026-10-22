@@ -118,6 +118,7 @@ const FontRow = ({
 
 export const SettingsPanel = ({
   dark,
+  focusKey = 0,
   login,
   onBind,
   onChange,
@@ -125,6 +126,7 @@ export const SettingsPanel = ({
   settings,
 }: {
   dark: boolean;
+  focusKey?: number;
   login: LoginState;
   onBind: (on: boolean) => void;
   onChange: (next: Settings) => void;
@@ -369,7 +371,11 @@ export const SettingsPanel = ({
         <section className="flex flex-col gap-2">
           <Heading>Voice notes</Heading>
           <Card>
-            <SpeechSettings onChange={onChange} settings={settings} />
+            <SpeechSettings
+              focusKey={focusKey}
+              onChange={onChange}
+              settings={settings}
+            />
           </Card>
         </section>
 

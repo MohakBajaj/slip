@@ -51,6 +51,11 @@ export const actionsForPackaged = (
   };
 };
 
+export const shouldRunLoginHandoff = (
+  packaged: boolean,
+  alreadyDone: boolean
+): boolean => packaged && !alreadyDone;
+
 export const parseLoginItemNames = (output: string): string[] =>
   output
     .split(",")

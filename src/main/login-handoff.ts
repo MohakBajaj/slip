@@ -1,5 +1,12 @@
 import { execFile } from "node:child_process";
-import { readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 import { app } from "electron";
@@ -8,6 +15,7 @@ import {
   actionsForPackaged,
   parseLoginItemNames,
   planLoginHandoff,
+  shouldRunLoginHandoff,
 } from "../shared/login-handoff";
 import type { LoginAgent } from "../shared/login-handoff";
 
@@ -79,13 +87,20 @@ const forgetLoginItem = async (name: string): Promise<void> => {
   }
 };
 
+const handoffMarker = (): string =>
+  path.join(app.getPath("userData"), "login-handoff-done");
+
 /** Re-register login-at-start for this bundle and drop the old Slip item. */
 export const handoffLogin = async (): Promise<void> => {
+  const marker = handoffMarker();
+  if (!shouldRunLoginHandoff(app.isPackaged, existsSync(marker))) {
+    return;
+  }
   const plan = planLoginHandoff({
     launchAgents: launchAgents(),
     loginItemNames: await loginItemNames(),
   });
-  const actions = actionsForPackaged(plan, app.isPackaged);
+  const actions = actionsForPackaged(plan, true);
   if (actions.register) {
     app.setLoginItemSettings({ openAtLogin: true, type: "mainAppService" });
   }
@@ -93,4 +108,6 @@ export const handoffLogin = async (): Promise<void> => {
   for (const file of actions.removeAgents) {
     rmSync(file, { force: true });
   }
+  mkdirSync(path.dirname(marker), { recursive: true });
+  writeFileSync(marker, "done\n");
 };

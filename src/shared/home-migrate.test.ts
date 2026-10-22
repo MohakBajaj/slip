@@ -4,13 +4,20 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { migrateHome, relocate } from "./home-migrate";
+import {
+  migrateHome,
+  preferredVaultPath,
+  relocate,
+  sameEntry,
+} from "./home-migrate";
 import type { MigrateStep } from "./home-migrate";
 import { defaultVaultPath, settingsFile } from "./types";
 
@@ -128,6 +135,12 @@ describe("migrate Application Support from Slip to Jot", () => {
     );
     expect(existsSync(slip)).toBe(false);
     expect(existsSync(`${jot}.migrating`)).toBe(false);
+    expect(existsSync(path.join(jot, "migrated-from-slip.json"))).toBe(true);
+    expect(
+      existsSync(
+        `${path.join(root, "Library", "Preferences", "dev.mohak.jot.plist")}.jot-migrated-from-slip`
+      )
+    ).toBe(false);
     rmSync(root, { force: true, recursive: true });
   });
 
@@ -138,22 +151,27 @@ describe("migrate Application Support from Slip to Jot", () => {
     write(path.join(slip, "settings.json"), '{"vaultPath":"/notes"}');
     write(path.join(slip, "cleanup-key"), "secret");
     let crash: MigrateStep | null = "copied";
-    expect(() =>
-      migrateHome(root, {
-        after: (step) => {
-          if (step === crash) {
-            throw new Error("crash");
-          }
-        },
-      })
-    ).toThrow("crash");
+    const crashed = migrateHome(root, {
+      forceCopy: true,
+      after: (step) => {
+        if (step === crash) {
+          throw new Error("crash");
+        }
+      },
+    });
+    expect(crashed.usingLegacy).toBe(true);
+    expect(crashed.userData).toBe(slip);
     expect(readFileSync(path.join(slip, "settings.json"), "utf8")).toBe(
       '{"vaultPath":"/notes"}'
     );
     expect(readFileSync(path.join(slip, "cleanup-key"), "utf8")).toBe("secret");
     expect(existsSync(jot)).toBe(false);
+    expect(existsSync(`${jot}.migrating`)).toBe(false);
+    mkdirSync(jot);
+    write(path.join(jot, "Cache", "Cache.db"), "electron");
     crash = null;
-    migrateHome(root);
+    const again = migrateHome(root);
+    expect(again.usingLegacy).toBe(false);
     expect(readFileSync(path.join(jot, "cleanup-key"), "utf8")).toBe("secret");
     expect(existsSync(slip)).toBe(false);
     expect(existsSync(`${jot}.migrating`)).toBe(false);
@@ -166,15 +184,15 @@ describe("migrate Application Support from Slip to Jot", () => {
     const jot = path.join(root, "Library", "Application Support", "Jot");
     write(path.join(slip, "settings.json"), "original");
     let crash: MigrateStep | null = "renamed";
-    expect(() =>
-      migrateHome(root, {
-        after: (step) => {
-          if (step === crash) {
-            throw new Error("crash");
-          }
-        },
-      })
-    ).toThrow("crash");
+    const crashed = migrateHome(root, {
+      forceCopy: true,
+      after: (step) => {
+        if (step === crash) {
+          throw new Error("crash");
+        }
+      },
+    });
+    expect(crashed.usingLegacy).toBe(false);
     expect(readFileSync(path.join(jot, "settings.json"), "utf8")).toBe(
       "original"
     );
@@ -230,14 +248,123 @@ describe("migrate Application Support from Slip to Jot", () => {
   test("a lowercase slip folder is moved when it is a different path", () => {
     const root = home();
     const slip = path.join(root, "Library", "Application Support", "slip");
+    const upper = path.join(root, "Library", "Application Support", "Slip");
     const jot = path.join(root, "Library", "Application Support", "Jot");
     write(path.join(slip, "settings.json"), "lower");
-    const moved = migrateHome(root).results.find(
-      (item) => item.source === slip
-    );
-    expect(moved?.action).toBe("moved");
+    const results = migrateHome(root).results;
+    if (sameEntry(slip, upper)) {
+      expect(results.some((item) => item.source === slip)).toBe(false);
+      expect(results.find((item) => item.source === upper)?.action).toBe(
+        "moved"
+      );
+    } else {
+      expect(results.find((item) => item.source === slip)?.action).toBe(
+        "moved"
+      );
+    }
     expect(readFileSync(path.join(jot, "settings.json"), "utf8")).toBe("lower");
     expect(existsSync(slip)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("relative symlinks move verbatim and Singleton locks are skipped", () => {
+    const root = home();
+    const slip = path.join(root, "Library", "Application Support", "Slip");
+    const jot = path.join(root, "Library", "Application Support", "Jot");
+    write(path.join(slip, "settings.json"), "linked");
+    symlinkSync("settings.json", path.join(slip, "alias.json"));
+    symlinkSync("../outside", path.join(slip, "rel.json"));
+    symlinkSync("stale-lock", path.join(slip, "SingletonLock"));
+    symlinkSync("cookie", path.join(slip, "SingletonCookie"));
+    const moved = migrateHome(root, { pgrep: () => false });
+    const support = moved.results.find((item) => item.dest === jot);
+    expect(support?.action).toBe("moved");
+    expect(readlinkSync(path.join(jot, "alias.json"))).toBe("settings.json");
+    expect(readlinkSync(path.join(jot, "rel.json"))).toBe("../outside");
+    expect(existsSync(path.join(jot, "SingletonLock"))).toBe(false);
+    expect(existsSync(path.join(jot, "SingletonCookie"))).toBe(false);
+    expect(existsSync(slip)).toBe(false);
+
+    const copyRoot = home();
+    const copySlip = path.join(
+      copyRoot,
+      "Library",
+      "Application Support",
+      "Slip"
+    );
+    const copyJot = path.join(
+      copyRoot,
+      "Library",
+      "Application Support",
+      "Jot"
+    );
+    write(path.join(copySlip, "settings.json"), "linked");
+    symlinkSync("settings.json", path.join(copySlip, "alias.json"));
+    symlinkSync("stale-lock", path.join(copySlip, "SingletonLock"));
+    migrateHome(copyRoot, { forceCopy: true, pgrep: () => false });
+    expect(readlinkSync(path.join(copyJot, "alias.json"))).toBe(
+      "settings.json"
+    );
+    expect(existsSync(path.join(copyJot, "SingletonLock"))).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+    rmSync(copyRoot, { force: true, recursive: true });
+  });
+
+  test("a live Slip lock skips the move and a later launch retries", () => {
+    const root = home();
+    const slip = path.join(root, "Library", "Application Support", "Slip");
+    const jot = path.join(root, "Library", "Application Support", "Jot");
+    write(path.join(slip, "settings.json"), "open");
+    symlinkSync(`host-${process.pid}`, path.join(slip, "SingletonLock"));
+    const blocked = migrateHome(root, { pgrep: () => false });
+    expect(blocked.notice).toContain("Quit Slip first");
+    expect(blocked.usingLegacy).toBe(true);
+    expect(blocked.userData).toBe(slip);
+    expect(existsSync(jot)).toBe(false);
+    expect(readFileSync(path.join(slip, "settings.json"), "utf8")).toBe("open");
+    const again = migrateHome(root, { pgrep: () => false, slipRunning: false });
+    expect(again.notice).toBe("");
+    expect(again.usingLegacy).toBe(false);
+    expect(readFileSync(path.join(jot, "settings.json"), "utf8")).toBe("open");
+    expect(existsSync(path.join(jot, "SingletonLock"))).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a Slip folder that comes back with different files is kept", () => {
+    const root = home();
+    const parent = path.join(root, "Library", "Application Support");
+    const source = path.join(parent, "Slip");
+    const dest = path.join(parent, "Jot");
+    write(path.join(source, "settings.json"), "v1");
+    expect(
+      relocate(source, dest, { markerDir: dest, pgrep: () => false }).action
+    ).toBe("moved");
+    write(path.join(dest, "settings.json"), "edited");
+    write(path.join(source, "settings.json"), "v1");
+    expect(relocate(source, dest, { markerDir: dest }).action).toBe("already");
+    expect(existsSync(source)).toBe(false);
+    expect(readFileSync(path.join(dest, "settings.json"), "utf8")).toBe(
+      "edited"
+    );
+    write(path.join(source, "settings.json"), "v2");
+    expect(relocate(source, dest, { markerDir: dest }).action).toBe(
+      "kept-both"
+    );
+    expect(readFileSync(path.join(source, "settings.json"), "utf8")).toBe("v2");
+    expect(readFileSync(path.join(dest, "settings.json"), "utf8")).toBe(
+      "edited"
+    );
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("an existing Documents/Slip vault is kept when Jot has no vault yet", () => {
+    const root = home();
+    const slip = path.join(root, "Documents", "Slip");
+    const jot = path.join(root, "Documents", "Jot");
+    mkdirSync(slip, { recursive: true });
+    expect(preferredVaultPath(root)).toBe(slip);
+    mkdirSync(jot);
+    expect(preferredVaultPath(root)).toBe(jot);
     rmSync(root, { force: true, recursive: true });
   });
 

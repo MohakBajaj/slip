@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-10-22
+
+### Changed
+
+- Jot is the app. The bundle id is `dev.mohak.jot`. Notes that already live in Documents/Slip stay there. The first launch moves Application Support from Slip to Jot.
+- Releases 1.0.5–1.0.7 cannot install this build on their own. Install the dmg or zip once by hand. After that, Check for Updates works.
+
+### Fixed
+
+- Quitting from the Dock, the Apple menu, or an update no longer stays stuck on the quick-note window, and a second launch does not add another Dock tile.
+
 ## [1.0.7] - 2026-10-21
 
 ### Added
@@ -128,7 +139,8 @@ Tagged on this date and not published. The changes below are included in 1.0.6.
 - CLI shipped inside Slip.app at Contents/Helpers/slip.
 - macOS disk image styled like Slip paper.
 
-[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/MohakBajaj/slip/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/MohakBajaj/slip/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/MohakBajaj/slip/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/MohakBajaj/slip/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/MohakBajaj/slip/compare/v1.0.4...v1.0.5

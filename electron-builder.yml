@@ -44,6 +44,7 @@ mac:
   hardenedRuntime: false
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
+    NSAppleEventsUsageDescription: Jot checks login items once so an older Slip login item can be removed.
     NSAutoFillHeuristicControllerEnabled: false
     NSDocumentsFolderUsageDescription: Jot keeps your notes as markdown in Documents.
     NSMicrophoneUsageDescription: Jot transcribes speech on this Mac when you capture by speaking.

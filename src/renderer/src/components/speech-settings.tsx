@@ -215,6 +215,7 @@ const GatewayKey = ({
       <div className="flex gap-1">
         <Input
           aria-label="Vercel AI Gateway API key"
+          id="gateway-key"
           className="h-7 text-[12px]"
           onBlur={saveKey}
           onChange={(event) => {
@@ -258,9 +259,11 @@ const GatewayKey = ({
 };
 
 export const SpeechSettings = ({
+  focusKey = 0,
   onChange,
   settings,
 }: {
+  focusKey?: number;
   onChange: (next: Settings) => void;
   settings: Settings;
 }) => {
@@ -270,6 +273,22 @@ export const SpeechSettings = ({
   const [keyStatus, setKeyStatus] = useState<KeyStatus>("absent");
   const [apple, setApple] = useState<AppleCleanupStatus | null>(null);
 
+  useEffect(() => {
+    if (focusKey < 1) {
+      return () => undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      const field = document.querySelector("#gateway-key");
+      if (!(field instanceof HTMLElement)) {
+        return;
+      }
+      field.scrollIntoView({ block: "center" });
+      field.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [focusKey, keyStatus]);
   useEffect(() => {
     window.slip
       .gatewayCatalog()
