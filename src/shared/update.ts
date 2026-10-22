@@ -446,7 +446,7 @@ export const signingMode = (
 
 export const applyUpdateScript = (): string => `#!/bin/bash
 set -euo pipefail
-log="/tmp/slip-update.log"
+log="\${SLIP_APPLY_LOG:-/tmp/slip-update.log}"
 exec >>"$log" 2>&1
 echo "start $(date)"
 pid="$1"
@@ -455,6 +455,24 @@ dest="$3"
 workdir="$4"
 aside="\${dest}.slip-old"
 stage="\${dest}.slip-new"
+trap 'rm -f "$0"' EXIT
+trap 'exit 1' TERM INT
+wait_for_pid() {
+  local ticks=0
+  local seconds="\${SLIP_APPLY_WAIT_SECONDS:-60}"
+  local max_ticks=$((seconds * 5))
+  if [[ "$max_ticks" -lt 1 ]]; then
+    max_ticks=1
+  fi
+  while kill -0 "$pid" 2>/dev/null; do
+    ticks=$((ticks + 1))
+    if [[ "$ticks" -ge "$max_ticks" ]]; then
+      echo "giving up after \${seconds}s waiting for pid $pid"
+      return 1
+    fi
+    sleep 0.2
+  done
+}
 abort() {
   trap - ERR
   echo "update failed"
@@ -462,11 +480,12 @@ abort() {
   if [[ ! -d "$dest" && -d "$aside" ]]; then
     mv "$aside" "$dest" || true
   fi
-  while kill -0 "$pid" 2>/dev/null; do
-    sleep 0.2
-  done
-  if [[ -d "$dest" ]]; then
-    open "$dest" || echo "open failed"
+  if wait_for_pid; then
+    if [[ -d "$dest" ]]; then
+      open "$dest" || echo "open failed"
+    fi
+  else
+    echo "left pid $pid running; did not relaunch"
   fi
   exit 1
 }
@@ -503,9 +522,11 @@ for bin in parakeet-cli slip-cleanup; do
     abort
   fi
 done
-while kill -0 "$pid" 2>/dev/null; do
-  sleep 0.2
-done
+if ! wait_for_pid; then
+  echo "update did not apply"
+  rm -rf "$workdir"
+  exit 1
+fi
 sleep 1
 rm -rf "$stage"
 ditto "$src" "$stage"

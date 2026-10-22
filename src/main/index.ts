@@ -45,6 +45,8 @@ import {
   noticeLine,
   voiceReplySettles,
 } from "../shared/dictate";
+import { dockTarget, planDockChange } from "../shared/dock-policy";
+import type { DockSnapshot } from "../shared/dock-policy";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
 import { attachmentType, imageExt } from "../shared/images";
@@ -53,6 +55,7 @@ import { slipPatch, slipRecord } from "../shared/markdown-file";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
 import { annotatePlan, voicePillWidth } from "../shared/paste-out";
+import { QUIT_FALLBACK_MS, QUIT_SIGNALS, planQuit } from "../shared/quit-path";
 import { emptyContext } from "../shared/source";
 import type { FrontContext } from "../shared/source";
 import { VOICE_SOURCE } from "../shared/speech";
@@ -382,52 +385,53 @@ const visibleWindows = (): boolean =>
     (target) => target !== null && !target.isDestroyed() && target.isVisible()
   );
 
-let activation: "accessory" | "regular" = "regular";
+let dockState: DockSnapshot = { policy: "accessory", visible: false };
+let dockSeeded = false;
+let dockIconReady = false;
 
-const setActivation = (next: "accessory" | "regular"): void => {
-  if (process.platform !== "darwin" || activation === next) {
+const seedDockState = (): void => {
+  if (dockSeeded) {
     return;
   }
-  activation = next;
-  app.setActivationPolicy(next);
-  remountTray();
+  dockSeeded = true;
+  const visible = app.dock?.isVisible() ?? true;
+  dockState = visible
+    ? { policy: "regular", visible: true }
+    : { policy: "accessory", visible: false };
 };
 
-const syncActivation = (): void => {
-  if (process.platform !== "darwin") {
-    return;
-  }
-  if (settings.dock || visibleWindows()) {
-    setActivation("regular");
-    return;
-  }
-  setActivation("accessory");
-};
-
+// show() and hide() are not idempotent: each call can add a Dock tile,
+// and isVisible() stays false until show() settles. Remember the last
+// change and skip the native call when it already matches. Never hide
+// and then set regular in the same turn. That pair is the duplicate tile.
 const applyDock = (show: boolean): void => {
   if (process.platform !== "darwin" || !app.dock) {
     return;
   }
-  if (show) {
-    if (!app.dock.isVisible()) {
-      app.dock.show();
-      // show() forces regular and can drop the status item.
-      activation = "regular";
-      remountTray();
+  seedDockState();
+  const change = planDockChange(dockState, dockTarget(show, visibleWindows()));
+  dockState = change.next;
+  if (change.ops.length === 0) {
+    if (dockState.visible && !dockIconReady) {
+      applyDockIcon(isDark());
+      dockIconReady = true;
     }
-    applyDockIcon(isDark());
-    setActivation("regular");
     return;
   }
-  if (app.dock.isVisible()) {
-    app.dock.hide();
-    // hide() forces accessory and drops the Slip menu bar. Remount
-    // the extra, then restore regular while a window is up so Inbox /
-    // Edit / Settings still work.
-    activation = "accessory";
-    remountTray();
+  for (const op of change.ops) {
+    if (op.kind === "show") {
+      // show() forces regular and can drop the status item.
+      void app.dock.show().catch(() => undefined);
+    } else {
+      // hide() forces accessory and drops the menu-bar extra.
+      app.dock.hide();
+    }
   }
-  syncActivation();
+  remountTray();
+  if (dockState.visible) {
+    applyDockIcon(isDark());
+    dockIconReady = true;
+  }
 };
 
 const pinWorkspace = (target: BrowserWindow): void => {
@@ -1499,6 +1503,8 @@ const createNoteWindow = (): BrowserWindow => {
   const target = new BrowserWindow({
     alwaysOnTop: true,
     backgroundColor: windowHex(),
+    // Quit sets this back to closable. Left false, macOS cancels app.quit
+    // and Cmd+Q, AppleScript, SIGTERM's quit, and the updater all stay up.
     closable: false,
     focusable: true,
     frame: false,
@@ -1582,6 +1588,12 @@ const showNote = (): void => {
 
 const boot = async (): Promise<void> => {
   await app.whenReady();
+  for (const signal of QUIT_SIGNALS) {
+    process.on(signal, () => {
+      armQuitFallback();
+      app.quit();
+    });
+  }
   primeGatewayModels();
   void refreshGatewayModels();
   session.defaultSession.setSpellCheckerEnabled(false);
@@ -1619,7 +1631,6 @@ const boot = async (): Promise<void> => {
 
   ensureVault(vaultRoot());
   applyThemeSource();
-  applyDock(settings.dock);
   loginKnown = loginState();
 
   protocol.handle("slip-img", (request) => {
@@ -1657,7 +1668,7 @@ const boot = async (): Promise<void> => {
   createTray();
   nativeTheme.on("updated", () => {
     paintWindows();
-    if (settings.dock) {
+    if (dockState.visible) {
       applyDockIcon(isDark());
     }
   });
@@ -1678,7 +1689,7 @@ const boot = async (): Promise<void> => {
     const vaultChanged = settings.vaultPath !== prev.vaultPath;
     if (settings.dock !== prev.dock) {
       applyDock(settings.dock);
-    } else if (settings.dock && isDark() !== prevDark) {
+    } else if (dockState.visible && isDark() !== prevDark) {
       applyDockIcon(isDark());
     }
     if (settings.trayIcon !== prev.trayIcon) {
@@ -2372,10 +2383,14 @@ const boot = async (): Promise<void> => {
   bootCapture();
   releaseHeld().catch(() => undefined);
   ensureNote();
-  if (!loginItem().wasOpenedAtLogin) {
+  if (loginItem().wasOpenedAtLogin) {
+    applyDock(settings.dock);
+  } else {
     createWindow();
   }
 
+  // A Dock click activates this process. Show the window that is already
+  // open. applyDock is idempotent, so this must not show or hide the tile.
   app.on("activate", () => {
     if (noteOpen || Date.now() < suppressActivate) {
       return;
@@ -2386,14 +2401,54 @@ const boot = async (): Promise<void> => {
 
 app.setName("Slip");
 
-boot().catch(() => {
-  setCapture("failed");
-});
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (gotSingleInstanceLock) {
+  app.on("second-instance", () => {
+    void app.whenReady().then(() => {
+      showWindow();
+    });
+  });
+  boot().catch(() => {
+    setCapture("failed");
+  });
+} else {
+  app.exit(0);
+}
 
 let releasingHeld = false;
+let quitFallback: ReturnType<typeof setTimeout> | null = null;
+
+const armQuitFallback = (): void => {
+  if (quitFallback !== null) {
+    return;
+  }
+  quitFallback = setTimeout(() => {
+    app.exit(0);
+  }, QUIT_FALLBACK_MS);
+  quitFallback.unref();
+};
+
+const unblockQuit = (): void => {
+  for (const target of BrowserWindow.getAllWindows()) {
+    if (!target.isDestroyed()) {
+      target.setClosable(true);
+    }
+  }
+  if (noteWin && !noteWin.isDestroyed()) {
+    noteWin.destroy();
+  }
+};
 
 app.on("before-quit", (event) => {
-  if (!releasingHeld && listHeldDeletes(vaultRoot()).length > 0) {
+  const plan = planQuit({
+    heldDeletes: listHeldDeletes(vaultRoot()).length,
+    releasingHeld,
+  });
+  armQuitFallback();
+  if (plan.unblockWindows) {
+    unblockQuit();
+  }
+  if (plan.preventDefault) {
     event.preventDefault();
     releasingHeld = true;
     releaseHeld()
@@ -2412,4 +2467,12 @@ app.on("before-quit", (event) => {
   hideAnnotate();
 });
 
+app.on("will-quit", () => {
+  if (quitFallback !== null) {
+    clearTimeout(quitFallback);
+    quitFallback = null;
+  }
+});
+
+// Closing the window leaves the menu-bar extra running.
 app.on("window-all-closed", () => undefined);

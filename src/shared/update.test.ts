@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -554,6 +554,49 @@ describe("notes and signing mode", () => {
     );
     const both = run("both");
     expect(existsSync(both.stage)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("the swap gives up when Slip is still running", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-wait-"));
+    const log = path.join(root, "update.log");
+    const sleeper = spawn("sleep", ["30"], { stdio: "ignore" });
+    const app = (dir: string, marker: string): void => {
+      const bins = path.join(dir, "Contents", "Resources", "bin");
+      mkdirSync(bins, { recursive: true });
+      writeFileSync(path.join(bins, "parakeet-cli"), marker);
+      writeFileSync(path.join(bins, "slip-cleanup"), marker);
+      writeFileSync(path.join(dir, "marker"), marker);
+    };
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Slip.app");
+    const dest = path.join(root, "Slip.app");
+    app(src, "new");
+    app(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, [String(sleeper.pid), src, dest, work], {
+        env: {
+          ...process.env,
+          SLIP_APPLY_LOG: log,
+          SLIP_APPLY_WAIT_SECONDS: "0",
+        },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    } finally {
+      sleeper.kill();
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(script)).toBe(false);
+    expect(existsSync(work)).toBe(false);
+    expect(readFileSync(log, "utf8")).toContain(
+      `giving up after 0s waiting for pid ${sleeper.pid}`
+    );
     rmSync(root, { force: true, recursive: true });
   });
 });
