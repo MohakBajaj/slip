@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -272,9 +272,10 @@ export const SpeechSettings = ({
   );
   const [keyStatus, setKeyStatus] = useState<KeyStatus>("absent");
   const [apple, setApple] = useState<AppleCleanupStatus | null>(null);
+  const handledFocus = useRef(0);
 
   useEffect(() => {
-    if (focusKey < 1) {
+    if (focusKey < 1 || handledFocus.current === focusKey) {
       return () => undefined;
     }
     const frame = requestAnimationFrame(() => {
@@ -282,6 +283,7 @@ export const SpeechSettings = ({
       if (!(field instanceof HTMLElement)) {
         return;
       }
+      handledFocus.current = focusKey;
       field.scrollIntoView({ block: "center" });
       field.focus();
     });

@@ -1,7 +1,7 @@
 export type KeyStatus = "absent" | "reenter" | "saved";
 
 export const KEY_REENTER =
-  "Jot can't read the saved AI Gateway key after the rename. The old copy is still on disk. Enter the key again.";
+  "Jot can't read the saved AI Gateway key. Enter it again.";
 
 export const interpretStoredKey = (input: {
   bytes: Buffer | null;

@@ -13,7 +13,9 @@ test("a decrypt failure keeps the ciphertext and asks for the key again", () => 
   expect(read.status).toBe("reenter");
   expect(read.value).toBe("");
   expect(stored.equals(Buffer.from("slip-keychain-ciphertext"))).toBe(true);
-  expect(KEY_REENTER).toContain("still on disk");
+  expect(KEY_REENTER).toBe(
+    "Jot can't read the saved AI Gateway key. Enter it again."
+  );
   expect(
     interpretStoredKey({
       bytes: null,

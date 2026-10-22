@@ -1456,6 +1456,9 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
     },
     width,
   });
+  drawWin.webContents.on("page-title-updated", (event) => {
+    event.preventDefault();
+  });
   pinWorkspace(drawWin);
   drawWin.on("ready-to-show", () => {
     if (!drawWin || drawWin.isDestroyed()) {

@@ -15,6 +15,7 @@ import {
   actionsForPackaged,
   parseLoginItemNames,
   planLoginHandoff,
+  shouldAskSystemEvents,
   shouldRunLoginHandoff,
 } from "../shared/login-handoff";
 import type { LoginAgent } from "../shared/login-handoff";
@@ -58,8 +59,8 @@ const launchAgents = (): LoginAgent[] => {
   return found;
 };
 
-const loginItemNames = async (): Promise<string[]> => {
-  if (process.platform !== "darwin") {
+const loginItemNames = async (ask: boolean): Promise<string[]> => {
+  if (process.platform !== "darwin" || !ask) {
     return [];
   }
   try {
@@ -96,9 +97,17 @@ export const handoffLogin = async (): Promise<void> => {
   if (!shouldRunLoginHandoff(app.isPackaged, existsSync(marker))) {
     return;
   }
+  const agents = launchAgents();
+  const home = app.getPath("home");
   const plan = planLoginHandoff({
-    launchAgents: launchAgents(),
-    loginItemNames: await loginItemNames(),
+    launchAgents: agents,
+    loginItemNames: await loginItemNames(
+      shouldAskSystemEvents({
+        applicationsApp: existsSync("/Applications/Slip.app"),
+        desktopApp: existsSync(path.join(home, "Desktop", "Slip.app")),
+        launchAgents: agents,
+      })
+    ),
   });
   const actions = actionsForPackaged(plan, true);
   if (actions.register) {
