@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   createWriteStream,
@@ -17,6 +18,7 @@ import { pipeline } from "node:stream/promises";
 
 import { app, dialog, Notification } from "electron";
 
+import { QUIT_HARD_FALLBACK_MS } from "../shared/quit-path";
 import {
   applyUpdateScript,
   assessDownload,
@@ -305,19 +307,61 @@ const extractZip = async (
   return appPath;
 };
 
+let pendingApply: ChildProcess | null = null;
+let applyQuitTimer: ReturnType<typeof setTimeout> | null = null;
+
+const stopPendingApply = (): void => {
+  const child = pendingApply;
+  pendingApply = null;
+  if (child === null || child.exitCode !== null || child.killed) {
+    return;
+  }
+  child.kill("SIGTERM");
+};
+
+// before-quit also bounds trash and arms app.exit. This timer covers
+// the handoff when that quit never reaches will-quit.
+const quitAfterApply = (): void => {
+  if (applyQuitTimer === null) {
+    applyQuitTimer = setTimeout(() => {
+      app.exit(0);
+    }, QUIT_HARD_FALLBACK_MS);
+    applyQuitTimer.unref();
+    app.once("will-quit", () => {
+      if (applyQuitTimer !== null) {
+        clearTimeout(applyQuitTimer);
+        applyQuitTimer = null;
+      }
+    });
+  }
+  app.quit();
+};
+
 const handoff = (source: string, dest: string, workdir: string): void => {
   if (![source, dest, workdir].every(safeSwapPath)) {
     throw new Error("Slip did not change.");
   }
-  const scriptPath = path.join(tmpdir(), `slip-apply-${process.pid}.sh`);
+  // A previous download is still waiting on this pid. Kill it before
+  // writing another script, or the old waiter keeps the swap from running.
+  stopPendingApply();
+  const scriptPath = path.join(
+    tmpdir(),
+    `slip-apply-${process.pid}-${Date.now()}.sh`
+  );
   writeFileSync(scriptPath, applyUpdateScript(), { mode: 0o700 });
   const child = spawn(
     "/bin/bash",
     [scriptPath, String(process.pid), source, dest, workdir],
     { detached: true, stdio: "ignore" }
   );
+  pendingApply = child;
+  child.once("exit", () => {
+    if (pendingApply === child) {
+      pendingApply = null;
+    }
+  });
   child.unref();
-  app.quit();
+  quitAfterApply();
 };
 
 const installManifest = async (manifest: UpdateManifest): Promise<void> => {

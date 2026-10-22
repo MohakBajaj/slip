@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -443,7 +443,7 @@ describe("notes and signing mode", () => {
       writeFileSync(path.join(bins, "slip-cleanup"), marker);
       writeFileSync(path.join(dir, "marker"), marker);
     };
-    const work = path.join(root, "work");
+    const work = path.join(root, "slip-update-work");
     const src = path.join(work, "Slip.app");
     const dest = path.join(root, "Slip.app");
     app(src, "new");
@@ -554,6 +554,231 @@ describe("notes and signing mode", () => {
     );
     const both = run("both");
     expect(existsSync(both.stage)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("the swap gives up when Slip is still running", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-wait-"));
+    const log = path.join(root, "update.log");
+    const sleeper = spawn("sleep", ["30"], { stdio: "ignore" });
+    const app = (dir: string, marker: string): void => {
+      const bins = path.join(dir, "Contents", "Resources", "bin");
+      mkdirSync(bins, { recursive: true });
+      writeFileSync(path.join(bins, "parakeet-cli"), marker);
+      writeFileSync(path.join(bins, "slip-cleanup"), marker);
+      writeFileSync(path.join(dir, "marker"), marker);
+    };
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Slip.app");
+    const dest = path.join(root, "Slip.app");
+    app(src, "new");
+    app(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, [String(sleeper.pid), src, dest, work], {
+        env: {
+          ...process.env,
+          SLIP_APPLY_LOG: log,
+          SLIP_APPLY_WAIT_SECONDS: "0",
+        },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    } finally {
+      sleeper.kill();
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(script)).toBe(false);
+    expect(existsSync(work)).toBe(false);
+    expect(readFileSync(log, "utf8")).toContain(
+      `giving up after 0s waiting for pid ${sleeper.pid}`
+    );
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("stopping the swap midway puts the app back and removes the workdir", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-term-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    const stub = (name: string, body: string): void => {
+      const file = path.join(bin, name);
+      writeFileSync(file, body);
+      chmodSync(file, 0o755);
+    };
+    stub("ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stub("xattr", "#!/bin/sh\nexit 0\n");
+    stub("open", "#!/bin/sh\nexit 0\n");
+    stub(
+      "mv",
+      '#!/bin/sh\ncase "$2" in *.slip-old) /bin/mv "$@"; kill -TERM "$PPID"; exit 0 ;; esac\nexec /bin/mv "$@"\n'
+    );
+    const app = (dir: string, marker: string): void => {
+      const bins = path.join(dir, "Contents", "Resources", "bin");
+      mkdirSync(bins, { recursive: true });
+      writeFileSync(path.join(bins, "parakeet-cli"), marker);
+      writeFileSync(path.join(bins, "slip-cleanup"), marker);
+      writeFileSync(path.join(dir, "marker"), marker);
+    };
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Slip.app");
+    const dest = path.join(root, "Slip.app");
+    app(src, "new");
+    app(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, ["999999", src, dest, work], {
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(work)).toBe(false);
+    expect(existsSync(script)).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    expect(existsSync(`${dest}.slip-new`)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("aborting while Slip is running removes the workdir", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-abort-"));
+    const log = path.join(root, "update.log");
+    const sleeper = spawn("sleep", ["30"], { stdio: "ignore" });
+    const work = path.join(root, "slip-update-work");
+    const dest = path.join(root, "Slip.app");
+    mkdirSync(path.join(dest, "Contents"), { recursive: true });
+    writeFileSync(path.join(dest, "marker"), "old");
+    mkdirSync(work);
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(
+        script,
+        [String(sleeper.pid), path.join(work, "Slip.app"), dest, work],
+        {
+          env: {
+            ...process.env,
+            SLIP_APPLY_LOG: log,
+            SLIP_APPLY_WAIT_SECONDS: "0",
+          },
+        }
+      );
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    } finally {
+      sleeper.kill();
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(work)).toBe(false);
+    expect(existsSync(script)).toBe(false);
+    expect(readFileSync(log, "utf8")).toContain("did not relaunch");
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("stopping after the new app is in place removes the stage and the old app", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-placed-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    const stub = (name: string, body: string): void => {
+      const file = path.join(bin, name);
+      writeFileSync(file, body);
+      chmodSync(file, 0o755);
+    };
+    stub("ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stub("xattr", "#!/bin/sh\nexit 0\n");
+    stub("open", '#!/bin/sh\ntouch "$1/.opened"\n');
+    stub(
+      "mv",
+      '#!/bin/sh\ncase "$1" in *.slip-new) /bin/mv "$@"; kill -TERM "$PPID"; exit 0 ;; esac\nexec /bin/mv "$@"\n'
+    );
+    const app = (dir: string, marker: string): void => {
+      const bins = path.join(dir, "Contents", "Resources", "bin");
+      mkdirSync(bins, { recursive: true });
+      writeFileSync(path.join(bins, "parakeet-cli"), marker);
+      writeFileSync(path.join(bins, "slip-cleanup"), marker);
+      writeFileSync(path.join(dir, "marker"), marker);
+    };
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Slip.app");
+    const dest = path.join(root, "Slip.app");
+    app(src, "new");
+    app(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, ["999999", src, dest, work], {
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("new");
+    expect(existsSync(path.join(dest, ".opened"))).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    expect(existsSync(`${dest}.slip-new`)).toBe(false);
+    expect(existsSync(work)).toBe(false);
+    expect(existsSync(script)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a workdir path with .. is not deleted", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-guard-"));
+    const real = path.join(root, "slip-update-keep");
+    mkdirSync(real);
+    writeFileSync(path.join(real, "keep"), "safe");
+    const work = `${root}/slip-update-decoy/../slip-update-keep`;
+    const dest = path.join(root, "Slip.app");
+    mkdirSync(path.join(dest, "Contents"), { recursive: true });
+    writeFileSync(path.join(dest, "marker"), "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, ["999999", path.join(work, "Slip.app"), dest, work]);
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    }
+    expect(status).toBe(1);
+    expect(existsSync(path.join(real, "keep"))).toBe(true);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a workdir whose name is not slip-update-* is left alone", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-name-"));
+    const work = path.join(root, "notes");
+    mkdirSync(work);
+    writeFileSync(path.join(work, "keep"), "safe");
+    const dest = path.join(root, "Slip.app");
+    mkdirSync(path.join(dest, "Contents"), { recursive: true });
+    writeFileSync(path.join(dest, "marker"), "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, ["999999", path.join(work, "Slip.app"), dest, work]);
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    }
+    expect(status).toBe(1);
+    expect(existsSync(path.join(work, "keep"))).toBe(true);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
     rmSync(root, { force: true, recursive: true });
   });
 });

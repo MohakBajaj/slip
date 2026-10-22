@@ -446,7 +446,7 @@ export const signingMode = (
 
 export const applyUpdateScript = (): string => `#!/bin/bash
 set -euo pipefail
-log="/tmp/slip-update.log"
+log="\${SLIP_APPLY_LOG:-/tmp/slip-update.log}"
 exec >>"$log" 2>&1
 echo "start $(date)"
 pid="$1"
@@ -455,18 +455,63 @@ dest="$3"
 workdir="$4"
 aside="\${dest}.slip-old"
 stage="\${dest}.slip-new"
+restore_dest() {
+  if [[ ! -d "$dest" && -d "$aside" ]]; then
+    mv "$aside" "$dest" || true
+  fi
+}
+release_workdir() {
+  case "$workdir" in
+    *..*) return ;;
+  esac
+  case "$(basename "$(basename "$workdir")")" in
+    slip-update-*) rm -rf "$workdir" || true ;;
+  esac
+}
+bundle_complete() {
+  [[ -d "$1" && -f "$1/Contents/Resources/bin/parakeet-cli" && -f "$1/Contents/Resources/bin/slip-cleanup" ]]
+}
+on_stop() {
+  trap - EXIT TERM INT ERR
+  restore_dest
+  rm -rf "$stage" || true
+  if bundle_complete "$dest"; then
+    rm -rf "$aside" || true
+  fi
+  release_workdir
+  rm -f "$0"
+}
+trap on_stop EXIT
+trap 'exit 1' TERM INT
+wait_for_pid() {
+  local ticks=0
+  local seconds="\${SLIP_APPLY_WAIT_SECONDS:-60}"
+  local max_ticks=$((seconds * 5))
+  if [[ "$max_ticks" -lt 1 ]]; then
+    max_ticks=1
+  fi
+  while kill -0 "$pid" 2>/dev/null; do
+    ticks=$((ticks + 1))
+    if [[ "$ticks" -ge "$max_ticks" ]]; then
+      echo "giving up after \${seconds}s waiting for pid $pid"
+      return 1
+    fi
+    sleep 0.2
+  done
+}
 abort() {
   trap - ERR
   echo "update failed"
   rm -rf "$stage"
-  if [[ ! -d "$dest" && -d "$aside" ]]; then
-    mv "$aside" "$dest" || true
-  fi
-  while kill -0 "$pid" 2>/dev/null; do
-    sleep 0.2
-  done
-  if [[ -d "$dest" ]]; then
-    open "$dest" || echo "open failed"
+  restore_dest
+  if wait_for_pid; then
+    if [[ -d "$dest" ]]; then
+      open "$dest" || echo "open failed"
+    fi
+  else
+    echo "left pid $pid running; did not relaunch"
+    restore_dest
+    release_workdir
   fi
   exit 1
 }
@@ -477,7 +522,7 @@ if [[ ! -d "$dest" && -d "$stage" ]]; then
   xattr -dr com.apple.quarantine "$dest" || true
   open "$dest" || echo "open failed"
   if [[ -d "$workdir" ]]; then
-    rm -rf "$workdir"
+    release_workdir
   fi
   rm -f "$0"
   exit 0
@@ -490,7 +535,10 @@ case "$src" in
   *) echo "source is outside the work directory"; abort ;;
 esac
 case "$workdir" in
-  *slip-update-*) ;;
+  *..*) echo "refusing to delete $workdir"; abort ;;
+esac
+case "$(basename "$(basename "$workdir")")" in
+  slip-update-*) ;;
   *) echo "refusing to delete $workdir"; abort ;;
 esac
 if [[ ! -d "$src" ]]; then
@@ -503,9 +551,11 @@ for bin in parakeet-cli slip-cleanup; do
     abort
   fi
 done
-while kill -0 "$pid" 2>/dev/null; do
-  sleep 0.2
-done
+if ! wait_for_pid; then
+  echo "update did not apply"
+  release_workdir
+  exit 1
+fi
 sleep 1
 rm -rf "$stage"
 ditto "$src" "$stage"
@@ -533,6 +583,6 @@ trap - ERR
 rm -rf "$aside"
 xattr -dr com.apple.quarantine "$dest" || true
 open "$dest" || echo "open failed"
-rm -rf "$workdir"
+release_workdir
 rm -f "$0"
 `;
