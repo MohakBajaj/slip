@@ -773,6 +773,31 @@ details[open] .mark::after {
   text-underline-offset: 0.18em;
 }
 
+.credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.x-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+}
+
+.x-link svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentColor;
+}
+
+.x-link:hover {
+  background: rgba(248, 239, 217, 0.08);
+}
+
 @media (min-width: 800px) {
   .wrap {
     width: min(1120px, calc(100% - 4rem));
