@@ -1,12 +1,13 @@
 import path from "node:path";
 
+import { APP_BUNDLE_NAMES, PRODUCT_APP, PRODUCT_NAME } from "./product";
+
+export { BUNDLE_ID, LEGACY_APP, PRODUCT_APP, PRODUCT_NAME } from "./product";
 export const BUNDLED_BINS = ["parakeet-cli", "slip-cleanup"] as const;
-export const BUNDLE_ID = "dev.mohak.slip";
 export const DEFAULT_MIN_MACOS = "12.0";
 export const MANIFEST_NAME = "latest.json";
 export const MAX_NOTES = 20_000;
 export const MAX_ZIP_BYTES = 800_000_000;
-export const PRODUCT_APP = "Slip.app";
 export const RELEASE_OWNER = "MohakBajaj";
 export const RELEASE_REPO = "slip";
 
@@ -102,10 +103,10 @@ export const manifestUrl = (): string =>
   `https://github.com/${RELEASE_OWNER}/${RELEASE_REPO}/releases/latest/download/${MANIFEST_NAME}`;
 
 export const releaseZipName = (version: string): string =>
-  `Slip-${version}-arm64-mac.zip`;
+  `${PRODUCT_NAME}-${version}-arm64-mac.zip`;
 
 export const releaseDmgName = (version: string): string =>
-  `Slip-${version}.dmg`;
+  `${PRODUCT_NAME}-${version}.dmg`;
 
 export const releaseZipUrl = (version: string): string =>
   `https://github.com/${RELEASE_OWNER}/${RELEASE_REPO}/releases/download/v${version}/${releaseZipName(version)}`;
@@ -259,12 +260,12 @@ const manifestFailureDetail = (url: string, error: unknown): string | null => {
     return null;
   }
   if (status !== undefined) {
-    return `Slip couldn't read ${url} (HTTP ${status}).`;
+    return `${PRODUCT_NAME} couldn't read ${url} (HTTP ${status}).`;
   }
   if (message.length === 0 || isTransportFailure(message)) {
-    return `Slip couldn't read ${url} (network error).`;
+    return `${PRODUCT_NAME} couldn't read ${url} (network error).`;
   }
-  return `Slip couldn't read ${url} (${message}).`;
+  return `${PRODUCT_NAME} couldn't read ${url} (${message}).`;
 };
 
 export const noticeForManifestFailure = (input: {
@@ -381,13 +382,24 @@ export const zipEntryAllowed = (entry: string): boolean => {
   return parts[0] === PRODUCT_APP;
 };
 
+const bundleNameAt = (parts: string[], macOsAt: number): string | null => {
+  const name = parts[macOsAt - 2];
+  if (name === undefined) {
+    return null;
+  }
+  return APP_BUNDLE_NAMES.some((bundle) => bundle === name) ? name : null;
+};
+
 export const bundleFromExecutable = (execPath: string): string | null => {
   const parts = path.resolve(execPath).split(path.sep);
   const macOsAt = parts.lastIndexOf("MacOS");
   if (macOsAt < 3 || parts.length !== macOsAt + 2) {
     return null;
   }
-  if (parts[macOsAt - 1] !== "Contents" || parts[macOsAt - 2] !== PRODUCT_APP) {
+  if (
+    parts[macOsAt - 1] !== "Contents" ||
+    bundleNameAt(parts, macOsAt) === null
+  ) {
     return null;
   }
   return parts.slice(0, macOsAt - 1).join(path.sep);
@@ -401,24 +413,25 @@ export const describeInstallTarget = (
 ): InstallTarget => {
   if (bundlePath.includes(`${path.sep}AppTranslocation${path.sep}`)) {
     return {
-      message:
-        "macOS opened a temporary copy of Slip. Move Slip into the Applications folder, open that copy (right-click and choose Open the first time), then check for updates again.",
+      message: `macOS opened a temporary copy of ${PRODUCT_NAME}. Move ${PRODUCT_NAME} into the Applications folder, open that copy (right-click and choose Open the first time), then check for updates again.`,
       ok: false,
     };
   }
-  if (writable && bundlePath.endsWith(`${path.sep}${PRODUCT_APP}`)) {
+  const named = APP_BUNDLE_NAMES.some((bundle) =>
+    bundlePath.endsWith(`${path.sep}${bundle}`)
+  );
+  if (writable && named) {
     return { bundlePath, ok: true };
   }
   if (bundlePath.startsWith(`${path.sep}Volumes${path.sep}`)) {
     return {
-      message:
-        "Slip is running from a disk image, which can't be updated in place. Drag Slip into the Applications folder, open that copy, then check for updates again.",
+      message: `${PRODUCT_NAME} is running from a disk image, which can't be updated in place. Drag ${PRODUCT_NAME} into the Applications folder, open that copy, then check for updates again.`,
       ok: false,
     };
   }
   const parent = path.dirname(bundlePath);
   return {
-    message: `Slip can't replace itself in ${parent} because that folder isn't writable. Move Slip into a folder you can write to. ${releaseHelp}`,
+    message: `${PRODUCT_NAME} can't replace itself in ${parent} because that folder isn't writable. Move ${PRODUCT_NAME} into a folder you can write to. ${releaseHelp}`,
     ok: false,
   };
 };
@@ -453,13 +466,17 @@ pid="$1"
 src="$2"
 dest="$3"
 workdir="$4"
+final="$(dirname "$dest")/$(basename "$src")"
+stage="\${final}.slip-new"
 aside="\${dest}.slip-old"
-stage="\${dest}.slip-new"
 abort() {
   trap - ERR
   echo "update failed"
   rm -rf "$stage"
-  if [[ ! -d "$dest" && -d "$aside" ]]; then
+  if [[ -d "$final" && ! -f "$final/Contents/Resources/bin/parakeet-cli" ]]; then
+    rm -rf "$final"
+  fi
+  if [[ ! -d "$dest" && -d "$aside" && ! -d "$final" ]]; then
     mv "$aside" "$dest" || true
   fi
   while kill -0 "$pid" 2>/dev/null; do
@@ -467,15 +484,27 @@ abort() {
   done
   if [[ -d "$dest" ]]; then
     open "$dest" || echo "open failed"
+  elif [[ -d "$final" ]]; then
+    open "$final" || echo "open failed"
   fi
   exit 1
 }
 trap abort ERR
 if [[ ! -d "$dest" && -d "$stage" ]]; then
-  mv "$stage" "$dest"
+  mv "$stage" "$final"
   rm -rf "$aside"
-  xattr -dr com.apple.quarantine "$dest" || true
-  open "$dest" || echo "open failed"
+  xattr -dr com.apple.quarantine "$final" || true
+  open "$final" || echo "open failed"
+  if [[ -d "$workdir" ]]; then
+    rm -rf "$workdir"
+  fi
+  rm -f "$0"
+  exit 0
+fi
+if [[ ! -d "$dest" && -d "$final" && "$final" != "$dest" ]]; then
+  rm -rf "$aside" "$stage"
+  xattr -dr com.apple.quarantine "$final" || true
+  open "$final" || echo "open failed"
   if [[ -d "$workdir" ]]; then
     rm -rf "$workdir"
   fi
@@ -518,10 +547,12 @@ done
 xattr -dr com.apple.quarantine "$stage" || true
 rm -rf "$aside"
 mv "$dest" "$aside"
-if ! mv "$stage" "$dest"; then
-  if ! ditto "$stage" "$dest"; then
-    rm -rf "$dest"
-    mv "$aside" "$dest"
+if ! mv "$stage" "$final"; then
+  if ! ditto "$stage" "$final"; then
+    rm -rf "$final"
+    if [[ ! -d "$dest" && -d "$aside" ]]; then
+      mv "$aside" "$dest"
+    fi
     open "$dest" || echo "open failed"
     rm -rf "$stage"
     echo "update failed"
@@ -531,8 +562,8 @@ if ! mv "$stage" "$dest"; then
 fi
 trap - ERR
 rm -rf "$aside"
-xattr -dr com.apple.quarantine "$dest" || true
-open "$dest" || echo "open failed"
+xattr -dr com.apple.quarantine "$final" || true
+open "$final" || echo "open failed"
 rm -rf "$workdir"
 rm -f "$0"
 `;

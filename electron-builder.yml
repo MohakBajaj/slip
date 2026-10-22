@@ -1,5 +1,5 @@
-appId: dev.mohak.slip
-productName: Slip
+appId: dev.mohak.jot
+productName: Jot
 directories:
   buildResources: build
 files:
@@ -37,7 +37,7 @@ nsis:
 mac:
   # Zip has no config key in electron-builder 26. The dmg block sets its own
   # name, so this only forces the arm64 suffix into the zip.
-  artifactName: Slip-${version}-${arch}-mac.${ext}
+  artifactName: Jot-${version}-${arch}-mac.${ext}
   category: public.app-category.productivity
   icon: build/icon.png
   identity: null
@@ -45,19 +45,19 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSAutoFillHeuristicControllerEnabled: false
-    NSDocumentsFolderUsageDescription: Slip keeps your notes as markdown in Documents.
-    NSMicrophoneUsageDescription: Slip transcribes speech on this Mac when you capture by speaking.
+    NSDocumentsFolderUsageDescription: Jot keeps your notes as markdown in Documents.
+    NSMicrophoneUsageDescription: Jot transcribes speech on this Mac when you capture by speaking.
   notarize: false
   extraFiles:
     - from: dist/cli/slip
       to: Helpers/slip
 dmg:
-  artifactName: Slip-${version}.${ext}
+  artifactName: Jot-${version}.${ext}
   background: build/background.tiff
   icon: build/icon.icns
   iconSize: 80
   iconTextSize: 12
-  title: Slip
+  title: Jot
   window:
     x: 280
     y: 160

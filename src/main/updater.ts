@@ -17,6 +17,7 @@ import { pipeline } from "node:stream/promises";
 
 import { app, dialog, Notification } from "electron";
 
+import { PRODUCT_EXE, PRODUCT_NAME } from "../shared/product";
 import {
   applyUpdateScript,
   assessDownload,
@@ -65,7 +66,7 @@ const tell = async (message: string, detail: string): Promise<void> => {
     detail,
     message,
     noLink: true,
-    title: "Slip",
+    title: PRODUCT_NAME,
     type: "info",
   });
 };
@@ -79,7 +80,10 @@ const openRelease = (
     const req = httpsRequest(
       target,
       {
-        headers: { Accept: "application/octet-stream", "User-Agent": "Slip" },
+        headers: {
+          Accept: "application/octet-stream",
+          "User-Agent": PRODUCT_NAME,
+        },
         method: "GET",
       },
       (response) => {
@@ -175,7 +179,7 @@ const downloadZip = async (
       if (received > manifest.size) {
         callback(
           new Error(
-            "The download was larger than the release manifest. Slip did not change."
+            "The download was larger than the release manifest. Jot did not change."
           )
         );
         return;
@@ -200,8 +204,8 @@ const downloadZip = async (
     rmSync(file, { force: true });
     const detail =
       verdict.reason === "checksum"
-        ? "The download's SHA-256 did not match the release manifest. Slip did not change."
-        : "The download size did not match the release manifest. Slip did not change.";
+        ? "The download's SHA-256 did not match the release manifest. Jot did not change."
+        : "The download size did not match the release manifest. Jot did not change.";
     throw new Error(detail);
   }
 };
@@ -236,11 +240,11 @@ const acceptBundle = async (
 ): Promise<void> => {
   if (lstatSync(appPath).isSymbolicLink()) {
     throw new Error(
-      "The archive did not contain Slip.app. Slip did not change."
+      `The archive did not contain ${PRODUCT_APP}. Jot did not change.`
     );
   }
   const plistPath = path.join(appPath, "Contents", "Info.plist");
-  const exePath = path.join(appPath, "Contents", "MacOS", "Slip");
+  const exePath = path.join(appPath, "Contents", "MacOS", PRODUCT_EXE);
   if (
     !lstatSync(plistPath).isFile() ||
     !lstatSync(exePath).isFile() ||
@@ -248,7 +252,7 @@ const acceptBundle = async (
     !contained(appPath, exePath)
   ) {
     throw new Error(
-      "The archive did not contain Slip.app. Slip did not change."
+      `The archive did not contain ${PRODUCT_APP}. Jot did not change.`
     );
   }
   const stdout = await execFileText("/usr/bin/plutil", [
@@ -260,7 +264,7 @@ const acceptBundle = async (
   ]);
   if (!bundleAccepted(stdout, { id: BUNDLE_ID, version: manifest.version })) {
     throw new Error(
-      "The archive's bundle id or version did not match the manifest. Slip did not change."
+      "The archive's bundle id or version did not match the manifest. Jot did not change."
     );
   }
   const helpers = BUNDLED_BINS.every((name) => {
@@ -272,7 +276,7 @@ const acceptBundle = async (
   });
   if (!helpers) {
     throw new Error(
-      "The archive did not include parakeet-cli and slip-cleanup. Slip did not change."
+      "The archive did not include parakeet-cli and slip-cleanup. Jot did not change."
     );
   }
 };
@@ -296,7 +300,7 @@ const extractZip = async (
     entries.some((entry) => !zipEntryAllowed(entry))
   ) {
     throw new Error(
-      "The archive was not a Slip.app bundle. Slip did not change."
+      `The archive was not a ${PRODUCT_APP} bundle. Jot did not change.`
     );
   }
   await execFileText("/usr/bin/ditto", ["-x", "-k", zipPath, workdir]);
@@ -307,7 +311,7 @@ const extractZip = async (
 
 const handoff = (source: string, dest: string, workdir: string): void => {
   if (![source, dest, workdir].every(safeSwapPath)) {
-    throw new Error("Slip did not change.");
+    throw new Error("Jot did not change.");
   }
   const scriptPath = path.join(tmpdir(), `slip-apply-${process.pid}.sh`);
   writeFileSync(scriptPath, applyUpdateScript(), { mode: 0o700 });
@@ -324,7 +328,7 @@ const installManifest = async (manifest: UpdateManifest): Promise<void> => {
   const bundlePath = bundleFromExecutable(process.execPath);
   if (bundlePath === null) {
     throw new Error(
-      "Slip can't find its own app bundle, so it did not change."
+      `${PRODUCT_NAME} can't find its own app bundle, so it did not change.`
     );
   }
   const target = describeInstallTarget(bundlePath, parentWritable(bundlePath));
@@ -332,7 +336,7 @@ const installManifest = async (manifest: UpdateManifest): Promise<void> => {
     throw new Error(target.message);
   }
   const workdir = mkdtempSync(path.join(tmpdir(), "slip-update-"));
-  const zipPath = path.join(workdir, "Slip.zip");
+  const zipPath = path.join(workdir, `${PRODUCT_NAME}.zip`);
   let source = "";
   try {
     await downloadZip(manifest, zipPath);
@@ -344,8 +348,8 @@ const installManifest = async (manifest: UpdateManifest): Promise<void> => {
   try {
     if (Notification.isSupported()) {
       new Notification({
-        body: "Slip will quit and reopen when the download is in place.",
-        title: "Updating Slip",
+        body: `${PRODUCT_NAME} will quit and reopen when the download is in place.`,
+        title: `Updating ${PRODUCT_NAME}`,
       }).show();
     }
   } catch {
@@ -373,7 +377,7 @@ const checkOnce = async (input: {
     await finish(
       input.manual,
       "This build can't update itself",
-      "Updates install into a packaged Slip.app."
+      `Updates install into a packaged ${PRODUCT_APP}.`
     );
     return;
   }
@@ -394,7 +398,7 @@ const checkOnce = async (input: {
     if (notice.kind === "current") {
       await finish(
         input.manual,
-        "Slip is up to date",
+        `${PRODUCT_NAME} is up to date`,
         `You're running ${app.getVersion()}.`
       );
       return;
@@ -417,7 +421,7 @@ const checkOnce = async (input: {
   if (decision.kind === "current") {
     await finish(
       input.manual,
-      "Slip is up to date",
+      `${PRODUCT_NAME} is up to date`,
       `You're running ${app.getVersion()}.`
     );
     return;
@@ -426,7 +430,7 @@ const checkOnce = async (input: {
     if (input.manual && decision.reason === "os") {
       await tell(
         "This Mac can't run that update",
-        `Slip ${manifest.version} needs macOS ${manifest.minimumMacOS} or newer.`
+        `${PRODUCT_NAME} ${manifest.version} needs macOS ${manifest.minimumMacOS} or newer.`
       );
     }
     return;
@@ -440,9 +444,9 @@ const checkOnce = async (input: {
     cancelId: 0,
     defaultId: 1,
     detail: clipNotes(manifest.notes),
-    message: `Slip ${manifest.version} is available`,
+    message: `${PRODUCT_NAME} ${manifest.version} is available`,
     noLink: true,
-    title: "Update Slip",
+    title: `Update ${PRODUCT_NAME}`,
     type: "info",
   });
   if (choice.response !== 1) {
@@ -452,7 +456,7 @@ const checkOnce = async (input: {
     await installManifest(manifest);
   } catch (error) {
     const detail =
-      error instanceof Error ? error.message : "Slip did not change.";
+      error instanceof Error ? error.message : "Jot did not change.";
     await tell("Update aborted", detail);
   }
 };

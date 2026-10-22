@@ -2,7 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import type { DrawSession, DrawTarget } from "../shared/annotate";
 import type { GatewayCatalog } from "../shared/gateway-models";
+import type { GrantPrompt } from "../shared/grants";
 import type { ImagePayload, PreviewState } from "../shared/images";
+import type { KeyStatus } from "../shared/key-status";
 import type { MenuEntry } from "../shared/menu";
 import type { VoiceStatus } from "../shared/speech";
 import type { AppleCleanupStatus } from "../shared/speech-engines";
@@ -21,6 +23,8 @@ const api = {
     ipcRenderer.invoke("appleCleanupStatus") as Promise<AppleCleanupStatus>,
   askMic: () => ipcRenderer.invoke("askMic") as Promise<boolean>,
   cleanupKeySet: () => ipcRenderer.invoke("cleanupKeySet") as Promise<boolean>,
+  cleanupKeyStatus: () =>
+    ipcRenderer.invoke("cleanupKeyStatus") as Promise<KeyStatus>,
   clipboardImage: () =>
     ipcRenderer.invoke("clipboardImage") as Promise<{
       bytes: Uint8Array;
@@ -55,6 +59,8 @@ const api = {
   drawSession: () => ipcRenderer.invoke("drawSession") as Promise<DrawSession>,
   gatewayCatalog: () =>
     ipcRenderer.invoke("gatewayCatalog") as Promise<GatewayCatalog>,
+  grantStatus: () =>
+    ipcRenderer.invoke("grantStatus") as Promise<GrantPrompt[]>,
   inputMonitoring: () =>
     ipcRenderer.invoke("inputMonitoring") as Promise<boolean>,
   installSkill: () =>
@@ -187,6 +193,7 @@ const api = {
   openMic: () => ipcRenderer.invoke("openMic"),
   openPreview: (slipId: string, index: number) =>
     ipcRenderer.invoke("openPreview", slipId, index),
+  openScreen: () => ipcRenderer.invoke("openScreen"),
   openVault: () => ipcRenderer.invoke("openVault"),
   openVoice: () => ipcRenderer.invoke("openVoice"),
   pickVault: () => ipcRenderer.invoke("pickVault") as Promise<string | null>,

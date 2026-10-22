@@ -12,6 +12,8 @@ import type {
   ModelChoice,
 } from "../../../shared/gateway-models";
 import { bundledGatewayModels } from "../../../shared/gateway-snapshot";
+import { KEY_REENTER } from "../../../shared/key-status";
+import type { KeyStatus } from "../../../shared/key-status";
 import {
   appleCleanupDetail,
   localCleanups,
@@ -171,9 +173,11 @@ const cloudDetail = (price: string, keySet: boolean): string => {
 
 const GatewayKey = ({
   keySet,
+  message,
   onSet,
 }: {
   keySet: boolean;
+  message: string;
   onSet: (set: boolean) => void;
 }) => {
   const [draft, setDraft] = useState("");
@@ -207,6 +211,7 @@ const GatewayKey = ({
       <p className="text-muted-foreground text-[11px]">
         Stored in the keychain.
       </p>
+      {message.length > 0 ? <p className="text-[11px]">{message}</p> : null}
       <div className="flex gap-1">
         <Input
           aria-label="Vercel AI Gateway API key"
@@ -262,7 +267,7 @@ export const SpeechSettings = ({
   const [catalog, setCatalog] = useState<GatewayCatalog>(() =>
     catalogChoices(bundledGatewayModels())
   );
-  const [keySet, setKeySet] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>("absent");
   const [apple, setApple] = useState<AppleCleanupStatus | null>(null);
 
   useEffect(() => {
@@ -271,8 +276,8 @@ export const SpeechSettings = ({
       .then(setCatalog)
       .catch(() => undefined);
     window.slip
-      .cleanupKeySet()
-      .then(setKeySet)
+      .cleanupKeyStatus()
+      .then(setKeyStatus)
       .catch(() => undefined);
   }, []);
   useEffect(() => {
@@ -293,6 +298,7 @@ export const SpeechSettings = ({
     };
   }, [settings.cleanTranscripts, settings.cleanupRoute]);
 
+  const keySet = keyStatus === "saved";
   const transcribePrice = priceOf(
     catalog.transcription,
     settings.transcribeModel
@@ -318,6 +324,7 @@ export const SpeechSettings = ({
 
   const showKey =
     keySet ||
+    keyStatus === "reenter" ||
     settings.transcribeRoute === "cloud" ||
     (settings.cleanTranscripts && settings.cleanupRoute === "cloud");
 
@@ -395,7 +402,15 @@ export const SpeechSettings = ({
       {cleanupHint.length > 0 ? (
         <p className="text-muted-foreground text-[11px]">{cleanupHint}</p>
       ) : null}
-      {showKey ? <GatewayKey keySet={keySet} onSet={setKeySet} /> : null}
+      {showKey ? (
+        <GatewayKey
+          keySet={keySet}
+          message={keyStatus === "reenter" ? KEY_REENTER : ""}
+          onSet={(set) => {
+            setKeyStatus(set ? "saved" : "absent");
+          }}
+        />
+      ) : null}
     </div>
   );
 };

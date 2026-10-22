@@ -192,7 +192,7 @@ export const SettingsPanel = ({
 
   let loginDetail: string | undefined;
   if (login === "unavailable") {
-    loginDetail = "Needs an installed Slip";
+    loginDetail = "Needs an installed Jot";
   }
 
   let skillDetail = "Claude and other agents";
@@ -340,7 +340,7 @@ export const SettingsPanel = ({
                 Quick note
               </p>
               <CaptureBind
-                hint="On this screen, without opening Slip."
+                hint="On this screen, without opening Jot."
                 onBind={onBind}
                 onSequence={onChord("noteCapture")}
                 presets={false}
@@ -466,11 +466,11 @@ export const SettingsPanel = ({
                     />
                   </SettingsRow>
                   <SettingsRow
-                    detail="Keep finished slips in the list"
+                    detail="Keep finished jots in the list"
                     label="Show done"
                   >
                     <Switch
-                      aria-label="Show done slips"
+                      aria-label="Show done jots"
                       checked={settings.showDone}
                       onCheckedChange={(showDone) =>
                         onChange({ ...settings, showDone })

@@ -30,7 +30,9 @@ import {
   formatHold,
 } from "../../shared/capture-bind";
 import { captureLabel } from "../../shared/capture-label";
+import type { GrantPrompt } from "../../shared/grants";
 import { imageTitle } from "../../shared/images";
+import { KEY_REENTER } from "../../shared/key-status";
 import {
   groupedRows,
   sectionsOf,
@@ -114,6 +116,8 @@ const App = () => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [flash, setFlash] = useState("");
+  const [grants, setGrants] = useState<GrantPrompt[]>([]);
+  const [keyNote, setKeyNote] = useState("");
   const [undo, setUndo] = useState<{
     drop: string[];
     held: string[];
@@ -135,6 +139,34 @@ const App = () => {
     const data = await window.slip.load();
     setSlips(data.slips);
   }, []);
+
+  useEffect(() => {
+    let live = true;
+    const readGrants = (): void => {
+      window.slip
+        .grantStatus()
+        .then((rows) => {
+          if (live) {
+            setGrants(rows);
+          }
+        })
+        .catch(() => undefined);
+      window.slip
+        .cleanupKeyStatus()
+        .then((status) => {
+          if (live) {
+            setKeyNote(status === "reenter" ? KEY_REENTER : "");
+          }
+        })
+        .catch(() => undefined);
+    };
+    readGrants();
+    window.addEventListener("focus", readGrants);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", readGrants);
+    };
+  }, [settingsOpen]);
 
   useEffect(() => {
     loadInbox().catch(() => undefined);
@@ -806,10 +838,10 @@ const App = () => {
     </div>
   );
   if (showArchived) {
-    emptyCopy = "No archived slips";
+    emptyCopy = "No archived jots";
   }
   if (query.trim()) {
-    emptyCopy = `No slips match "${query.trim()}"`;
+    emptyCopy = `No jots match "${query.trim()}"`;
   }
 
   return (
@@ -828,7 +860,7 @@ const App = () => {
               draggable={false}
               src={dark ? darkIcon : lightIcon}
             />
-            <p className="truncate text-[13px] font-medium">Slip</p>
+            <p className="truncate text-[13px] font-medium">Jot</p>
           </div>
           {settingsOpen ? null : (
             <div className="no-drag ml-auto flex shrink-0 gap-1">
@@ -870,7 +902,7 @@ const App = () => {
                 className={`h-7 pl-7 text-[13px] ${query ? "pr-7" : ""}`}
                 data-search=""
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search slips"
+                placeholder="Search jots"
                 spellCheck={false}
                 title={shortcutTip("Search", settings.shortcuts.search)}
                 value={query}
@@ -923,9 +955,58 @@ const App = () => {
         </div>
       </header>
 
+      {keyNote.length > 0 ? (
+        <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
+          <p>{keyNote}</p>
+          <Button
+            className="press"
+            onClick={() => {
+              setSettingsOpen(true);
+            }}
+            size="xs"
+          >
+            Enter key
+          </Button>
+        </div>
+      ) : null}
+      {grants
+        .filter((grant) => !(grant.id === "access" && capture === "denied"))
+        .map((grant) => (
+          <div
+            className="bg-card mx-2.5 mb-1.5 flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
+            key={grant.id}
+          >
+            <p>{grant.detail}</p>
+            <Button
+              className="press"
+              onClick={() => {
+                if (grant.id === "access") {
+                  window.slip.openAccess().catch(() => undefined);
+                  return;
+                }
+                if (grant.id === "input") {
+                  window.slip.openInput().catch(() => undefined);
+                  return;
+                }
+                if (grant.id === "microphone") {
+                  window.slip
+                    .askMic()
+                    .then(() => window.slip.grantStatus())
+                    .then(setGrants)
+                    .catch(() => undefined);
+                  return;
+                }
+                window.slip.openScreen().catch(() => undefined);
+              }}
+              size="xs"
+            >
+              Allow
+            </Button>
+          </div>
+        ))}
       {capture === "denied" ? (
         <div className="bg-card mx-2.5 mb-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)]">
-          <p>{chordName} needs Accessibility.</p>
+          <p>Capture and paste need Accessibility.</p>
           <Button
             onClick={() => {
               window.slip.openAccess().catch(() => undefined);

@@ -24,6 +24,7 @@ import { createFnHold, watchFnHold } from "../shared/fn-hold";
 import type { FnEvent } from "../shared/fn-hold";
 import { fetchPublicBytes } from "../shared/image-fetch";
 import { extFromMime, IMAGE_EXT, imageExt } from "../shared/images";
+import { PRODUCT_NAME } from "../shared/product";
 import type { CaptureState } from "../shared/types";
 import { startFrontContext } from "./front-context";
 import { inputMonitoringGranted } from "./input-monitor";
@@ -572,7 +573,9 @@ const install = (opts: {
     grabbing = true;
     let context: ReturnType<typeof startFrontContext>;
     try {
-      context = startFrontContext(opts.skip ?? ["Electron", "Slip"]);
+      context = startFrontContext(
+        opts.skip ?? ["Electron", "Slip", PRODUCT_NAME]
+      );
     } catch {
       grabbing = false;
       return;

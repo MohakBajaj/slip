@@ -53,6 +53,7 @@ export default defineConfig({
         "src/shared/capture-match.ts",
         "src/shared/fn-hold.ts",
         "src/main/input-monitor.ts",
+        "src/main/login-handoff.ts",
         "src/main/dock-icon.ts",
         "src/main/cleanup-run.ts",
         "src/main/gateway-catalog.ts",

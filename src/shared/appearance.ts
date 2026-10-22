@@ -94,7 +94,7 @@ export const FONTS: {
 ];
 
 export const TRAY_ICONS: { id: TrayIconId; label: string }[] = [
-  { id: "slip", label: "Slip" },
+  { id: "slip", label: "Jot" },
   { id: "shift", label: "Shift" },
   { id: "inbox", label: "Inbox" },
   { id: "pin", label: "Pin" },

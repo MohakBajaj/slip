@@ -57,18 +57,22 @@ func context(size: Int) -> CGContext {
 
 func drawSlip(_ ctx: CGContext) {
   ctx.saveGState()
-  ctx.translateBy(x: 16, y: 16)
+  ctx.translateBy(x: 14, y: 16)
   ctx.rotate(by: -10 * .pi / 180)
-  ctx.translateBy(x: -16, y: -16)
-  let card = CGRect(x: 9, y: 6.5, width: 14, height: 19)
-  ctx.addPath(CGPath(roundedRect: card, cornerWidth: 1.6, cornerHeight: 1.6, transform: nil))
-  ctx.strokePath()
-  ctx.move(to: CGPoint(x: 12.2, y: 13.2))
-  ctx.addLine(to: CGPoint(x: 19.6, y: 13.2))
-  ctx.move(to: CGPoint(x: 12.4, y: 17.2))
-  ctx.addLine(to: CGPoint(x: 18.2, y: 17.2))
-  ctx.strokePath()
+  ctx.translateBy(x: -14, y: -16)
+  ctx.move(to: CGPoint(x: 8.2, y: 7.4))
+  ctx.addLine(to: CGPoint(x: 15.4, y: 7.4))
+  ctx.addLine(to: CGPoint(x: 19, y: 11))
+  ctx.addLine(to: CGPoint(x: 19, y: 24))
+  ctx.addLine(to: CGPoint(x: 8.2, y: 24))
+  ctx.closePath()
+  ctx.fillPath()
   ctx.restoreGState()
+  ctx.move(to: CGPoint(x: 17.4, y: 12.2))
+  ctx.addLine(to: CGPoint(x: 24.6, y: 16.2))
+  ctx.addLine(to: CGPoint(x: 18.6, y: 21.2))
+  ctx.closePath()
+  ctx.fillPath()
 }
 
 func drawShift(_ ctx: CGContext) {

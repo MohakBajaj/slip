@@ -12,10 +12,20 @@ export const TrayGlyph = ({ id }: { id: TrayIconId }) => (
     viewBox="0 0 32 32"
   >
     {id === "slip" ? (
-      <g transform="rotate(-10 16 16)">
-        <rect height="19" rx="1.6" width="14" x="9" y="6.5" />
-        <path d="M12.2 13.2h7.4M12.4 17.2h5.8" />
+      <g transform="rotate(-10 14 16)">
+        <path
+          d="M8.2 7.4h7.2l3.6 3.6V24H8.2z"
+          fill="currentColor"
+          stroke="none"
+        />
       </g>
+    ) : null}
+    {id === "slip" ? (
+      <path
+        d="M17.4 12.2 24.6 16.2 18.6 21.2z"
+        fill="currentColor"
+        stroke="none"
+      />
     ) : null}
     {id === "shift" ? (
       <path d="M8.2 16.6 16 11.2l7.8 5.4M8.2 24 16 18.6 23.8 24" />
