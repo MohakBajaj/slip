@@ -4,7 +4,9 @@ import {
   faqPricingAnswer,
   formatUsd,
   introMarkup,
+  metaDescription,
   offerModel,
+  ogAlt,
   priceMarkup,
   siteConfig,
 } from "./render"
@@ -109,6 +111,21 @@ describe("faq", () => {
     expect(answer).toContain("first 50 users")
     expect(answer).toContain("nothing renews")
     expect(answer).not.toContain("spots left")
+  })
+})
+
+describe("positioning", () => {
+  test("leads with the notes inbox", () => {
+    const desc = metaDescription(siteConfig)
+    expect(desc).toContain("local-first notes inbox")
+    expect(desc).toContain("$9")
+    expect(desc).toContain("$29")
+    expect(desc).not.toContain("Hold fn")
+    const alt = ogAlt(siteConfig)
+    expect(alt).toContain("select. shift shift. it's a jot.")
+    expect(alt).not.toContain("hold fn. speak. it's typed.")
+    expect(alt).toContain("$9")
+    expect(alt).toContain("Regular price $29")
   })
 })
 

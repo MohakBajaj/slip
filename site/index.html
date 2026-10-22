@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Jot — hold fn. speak. it's typed.</title>
+    <title>Jot — select. shift shift. it's a jot.</title>
     <meta name="description" content="__DESCRIPTION__">
     <link rel="canonical" href="__ORIGIN__/">
     <meta name="robots" content="index, follow">
@@ -41,11 +41,10 @@
         <span>jot</span>
       </a>
       <nav aria-label="Sections">
-        <a href="#cleanup">cleanup</a>
-        <a href="#private">private</a>
-        <a href="#annotate">annotate</a>
         <a href="#notes">notes</a>
-        <a href="#shortcuts">shortcuts</a>
+        <a href="#files">files</a>
+        <a href="#more">more</a>
+        <a href="#models">models</a>
         <a href="#pricing">pricing</a>
         <a href="#faq">questions</a>
       </nav>
@@ -54,25 +53,13 @@
     <main id="main">
       <div class="wrap">
         <section class="hero" aria-labelledby="hero-title">
-          <img class="hero-icon" src="/icon.svg" alt="" width="1024" height="1024">
           <div class="paper">
             <p class="eyebrow">macos</p>
             <h1 id="hero-title">
               <span class="wordmark">jot</span>
-              <span class="tagline">hold fn. speak. it's typed.</span>
+              <span class="tagline">select. shift shift.<br>it's a jot.</span>
             </h1>
-            <p class="lede">you dictate anywhere. clean text is pasted into whatever app you're in.</p>
-            <div class="demo" aria-hidden="true">
-              <div class="demo-kicker">
-                <span class="kicker-messy">spoken</span>
-                <span class="kicker-clean">typed</span>
-              </div>
-              <div class="stack">
-                <p class="line messy"><span class="kill">um </span>so i think <span class="kill">we should </span><span class="kill">uh </span>we should ship this friday</p>
-                <p class="line clean">So I think we should ship this Friday.</p>
-              </div>
-            </div>
-            <p class="sr-only">Spoken, “um so i think we should uh we should ship this friday.” Typed, “So I think we should ship this Friday.”</p>
+            <p class="lede">a local-first notes inbox for your mac. one keystroke, and it lands as a plain markdown file in a folder you own.</p>
             <div class="cta">
               __PRICE_COMPACT__
               <div class="actions">
@@ -82,6 +69,40 @@
             </div>
             <span class="fold" aria-hidden="true"></span>
           </div>
+          <figure class="inbox">
+            <div class="window" aria-hidden="true">
+              <div class="window-bar">
+                <span class="lights"><i></i><i></i><i></i></span>
+                <span class="window-name">
+                  <img src="/icon.svg" alt="" width="16" height="16">
+                  jot
+                </span>
+                <span class="chips">
+                  <span class="chip on">Inbox</span>
+                  <span class="chip">Archive</span>
+                </span>
+              </div>
+              <div class="window-search">
+                <span class="search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"></circle><path d="M10.2 10.2 13 13"></path></svg>search</span>
+                <span class="palette">⌘K</span>
+              </div>
+              <ul class="rows">
+                <li class="on">
+                  <span class="row-title">ship this friday</span>
+                  <span class="row-meta">just now</span>
+                </li>
+                <li>
+                  <span class="row-title">the menu, with the screenshot</span>
+                  <span class="row-meta">2 hr ago</span>
+                </li>
+                <li>
+                  <span class="row-title">a line from the page</span>
+                  <span class="row-meta">yesterday</span>
+                </li>
+              </ul>
+            </div>
+            <figcaption class="sr-only">The Jot inbox, on the cream paper theme. Inbox is selected, Archive sits beside it, and the search field is open.</figcaption>
+          </figure>
         </section>
 
         <section id="intro" class="block intro" aria-labelledby="intro-title">
@@ -91,60 +112,58 @@
           </div>
         </section>
 
-        <section id="cleanup" class="block feature" aria-labelledby="cleanup-title">
+        <section id="notes" class="block feature" aria-labelledby="notes-title">
           <p class="index">01</p>
           <div>
-            <h2 id="cleanup-title">cleanup</h2>
-            <p class="lead">fillers, stutters, and false starts come out. sentences and lists get formatted. the wording stays yours.</p>
-            <p class="sub">one switch turns it off.</p>
+            <h2 id="notes-title">the inbox</h2>
+            <p class="lead">shift shift captures the selection. text, images in it, or a screenshot already on the clipboard.</p>
+            <p class="sub">quick note writes one without opening the window. that shortcut stays off until you set it.</p>
+            <p class="sub">the inbox is keyboard-first.</p>
+            <ul class="keys">
+              <li><span class="key">⌘N</span> new</li>
+              <li><span class="key">⌘F</span> search</li>
+              <li><span class="key">⌘K</span> palette</li>
+              <li><span class="key">E</span> archive</li>
+              <li><span class="key">⌘⌫</span> delete</li>
+              <li><span class="key">⌘Z</span> undo</li>
+              <li><span class="key">J / K</span> move</li>
+            </ul>
           </div>
         </section>
 
-        <section id="private" class="block feature" aria-labelledby="private-title">
+        <section id="files" class="block feature" aria-labelledby="files-title">
           <p class="index">02</p>
           <div>
-            <h2 id="private-title">private by choice</h2>
-            <p class="lead">transcription and cleanup are separate choices.</p>
+            <h2 id="files-title">a folder you own</h2>
+            <p class="lead">every jot is a plain markdown file.</p>
+            <p class="path"><code>~/Documents/Jot/YYYY-MM-DD-id.md</code></p>
+            <p class="sub">no account. no sync. no telemetry. agents and other tools can read the folder.</p>
+          </div>
+        </section>
+
+        <section id="more" class="block feature" aria-labelledby="more-title">
+          <p class="index">03</p>
+          <div>
+            <h2 id="more-title">more ways in</h2>
             <div class="choices">
               <article class="choice">
-                <h3>transcription</h3>
-                <p>on this mac, parakeet. or a cloud model.</p>
+                <h3>hold fn</h3>
+                <p>speak, and the text pastes into the app in front. keep dictations on, and a copy is a jot. cleanup is optional. fillers and false starts come out. the wording stays. one switch turns cleanup off.</p>
               </article>
               <article class="choice">
-                <h3>cleanup</h3>
-                <p>on this mac, apple's on-device model. or a cloud model.</p>
+                <h3>⌃⌥A</h3>
+                <p>grab a screenshot, or the image already on the clipboard. mark it up, then copy it to paste anywhere, or save it to the inbox.</p>
               </article>
             </div>
           </div>
         </section>
 
-        <section id="annotate" class="block feature" aria-labelledby="annotate-title">
-          <p class="index">03</p>
-          <div>
-            <h2 id="annotate-title">annotate</h2>
-            <p class="lead">draw on a screenshot, or on an image. copy it, and paste it anywhere.</p>
-          </div>
-        </section>
-
-        <section id="notes" class="block feature" aria-labelledby="notes-title">
+        <section id="models" class="block feature" aria-labelledby="models-title">
           <p class="index">04</p>
           <div>
-            <h2 id="notes-title">your notes</h2>
-            <p class="lead">they're files in a local folder you own.</p>
-            <p class="sub">open the folder. the notes are files.</p>
-          </div>
-        </section>
-
-        <section id="shortcuts" class="block feature" aria-labelledby="shortcuts-title">
-          <p class="index">05</p>
-          <div>
-            <h2 id="shortcuts-title">shortcuts</h2>
-            <p class="lead">a few shortcuts. short enough to remember.</p>
-            <ul class="keys">
-              <li><span class="key">shift shift</span> captures the selection into the inbox.</li>
-              <li><span class="key">hold fn</span> to dictate.</li>
-              <li><span class="key">⌃⌥A</span> to annotate anywhere.</li>
-            </ul>
+            <h2 id="models-title">on this mac, or a cloud model</h2>
+            <p class="lead">transcription and cleanup are separate choices.</p>
+            <p class="sub">transcription is parakeet on this mac, or a cloud model. cleanup is apple's on-device model, or a cloud model.</p>
           </div>
         </section>
 
@@ -176,15 +195,15 @@
             <details>
               <summary>which permissions does jot ask for? <span class="mark" aria-hidden="true"></span></summary>
               <ul>
-                <li><strong>microphone.</strong> jot hears you dictate.</li>
-                <li><strong>accessibility.</strong> jot pastes the text into the app you're in.</li>
+                <li><strong>accessibility.</strong> jot captures a selection, and pastes dictated text into the app in front.</li>
                 <li><strong>input monitoring.</strong> the fn hold works while another app is in front.</li>
+                <li><strong>microphone.</strong> jot hears you dictate.</li>
                 <li><strong>screen recording.</strong> jot captures the screen when you annotate.</li>
               </ul>
             </details>
             <details>
               <summary>where does my data live? <span class="mark" aria-hidden="true"></span></summary>
-              <p>your notes are files in a local folder you own, on your mac. transcription with parakeet, and cleanup with apple's on-device model, stay on the machine. pick a cloud model for either one, and that part is sent to the model you chose.</p>
+              <p>every jot is a markdown file at ~/Documents/Jot/, named YYYY-MM-DD-id.md. no account, no sync, no telemetry. agents and other tools can read the folder. parakeet, and cleanup with apple's on-device model, stay on the machine. pick a cloud model, and that part is sent to the model you chose.</p>
             </details>
           </div>
         </section>

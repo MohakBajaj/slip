@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js"
-import { assertConfig, offerModel, siteConfig } from "../src/render"
+import { assertConfig, offerModel, siteConfig, TAGLINE } from "../src/render"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const publicDir = join(root, "public")
@@ -98,7 +98,7 @@ const ogSvg = (iconPng: Buffer): string => {
   <image href="${href}" x="8" y="28" width="575" height="575"/>
   <text x="600" y="168" font-family="Instrument Sans" font-size="16" letter-spacing="3.4" fill="#ffbd46">macos</text>
   <text x="600" y="300" font-family="Instrument Serif" font-size="118" fill="#f8efd9">jot</text>
-  <text x="600" y="362" font-family="Instrument Sans" font-size="30" fill="#f8efd9">hold fn. speak. it's typed.</text>
+  <text x="600" y="362" font-family="Instrument Sans" font-size="28" fill="#f8efd9">${xml(TAGLINE)}</text>
   <rect x="600" y="392" width="72" height="4" rx="2" fill="#ffac21"/>
   ${priceBlock()}
 </svg>`
@@ -111,7 +111,7 @@ const fallbackSvg = (iconPng: Buffer): string => {
   <rect width="1280" height="720" fill="#232428"/>
   <image href="${href}" x="80" y="150" width="420" height="420"/>
   <text x="540" y="300" font-family="Instrument Serif" font-size="92" fill="#f8efd9">intro</text>
-  <text x="540" y="370" font-family="Instrument Sans" font-size="32" fill="#f8efd9">hold fn. speak. it's typed.</text>
+  <text x="540" y="370" font-family="Instrument Sans" font-size="28" fill="#f8efd9">${xml(TAGLINE)}</text>
   <text x="540" y="440" font-family="Instrument Sans" font-size="24" fill="#c9bfae">the intro isn't up yet.</text>
 </svg>`
 }

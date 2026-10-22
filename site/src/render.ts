@@ -179,9 +179,11 @@ export const faqPricingAnswer = (config: SiteConfig): string => {
   return `${base} nothing renews. the price is still being set.`
 }
 
+export const TAGLINE = "select. shift shift. it's a jot."
+
 export const metaDescription = (config: SiteConfig): string => {
   const pitch =
-    "Jot is a macOS app. Hold fn, speak, and clean text is pasted into whatever app you're in."
+    "Jot is a local-first notes inbox for your Mac. Capture anything in a keystroke and it lands as a plain markdown file in a folder you own."
   const note = launchNote(config)
   if (config.launchPrice != null && config.price != null && note) {
     return `${pitch} One-time license, ${formatUsd(config.launchPrice)} ${note}. Regular price ${formatUsd(config.price)}.`
@@ -195,12 +197,12 @@ export const metaDescription = (config: SiteConfig): string => {
 export const ogAlt = (config: SiteConfig): string => {
   const offer = offerModel(config)
   if (offer.was && offer.now && offer.note) {
-    return `Jot. hold fn. speak. it's typed. ${offer.now} ${offer.note}. Regular price ${offer.was}.`
+    return `Jot. ${TAGLINE} ${offer.now} ${offer.note}. Regular price ${offer.was}.`
   }
   if (offer.now) {
-    return `Jot. hold fn. speak. it's typed. ${offer.now}, one-time license.`
+    return `Jot. ${TAGLINE} ${offer.now}, one-time license.`
   }
-  return "Jot. hold fn. speak. it's typed."
+  return `Jot. ${TAGLINE}`
 }
 
 export const jsonLd = (config: SiteConfig): string => {
@@ -231,7 +233,7 @@ export const jsonLd = (config: SiteConfig): string => {
 export const introMarkup = (hasVideo: boolean): string => {
   if (!hasVideo) {
     return `<div class="intro-fallback">
-      <img src="/intro-fallback.png" width="1280" height="720" alt="Intro coming soon. hold fn. speak. it's typed.">
+      <img src="/intro-fallback.png" width="1280" height="720" alt="Intro coming soon. ${TAGLINE}">
       <p>the intro isn't up yet.</p>
     </div>`
   }
