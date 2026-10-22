@@ -5,12 +5,14 @@ import Foundation
 // Black-on-clear template glyphs for the menu bar. macOS tints these.
 // 16pt @1x and 32pt @2x — Electron's recommended status-item sizes.
 // Named *Template.png so Electron marks them.
+// The Jot mark (slip) is exported from build/tray-slip.svg by
+// scripts/export-icon.mjs, so this generator leaves those files alone.
 
 let outDir = CommandLine.arguments.count > 1
-  ? CommandLine.arguments[1]
-  : "resources/tray"
+    ? CommandLine.arguments[1]
+    : "resources/tray"
 
-let icons = ["slip", "shift", "inbox", "pin", "dot", "fold"]
+let icons = ["shift", "inbox", "pin", "dot", "fold"]
 
 func writePng(_ image: CGImage, _ path: String) {
   let url = URL(fileURLWithPath: path) as CFURL
@@ -53,26 +55,6 @@ func context(size: Int) -> CGContext {
   ctx.setLineJoin(.round)
   ctx.setLineWidth(1.9)
   return ctx
-}
-
-func drawSlip(_ ctx: CGContext) {
-  ctx.saveGState()
-  ctx.translateBy(x: 14, y: 16)
-  ctx.rotate(by: -10 * .pi / 180)
-  ctx.translateBy(x: -14, y: -16)
-  ctx.move(to: CGPoint(x: 8.2, y: 7.4))
-  ctx.addLine(to: CGPoint(x: 15.4, y: 7.4))
-  ctx.addLine(to: CGPoint(x: 19, y: 11))
-  ctx.addLine(to: CGPoint(x: 19, y: 24))
-  ctx.addLine(to: CGPoint(x: 8.2, y: 24))
-  ctx.closePath()
-  ctx.fillPath()
-  ctx.restoreGState()
-  ctx.move(to: CGPoint(x: 17.4, y: 12.2))
-  ctx.addLine(to: CGPoint(x: 24.6, y: 16.2))
-  ctx.addLine(to: CGPoint(x: 18.6, y: 21.2))
-  ctx.closePath()
-  ctx.fillPath()
 }
 
 func drawShift(_ ctx: CGContext) {
@@ -139,7 +121,6 @@ func drawFold(_ ctx: CGContext) {
 
 func draw(_ name: String, _ ctx: CGContext) {
   switch name {
-  case "slip": drawSlip(ctx)
   case "shift": drawShift(ctx)
   case "inbox": drawInbox(ctx)
   case "pin": drawPin(ctx)

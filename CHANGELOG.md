@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Jot is the app. The bundle id is `dev.mohak.jot`. Notes that already live in Documents/Slip stay there. The first launch moves Application Support from Slip to Jot.
+- The app icon is a cream note, an amber nib, and sound waves. The menu-bar mark matches it.
 - Releases 1.0.5–1.0.7 cannot install this build on their own. Install the dmg or zip once by hand. After that, Check for Updates works.
 
 ### Fixed

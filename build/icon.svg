@@ -1,41 +1,113 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- SVG created with Arrow, by QuiverAI (https://quiver.ai) -->
   <defs>
-    <linearGradient id="nib" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#F3B15A" />
-      <stop offset="0.5" stop-color="#E07B1C" />
-      <stop offset="1" stop-color="#C46210" />
+    <linearGradient id="tile-gradient" x1="300" y1="100" x2="724" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#414146"/>
+      <stop offset=".52" stop-color="#37383d"/>
+      <stop offset="1" stop-color="#303135"/>
     </linearGradient>
+    <radialGradient id="tile-soft-light" cx="440" cy="280" r="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4b4b50" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#222327" stop-opacity=".08"/>
+    </radialGradient>
+    <linearGradient id="paper-gradient" x1="275" y1="278" x2="663" y2="695" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f9f0da"/>
+      <stop offset=".57" stop-color="#f8efd9"/>
+      <stop offset="1" stop-color="#f5ead0"/>
+    </linearGradient>
+    <linearGradient id="fold-gradient" x1="592" y1="640" x2="638" y2="675" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e3c799"/>
+      <stop offset=".53" stop-color="#e9d0a6"/>
+      <stop offset="1" stop-color="#f1dfbd"/>
+    </linearGradient>
+    <linearGradient id="nib-gradient" x1="601" y1="393" x2="616" y2="649" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffac21"/>
+      <stop offset=".38" stop-color="#fca015"/>
+      <stop offset="1" stop-color="#e27c09"/>
+    </linearGradient>
+    <linearGradient id="nib-right-glow" x1="594" y1="569" x2="744" y2="519" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffad19" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffb52a" stop-opacity=".67"/>
+    </linearGradient>
+    <linearGradient id="signal-gradient" x1="729" y1="322" x2="834" y2="486" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb937"/>
+      <stop offset="1" stop-color="#ffaa27"/>
+    </linearGradient>
+    <radialGradient id="vent-gradient" cx="642" cy="513" r="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4a3521"/>
+      <stop offset="1" stop-color="#62431f"/>
+    </radialGradient>
+    <filter id="paper-shadow" x="-30%" y="-20%" width="170%" height="165%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="17"/>
+      <feOffset dx="3" dy="25"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".48"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="fold-shadow" x="-70%" y="-50%" width="230%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="-2" dy="3"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".14"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nib-shadow" x="-45%" y="-25%" width="200%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="13"/>
+      <feOffset dx="1" dy="19"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".37"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="signal-shadow" x="-30%" y="-25%" width="170%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".14"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  <path
-    fill="#3A3A3E"
-    d="M 924.0 512.0 L 923.6 650.4 L 922.6 694.5 L 920.8 726.3 L 918.3 751.9 L 915.1 773.7 L 911.2 792.6 L 906.4 809.3 L 901.0 824.2 L 894.7 837.7 L 887.6 849.8 L 879.6 860.8 L 870.7 870.7 L 860.8 879.6 L 849.8 887.6 L 837.7 894.7 L 824.2 901.0 L 809.3 906.4 L 792.6 911.2 L 773.7 915.1 L 751.9 918.3 L 726.3 920.8 L 694.5 922.6 L 650.4 923.6 L 512.0 924.0 L 373.6 923.6 L 329.5 922.6 L 297.7 920.8 L 272.1 918.3 L 250.3 915.1 L 231.4 911.2 L 214.7 906.4 L 199.8 901.0 L 186.3 894.7 L 174.2 887.6 L 163.2 879.6 L 153.3 870.7 L 144.4 860.8 L 136.4 849.8 L 129.3 837.7 L 123.0 824.2 L 117.6 809.3 L 112.8 792.6 L 108.9 773.7 L 105.7 751.9 L 103.2 726.3 L 101.4 694.5 L 100.4 650.4 L 100.0 512.0 L 100.4 373.6 L 101.4 329.5 L 103.2 297.7 L 105.7 272.1 L 108.9 250.3 L 112.8 231.4 L 117.6 214.7 L 123.0 199.8 L 129.3 186.3 L 136.4 174.2 L 144.4 163.2 L 153.3 153.3 L 163.2 144.4 L 174.2 136.4 L 186.3 129.3 L 199.8 123.0 L 214.7 117.6 L 231.4 112.8 L 250.3 108.9 L 272.1 105.7 L 297.7 103.2 L 329.5 101.4 L 373.6 100.4 L 512.0 100.0 L 650.4 100.4 L 694.5 101.4 L 726.3 103.2 L 751.9 105.7 L 773.7 108.9 L 792.6 112.8 L 809.3 117.6 L 824.2 123.0 L 837.7 129.3 L 849.8 136.4 L 860.8 144.4 L 870.7 153.3 L 879.6 163.2 L 887.6 174.2 L 894.7 186.3 L 901.0 199.8 L 906.4 214.7 L 911.2 231.4 L 915.1 250.3 L 918.3 272.1 L 920.8 297.7 L 922.6 329.5 L 923.6 373.6 L 924.0 512.0 Z"
-  />
-  <g transform="translate(455 520) rotate(-8)">
-    <path fill="#F4EBD6" d="M-168-228H146V120L68 228H-168Z" />
-    <path fill="#E4D3B4" d="M146 120 68 120 68 228Z" />
+  <g id="rounded-app-tile">
+    <path id="tile-base" d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z" fill="url(#tile-gradient)"/>
+    <path id="tile-soft-light" d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z" fill="url(#tile-soft-light)"/>
   </g>
-  <g transform="translate(628 505) rotate(-38)">
-    <path
-      fill="url(#nib)"
-      d="M0-132c28-8 48 28 46 92 0 36-20 62-46 70-26-8-46-34-46-70-2-64 18-100 46-92z"
-    />
-    <path
-      d="M0-96v78"
-      fill="none"
-      stroke="#3A3A3E"
-      stroke-linecap="round"
-      stroke-width="7"
-    />
-    <circle cx="0" cy="8" r="10" fill="#3A3A3E" />
+  <clipPath id="tile-clip"><path d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z"/></clipPath>
+  <g id="artwork" clip-path="url(#tile-clip)">
+  <g transform="translate(-38 27)">
+  <g id="cream-note" filter="url(#paper-shadow)">
+    <path id="paper-sheet" d="M276 283L607 236C625 233 637 243 640 261L690 607C691 615 682 616 672 623C651 650 627 675 605 694C601 698 596 700 589 701L344 735C325 738 312 730 309 711L249 316C246 298 256 286 276 283Z" fill="url(#paper-gradient)" stroke="#fff8e7" stroke-width="1.5"/>
+    <path id="turned-paper-corner" d="M596 697C595 686 590 672 591 658C592 641 600 632 616 628L664 620C648 642 622 674 603 692C600 695 598 696 596 697Z" fill="url(#fold-gradient)" filter="url(#fold-shadow)"/>
   </g>
-  <g
-    fill="none"
-    stroke="#E8922A"
-    stroke-linecap="round"
-    stroke-width="18"
-  >
-    <path d="M748 430a52 62 0 0 1 0 150" stroke="#F0A04A" />
-    <path d="M792 392a88 100 0 0 1 0 226" />
-    <path d="M842 354a124 138 0 0 1 0 302" stroke="#E07B1C" />
+  <g id="wireless-signal" fill="none" stroke-linecap="round" filter="url(#signal-shadow)">
+    <path id="outer-signal" d="M739.5 320.7C808 339.9 853.8 408.1 834.7 483.9" stroke="#ffbd46" stroke-width="21"/>
+    <path d="M739.5 320.7C808 339.9 853.8 408.1 834.7 483.9" stroke="url(#signal-gradient)" stroke-width="18"/>
+    <path id="middle-signal" d="M723.7 365.2C772 377.6 800.7 422.6 790.6 473" stroke="#ffbc43" stroke-width="21"/>
+    <path d="M723.7 365.2C772 377.6 800.7 422.6 790.6 473" stroke="url(#signal-gradient)" stroke-width="18"/>
+    <path id="inner-signal" d="M709.4 407.7C735.5 412 752.6 434.2 748.2 462.2" stroke="#ffba3e" stroke-width="21"/>
+    <path d="M709.4 407.7C735.5 412 752.6 434.2 748.2 462.2" stroke="url(#signal-gradient)" stroke-width="18"/>
+  </g>
+  <g id="gold-fountain-pen-nib" filter="url(#nib-shadow)">
+    <path id="nib-body" d="M544.3 405.6C542.4 397.3 545.3 391.1 550.7 390.7C553.6 390.5 555.5 392.7 558.2 396.6L637.6 508.6L643.5 504.4L562 393.5C557.7 387.7 560 382.2 565.3 380.9C568.7 380 572 381.9 576.7 385.3L703.5 475.1C707.8 478.2 710.3 481.2 711.9 487.6C725.9 537 744.1 585.3 765.5 628.1C770.6 638.4 767.8 645.8 760.3 651.2L731 672.2C723 678 716.7 677.2 710.9 671.7C669 631.6 627 598 589.9 567.3C585.4 563.6 583.1 559.9 581.8 554.4Z" fill="url(#nib-gradient)" stroke="#f5a024" stroke-width="1"/>
+    <path id="nib-surface-glow" d="M544.3 405.6C542.4 397.3 545.3 391.1 550.7 390.7C553.6 390.5 555.5 392.7 558.2 396.6L637.6 508.6L643.5 504.4L562 393.5C557.7 387.7 560 382.2 565.3 380.9C568.7 380 572 381.9 576.7 385.3L703.5 475.1C707.8 478.2 710.3 481.2 711.9 487.6C725.9 537 744.1 585.3 765.5 628.1C770.6 638.4 767.8 645.8 760.3 651.2L731 672.2C723 678 716.7 677.2 710.9 671.7C669 631.6 627 598 589.9 567.3C585.4 563.6 583.1 559.9 581.8 554.4Z" fill="url(#nib-right-glow)"/>
+    <path id="nib-split" d="M557.6 396.2L638.6 509" fill="none" stroke="#5a3c20" stroke-width="7" stroke-linecap="round"/>
+    <circle id="nib-breather-rim" cx="648.3" cy="521.5" r="20.2" fill="#fdb13b"/>
+    <circle id="nib-breather-hole" cx="648.3" cy="520.9" r="19.1" fill="url(#vent-gradient)"/>
+  </g>
+  </g>
   </g>
 </svg>

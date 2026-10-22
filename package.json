@@ -16,6 +16,7 @@
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json && node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.web.json",
     "test": "bun test src/shared src/vault.test.ts src/main/pasteboard.test.ts src/main/input-monitor.test.ts",
     "postinstall": "electron-builder install-app-deps",
+    "export:icon": "node scripts/export-icon.mjs",
     "make:tray": "xcrun swift scripts/make-tray-icons.swift resources/tray",
     "make:dock": "xcrun swift scripts/mask-dock-icon.swift resources/dock/light.png resources/dock/dark.png",
     "make:dmg": "xcrun swift scripts/make-dmg-background.swift build && tiffutil -cathidpicheck build/background.png build/background@2x.png -out build/background.tiff",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@napi-rs/canvas": "^1.0.11",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
