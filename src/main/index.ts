@@ -46,9 +46,11 @@ import {
   voiceReplySettles,
 } from "../shared/dictate";
 import {
-  DOCK_RECONCILE_MS,
   dockTarget,
   planDockChange,
+  reconcileSchedule,
+  shouldCallDockShow,
+  showFailureApplies,
 } from "../shared/dock-policy";
 import type { DockSnapshot } from "../shared/dock-policy";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
@@ -61,8 +63,11 @@ import { isMergeCaption } from "../shared/merge";
 import { annotatePlan, voicePillWidth } from "../shared/paste-out";
 import {
   QUIT_FALLBACK_MS,
+  QUIT_HARD_FALLBACK_MS,
   QUIT_SIGNALS,
-  nextSignalQuit,
+  TRASH_BOUND_MS,
+  boundRelease,
+  detachQuitSignals,
   planQuit,
 } from "../shared/quit-path";
 import { emptyContext } from "../shared/source";
@@ -397,17 +402,60 @@ const visibleWindows = (): boolean =>
 let dockState: DockSnapshot = { policy: "accessory", visible: false };
 let dockSeeded = false;
 let dockIconReady = false;
-let dockReconcile: ReturnType<typeof setTimeout> | null = null;
+let dockGeneration = 0;
+let dockAttempts = 0;
+const dockReconcileTimers: ReturnType<typeof setTimeout>[] = [];
+
+const syncDockMemo = (visible: boolean): void => {
+  dockState = visible
+    ? { policy: "regular", visible: true }
+    : { policy: "accessory", visible: false };
+};
 
 const seedDockState = (): void => {
   if (dockSeeded) {
     return;
   }
   dockSeeded = true;
-  const visible = app.dock?.isVisible() ?? true;
-  dockState = visible
-    ? { policy: "regular", visible: true }
-    : { policy: "accessory", visible: false };
+  syncDockMemo(app.dock?.isVisible() ?? true);
+};
+
+const clearDockReconcile = (): void => {
+  for (const timer of dockReconcileTimers) {
+    clearTimeout(timer);
+  }
+  dockReconcileTimers.length = 0;
+};
+
+const reconcileDock = (): void => {
+  if (process.platform !== "darwin" || !app.dock) {
+    return;
+  }
+  syncDockMemo(app.dock.isVisible());
+  applyDock(settings.dock, true);
+};
+
+const armDockReconcile = (delayMs: number): void => {
+  const timer = setTimeout(() => {
+    const index = dockReconcileTimers.indexOf(timer);
+    if (index !== -1) {
+      dockReconcileTimers.splice(index, 1);
+    }
+    reconcileDock();
+  }, delayMs);
+  timer.unref();
+  dockReconcileTimers.push(timer);
+};
+
+const enqueueDockReconcile = (): void => {
+  const delays = reconcileSchedule(dockAttempts);
+  if (delays.length === 0) {
+    return;
+  }
+  dockAttempts += 1;
+  for (const delayMs of delays) {
+    armDockReconcile(delayMs);
+  }
 };
 
 // show() and hide() are not idempotent: each call can add a Dock tile,
@@ -415,30 +463,24 @@ const seedDockState = (): void => {
 // change and skip the native call when it already matches. Never hide
 // and then set regular in the same turn. That pair is the duplicate tile.
 // hide() inside a second of show() is ignored, so the memo is checked
-// again after that window.
-const scheduleDockReconcile = (): void => {
-  if (dockReconcile !== null) {
-    clearTimeout(dockReconcile);
+// again after that window and once more for a slow show().
+const scheduleDockReconcile = (fromReconcile: boolean): void => {
+  if (fromReconcile) {
+    enqueueDockReconcile();
+    return;
   }
-  dockReconcile = setTimeout(() => {
-    dockReconcile = null;
-    if (process.platform !== "darwin" || !app.dock) {
-      return;
-    }
-    const visible = app.dock.isVisible();
-    dockState = visible
-      ? { policy: "regular", visible: true }
-      : { policy: "accessory", visible: false };
-    applyDock(settings.dock);
-  }, DOCK_RECONCILE_MS);
-  dockReconcile.unref();
+  clearDockReconcile();
+  dockAttempts = 0;
+  enqueueDockReconcile();
 };
 
-const applyDock = (show: boolean): void => {
+const applyDock = (show: boolean, fromReconcile = false): void => {
   if (process.platform !== "darwin" || !app.dock) {
     return;
   }
   seedDockState();
+  dockGeneration += 1;
+  const generation = dockGeneration;
   const change = planDockChange(dockState, dockTarget(show, visibleWindows()));
   const previous = dockState;
   dockState = change.next;
@@ -450,22 +492,36 @@ const applyDock = (show: boolean): void => {
     return;
   }
   const [op] = change.ops;
+  let called = false;
   if (op?.kind === "show") {
-    // show() forces regular and can drop the status item.
-    void app.dock.show().catch(() => {
-      dockState = previous;
-      dockIconReady = false;
-    });
+    // A repeat show() resets Electron's 1s hide block and can flicker.
+    if (shouldCallDockShow(app.dock.isVisible())) {
+      called = true;
+      void app.dock.show().catch(() => {
+        if (showFailureApplies(generation, dockGeneration)) {
+          dockState = previous;
+          dockIconReady = false;
+        }
+      });
+    } else {
+      syncDockMemo(true);
+    }
   } else if (op?.kind === "hide") {
     // hide() forces accessory and drops the menu-bar extra.
+    called = true;
     app.dock.hide();
   }
-  remountTray();
+  if (called) {
+    // show() forces regular and can drop the status item.
+    remountTray();
+  }
   if (dockState.visible) {
     applyDockIcon(isDark());
     dockIconReady = true;
   }
-  scheduleDockReconcile();
+  if (called) {
+    scheduleDockReconcile(fromReconcile);
+  }
 };
 
 const pinWorkspace = (target: BrowserWindow): void => {
@@ -1624,14 +1680,12 @@ const showNote = (): void => {
 
 const boot = async (): Promise<void> => {
   await app.whenReady();
-  let quitSignalsSeen = 0;
   const onQuitSignal = (): void => {
-    const action = nextSignalQuit(quitSignalsSeen);
-    quitSignalsSeen += 1;
-    if (action === "exit") {
-      app.exit(0);
-      return;
-    }
+    // The next SIGTERM or SIGINT is the default kill, even if this
+    // thread is busy inside quit and cannot run another JS handler.
+    detachQuitSignals((signal) => {
+      process.removeAllListeners(signal);
+    });
     app.quit();
   };
   for (const signal of QUIT_SIGNALS) {
@@ -2460,6 +2514,13 @@ if (gotSingleInstanceLock) {
 
 let releasingHeld = false;
 let quitFallback: ReturnType<typeof setTimeout> | null = null;
+let quitHardFallback: ReturnType<typeof setTimeout> | null = null;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    timer.unref();
+  });
 
 const armQuitFallback = (): void => {
   if (quitFallback !== null) {
@@ -2469,6 +2530,16 @@ const armQuitFallback = (): void => {
     app.exit(0);
   }, QUIT_FALLBACK_MS);
   quitFallback.unref();
+};
+
+const armQuitHardFallback = (): void => {
+  if (quitHardFallback !== null) {
+    return;
+  }
+  quitHardFallback = setTimeout(() => {
+    app.exit(0);
+  }, QUIT_HARD_FALLBACK_MS);
+  quitHardFallback.unref();
 };
 
 const unblockQuit = (): void => {
@@ -2487,21 +2558,21 @@ app.on("before-quit", (event) => {
     heldDeletes: listHeldDeletes(vaultRoot()).length,
     releasingHeld,
   });
-  if (dockReconcile !== null) {
-    clearTimeout(dockReconcile);
-    dockReconcile = null;
-  }
+  clearDockReconcile();
   if (plan.unblockWindows) {
     unblockQuit();
+  }
+  if (plan.armHardFallback) {
+    armQuitHardFallback();
   }
   if (plan.preventDefault) {
     event.preventDefault();
     releasingHeld = true;
-    releaseHeld()
-      .catch(() => undefined)
-      .finally(() => {
+    void boundRelease(() => releaseHeld(), delay, TRASH_BOUND_MS).finally(
+      () => {
         app.quit();
-      });
+      }
+    );
     return;
   }
   if (plan.armFallback) {
@@ -2520,6 +2591,10 @@ app.on("will-quit", () => {
   if (quitFallback !== null) {
     clearTimeout(quitFallback);
     quitFallback = null;
+  }
+  if (quitHardFallback !== null) {
+    clearTimeout(quitHardFallback);
+    quitHardFallback = null;
   }
 });
 

@@ -1,11 +1,16 @@
 import { expect, test } from "bun:test";
 
 import {
+  DOCK_RECONCILE_CAP,
+  DOCK_RECONCILE_LATE_MS,
   DOCK_RECONCILE_MS,
   createFakeDock,
   dockTarget,
   memoForVisible,
   planDockChange,
+  reconcileSchedule,
+  shouldCallDockShow,
+  showFailureApplies,
   stepFakeDock,
 } from "./dock-policy";
 import type { DockSnapshot } from "./dock-policy";
@@ -104,6 +109,30 @@ test("a quick show then hide sticks until reconcile retries the hide", () => {
   reconcile(false);
   expect(dock.visible).toBe(false);
   expect(reconcileAt).toBeNull();
+});
+
+test("show is skipped when the dock is already visible", () => {
+  expect(shouldCallDockShow(true)).toBe(false);
+  expect(shouldCallDockShow(false)).toBe(true);
+});
+
+test("reconcile looks again at three seconds, then stops", () => {
+  expect(DOCK_RECONCILE_LATE_MS).toBe(3000);
+  expect(DOCK_RECONCILE_CAP).toBe(2);
+  expect(reconcileSchedule(0)).toEqual([
+    DOCK_RECONCILE_MS,
+    DOCK_RECONCILE_LATE_MS,
+  ]);
+  expect(reconcileSchedule(1)).toEqual([
+    DOCK_RECONCILE_MS,
+    DOCK_RECONCILE_LATE_MS,
+  ]);
+  expect(reconcileSchedule(2)).toEqual([]);
+});
+
+test("a failed show does not overwrite a newer memo", () => {
+  expect(showFailureApplies(1, 1)).toBe(true);
+  expect(showFailureApplies(1, 2)).toBe(false);
 });
 
 test("a failed show puts the memo back so the next plan shows again", () => {
