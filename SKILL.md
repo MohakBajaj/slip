@@ -1,6 +1,6 @@
 # Jot
 
-Local capture inbox. One markdown file per jot. Never rename or move files. A new install uses `~/Documents/Jot`. An updated Mac keeps the vault path already in Jot settings, which is often `~/Documents/Slip`. `SLIP_VAULT` overrides both.
+Local capture inbox. One markdown file per jot. Never rename or move files. Notes live in `~/Documents/Jot`. `SLIP_VAULT` overrides that. Jot does not copy a Slip folder.
 
 ## CLI
 

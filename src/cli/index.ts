@@ -7,16 +7,15 @@ import { createCLI, defineCommand, option } from "@bunli/core";
 import { z } from "zod";
 
 import { promptFor, titleOf } from "../shared/format";
-import { migrateHome, preferredVaultPath } from "../shared/home-migrate";
 import { sourceSearchText } from "../shared/source";
-import { sanitizeSettings, settingsFile } from "../shared/types";
+import {
+  defaultVaultPath,
+  sanitizeSettings,
+  settingsFile,
+} from "../shared/types";
 import { createSlip, listSlips, updateSlip } from "../vault";
 
-const migratedHome = migrateHome(process.env.HOME);
-const SETTINGS_FILE =
-  migratedHome.userData.length > 0
-    ? path.join(migratedHome.userData, "settings.json")
-    : settingsFile();
+const SETTINGS_FILE = settingsFile();
 
 const vaultOption = option(z.string().optional(), {
   description: "Vault folder (or SLIP_VAULT, or Jot settings)",
@@ -36,10 +35,7 @@ const settingsVault = (): string | undefined => {
 };
 
 const vaultOf = (flag?: string): string =>
-  flag ??
-  process.env.SLIP_VAULT ??
-  settingsVault() ??
-  preferredVaultPath(process.env.HOME);
+  flag ?? process.env.SLIP_VAULT ?? settingsVault() ?? defaultVaultPath();
 
 const find = (root: string, id: string) => {
   const slips = listSlips(root);

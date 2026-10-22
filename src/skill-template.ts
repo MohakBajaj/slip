@@ -7,8 +7,7 @@ files.
 
 ## Layout
 
-\`~/Documents/Jot/\` for a new install, or the vault path in Jot settings.
-A Mac updated from Slip often still uses \`~/Documents/Slip/\`.
+\`~/Documents/Jot/\` for notes. \`SLIP_VAULT\` overrides it. Jot does not copy a Slip folder.
 
 - \`YYYY-MM-DD-<6id>.md\` — a jot. State lives in frontmatter.
 - \`INDEX.md\` — generated list. Do not edit.

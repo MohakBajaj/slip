@@ -14,7 +14,7 @@ Grant **Accessibility** the first time you capture, **Input Monitoring** to dict
 
 The first spoken jot downloads the speech model (about 200 MB) into Application Support. Transcription defaults to [Parakeet Redux](https://huggingface.co/moondream/parakeet-redux) by Moondream, a 1.58-bit build of NVIDIA's parakeet-tdt-0.6b-v3, under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). Cleanup defaults to Apple Intelligence on this Mac: fillers and false starts come out, and the wording stays. The original transcript is kept on the jot. Settings can send transcription, cleanup, or both to a cloud model through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). The gateway key is stored with the macOS keychain (`Jot Safe Storage`), not in the settings file. A key saved by Slip cannot be decrypted after the rename; the ciphertext stays on disk and Jot asks you to enter the key again. If a cloud transcription fails, Jot uses Parakeet. If a cloud cleanup fails, Jot uses Apple Intelligence, then the raw transcript.
 
-A Mac that already used Slip keeps its notes. The first launch copies `~/Library/Application Support/Slip` to `Jot`, and the preferences, caches, saved state, and HTTP storage that were under `dev.mohak.slip`. The notes folder is whatever settings already say, often `~/Documents/Slip`. Jot does not move that folder.
+Jot does not copy an older Slip install. Notes go in `~/Documents/Jot`. Slip's Application Support folder and its notes stay where they are.
 
 ## Capture
 
