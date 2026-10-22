@@ -1,0 +1,23 @@
+{
+  "name": "jot-site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "bun scripts/generate-assets.ts",
+    "predev": "bun scripts/generate-assets.ts",
+    "dev": "vite",
+    "prebuild": "bun scripts/generate-assets.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "bun test src"
+  },
+  "devDependencies": {
+    "@fontsource-variable/instrument-sans": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
+    "@resvg/resvg-js": "^2.6.2",
+    "@tailwindcss/vite": "^4.1.16",
+    "tailwindcss": "^4.1.16",
+    "vite": "^7.1.12"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+dist
+public/og.png
+public/favicon-16.png
+public/favicon-32.png
+public/apple-touch-icon.png
+public/intro-fallback.png
+public/fonts/

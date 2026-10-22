@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile-gradient" x1="300" y1="100" x2="724" y2="924" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#414146"/>
+      <stop offset=".52" stop-color="#37383d"/>
+      <stop offset="1" stop-color="#303135"/>
+    </linearGradient>
+    <linearGradient id="amber-gradient" x1="470" y1="380" x2="700" y2="740" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2A03D"/>
+      <stop offset="1" stop-color="#E5832A"/>
+    </linearGradient>
+  </defs>
+  <path id="tile-base" d="M383.4 100.0L640.6 100.0C722.2 100.0 763.0 100.0 806.9 113.9C854.9 131.3 892.7 169.1 910.1 217.1C924.0 261.0 924.0 301.8 924.0 383.4L924.0 640.6C924.0 722.2 924.0 763.0 910.1 806.9C892.7 854.9 854.9 892.7 806.9 910.1C763.0 924.0 722.2 924.0 640.6 924.0L383.4 924.0C301.8 924.0 261.0 924.0 217.1 910.1C169.1 892.7 131.3 854.9 113.9 806.9C100.0 763.0 100.0 722.2 100.0 640.6L100.0 383.4C100.0 301.8 100.0 261.0 113.9 217.1C131.3 169.1 169.1 131.3 217.1 113.9C261.0 100.0 301.8 100.0 383.4 100.0Z" fill="url(#tile-gradient)"/>
+  <g transform="rotate(-6 435 525)">
+    <path id="note-card" d="M270 260H590Q630 260 630 300V690L520 800H270Q230 800 230 760V300Q230 260 270 260Z" fill="#F6EEDC"/>
+    <path id="fold" d="M520 690H630L520 800Z" fill="#D8C49F"/>
+  </g>
+  <g fill="none" stroke="#F2A03D" stroke-width="48" stroke-linecap="round">
+    <path id="outer-wave" d="M680 250C770 268 827 346 812 442"/>
+    <path id="inner-wave" d="M670 346C716 356 742 391 738 438"/>
+  </g>
+  <path id="nib" d="M438 382L642 484Q653 490 657 504C674 566 700 629 734 687Q741 700 729 710L680 746Q669 754 658 744C610 696 559 650 511 609Q502 602 499 589Z" fill="url(#amber-gradient)"/>
+  <path id="nib-slit" d="M470 419L584 552" fill="none" stroke="#343539" stroke-width="26" stroke-linecap="round"/>
+  <circle id="breather-hole" cx="584" cy="552" r="35" fill="#343539"/>
+</svg>
