@@ -599,6 +599,91 @@ describe("notes and signing mode", () => {
     );
     rmSync(root, { force: true, recursive: true });
   });
+
+  test("stopping the swap midway puts the app back and removes the workdir", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-term-"));
+    const bin = path.join(root, "bin");
+    mkdirSync(bin);
+    const stub = (name: string, body: string): void => {
+      const file = path.join(bin, name);
+      writeFileSync(file, body);
+      chmodSync(file, 0o755);
+    };
+    stub("ditto", '#!/bin/sh\ncp -R "$1" "$2"\n');
+    stub("xattr", "#!/bin/sh\nexit 0\n");
+    stub("open", "#!/bin/sh\nexit 0\n");
+    stub(
+      "mv",
+      '#!/bin/sh\ncase "$2" in *.slip-old) /bin/mv "$@"; kill -TERM "$PPID"; exit 0 ;; esac\nexec /bin/mv "$@"\n'
+    );
+    const app = (dir: string, marker: string): void => {
+      const bins = path.join(dir, "Contents", "Resources", "bin");
+      mkdirSync(bins, { recursive: true });
+      writeFileSync(path.join(bins, "parakeet-cli"), marker);
+      writeFileSync(path.join(bins, "slip-cleanup"), marker);
+      writeFileSync(path.join(dir, "marker"), marker);
+    };
+    const work = path.join(root, "slip-update-work");
+    const src = path.join(work, "Slip.app");
+    const dest = path.join(root, "Slip.app");
+    app(src, "new");
+    app(dest, "old");
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(script, ["999999", src, dest, work], {
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(work)).toBe(false);
+    expect(existsSync(script)).toBe(false);
+    expect(existsSync(`${dest}.slip-old`)).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("aborting while Slip is running removes the workdir", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "slip-update-abort-"));
+    const log = path.join(root, "update.log");
+    const sleeper = spawn("sleep", ["30"], { stdio: "ignore" });
+    const work = path.join(root, "slip-update-work");
+    const dest = path.join(root, "Slip.app");
+    mkdirSync(path.join(dest, "Contents"), { recursive: true });
+    writeFileSync(path.join(dest, "marker"), "old");
+    mkdirSync(work);
+    const script = path.join(root, "swap.sh");
+    writeFileSync(script, applyUpdateScript());
+    chmodSync(script, 0o755);
+    let status = 0;
+    try {
+      execFileSync(
+        script,
+        [String(sleeper.pid), path.join(work, "Slip.app"), dest, work],
+        {
+          env: {
+            ...process.env,
+            SLIP_APPLY_LOG: log,
+            SLIP_APPLY_WAIT_SECONDS: "0",
+          },
+        }
+      );
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 0;
+    } finally {
+      sleeper.kill();
+    }
+    expect(status).toBe(1);
+    expect(readFileSync(path.join(dest, "marker"), "utf8")).toBe("old");
+    expect(existsSync(work)).toBe(false);
+    expect(existsSync(script)).toBe(false);
+    expect(readFileSync(log, "utf8")).toContain("did not relaunch");
+    rmSync(root, { force: true, recursive: true });
+  });
 });
 
 describe("check for updates setting", () => {

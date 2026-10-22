@@ -18,7 +18,6 @@ import { pipeline } from "node:stream/promises";
 
 import { app, dialog, Notification } from "electron";
 
-import { QUIT_FALLBACK_MS } from "../shared/quit-path";
 import {
   applyUpdateScript,
   assessDownload,
@@ -318,14 +317,9 @@ const stopPendingApply = (): void => {
   child.kill("SIGTERM");
 };
 
+// before-quit arms app.exit. It waits until held files are in the Trash
+// so this quit does not start that clock while trash is still running.
 const quitAfterApply = (): void => {
-  const timer = setTimeout(() => {
-    app.exit(0);
-  }, QUIT_FALLBACK_MS);
-  timer.unref();
-  app.once("will-quit", () => {
-    clearTimeout(timer);
-  });
   app.quit();
 };
 

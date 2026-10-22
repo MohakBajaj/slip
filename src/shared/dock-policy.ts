@@ -7,6 +7,12 @@ export interface DockSnapshot {
 
 export type DockOp = { kind: "hide" } | { kind: "show" };
 
+/** Electron ignores dock.hide() for this long after dock.show(). */
+export const DOCK_HIDE_BLOCK_MS = 1000;
+
+/** Re-read the Dock after a show or hide. Past the block above. */
+export const DOCK_RECONCILE_MS = 1100;
+
 const stable = (visible: boolean): DockSnapshot =>
   visible
     ? { policy: "regular", visible: true }
@@ -38,4 +44,35 @@ export const planDockChange = (
     return { next: stable(true), ops: [{ kind: "show" }] };
   }
   return { next: stable(false), ops: [{ kind: "hide" }] };
+};
+
+export interface FakeDock {
+  lastShowAt: number | null;
+  visible: boolean;
+}
+
+export const createFakeDock = (): FakeDock => ({
+  lastShowAt: null,
+  visible: false,
+});
+
+export const memoForVisible = (visible: boolean): DockSnapshot =>
+  stable(visible);
+
+/**
+ * Electron drops hide() when it lands inside a second of show()
+ * (browser_mac.mm). The call returns, and the tile stays.
+ */
+export const stepFakeDock = (
+  dock: FakeDock,
+  op: DockOp,
+  now: number
+): FakeDock => {
+  if (op.kind === "show") {
+    return { lastShowAt: now, visible: true };
+  }
+  if (dock.lastShowAt !== null && now - dock.lastShowAt < DOCK_HIDE_BLOCK_MS) {
+    return dock;
+  }
+  return { lastShowAt: dock.lastShowAt, visible: false };
 };

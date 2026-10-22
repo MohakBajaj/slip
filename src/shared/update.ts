@@ -455,7 +455,23 @@ dest="$3"
 workdir="$4"
 aside="\${dest}.slip-old"
 stage="\${dest}.slip-new"
-trap 'rm -f "$0"' EXIT
+restore_dest() {
+  if [[ ! -d "$dest" && -d "$aside" ]]; then
+    mv "$aside" "$dest" || true
+  fi
+}
+release_workdir() {
+  case "$workdir" in
+    *slip-update-*) rm -rf "$workdir" || true ;;
+  esac
+}
+on_stop() {
+  trap - EXIT TERM INT ERR
+  restore_dest
+  release_workdir
+  rm -f "$0"
+}
+trap on_stop EXIT
 trap 'exit 1' TERM INT
 wait_for_pid() {
   local ticks=0
@@ -477,15 +493,15 @@ abort() {
   trap - ERR
   echo "update failed"
   rm -rf "$stage"
-  if [[ ! -d "$dest" && -d "$aside" ]]; then
-    mv "$aside" "$dest" || true
-  fi
+  restore_dest
   if wait_for_pid; then
     if [[ -d "$dest" ]]; then
       open "$dest" || echo "open failed"
     fi
   else
     echo "left pid $pid running; did not relaunch"
+    restore_dest
+    release_workdir
   fi
   exit 1
 }

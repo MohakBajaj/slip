@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
 
-import { dockTarget, planDockChange } from "./dock-policy";
+import {
+  DOCK_RECONCILE_MS,
+  createFakeDock,
+  dockTarget,
+  memoForVisible,
+  planDockChange,
+  stepFakeDock,
+} from "./dock-policy";
 import type { DockSnapshot } from "./dock-policy";
 
 const shown: DockSnapshot = { policy: "regular", visible: true };
@@ -47,6 +54,66 @@ test("turning the dock off hides it only after the last window closes", () => {
   const closed = planDockChange(open.next, dockTarget(false, false));
   expect(closed.ops).toEqual([{ kind: "hide" }]);
   expect(closed.next).toEqual(hidden);
+});
+
+test("hide inside a second of show is ignored", () => {
+  const shown = stepFakeDock(createFakeDock(), { kind: "show" }, 0);
+  expect(stepFakeDock(shown, { kind: "hide" }, 999).visible).toBe(true);
+  expect(stepFakeDock(shown, { kind: "hide" }, 1000).visible).toBe(false);
+});
+
+test("a quick show then hide sticks until reconcile retries the hide", () => {
+  let dock = createFakeDock();
+  let memo = memoForVisible(false);
+  let now = 0;
+  let reconcileAt: number | null = null;
+
+  const apply = (windows: boolean): void => {
+    const change = planDockChange(memo, dockTarget(false, windows));
+    memo = change.next;
+    for (const op of change.ops) {
+      dock = stepFakeDock(dock, op, now);
+      reconcileAt = now + DOCK_RECONCILE_MS;
+    }
+  };
+
+  const reconcile = (windows: boolean): void => {
+    if (reconcileAt === null) {
+      return;
+    }
+    now = reconcileAt;
+    reconcileAt = null;
+    memo = memoForVisible(dock.visible);
+    apply(windows);
+  };
+
+  apply(true);
+  expect(dock.visible).toBe(true);
+  expect(memo.visible).toBe(true);
+
+  now = 50;
+  apply(false);
+  expect(memo.visible).toBe(false);
+  expect(dock.visible).toBe(true);
+  expect(reconcileAt).toBe(50 + DOCK_RECONCILE_MS);
+
+  reconcile(false);
+  expect(dock.visible).toBe(false);
+  expect(memo.visible).toBe(false);
+
+  reconcile(false);
+  expect(dock.visible).toBe(false);
+  expect(reconcileAt).toBeNull();
+});
+
+test("a failed show puts the memo back so the next plan shows again", () => {
+  const previous = memoForVisible(false);
+  const showed = planDockChange(previous, dockTarget(false, true));
+  expect(showed.ops).toEqual([{ kind: "show" }]);
+  const memo = previous;
+  expect(planDockChange(memo, dockTarget(false, true)).ops).toEqual([
+    { kind: "show" },
+  ]);
 });
 
 test("a plan is never hide and show together", () => {

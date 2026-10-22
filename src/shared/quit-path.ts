@@ -10,6 +10,7 @@ export interface QuitPlanInput {
 }
 
 export interface QuitPlan {
+  armFallback: boolean;
   preventDefault: boolean;
   releaseHeld: boolean;
   /**
@@ -23,11 +24,17 @@ export interface QuitPlan {
 export const planQuit = (input: QuitPlanInput): QuitPlan => {
   const release = !input.releasingHeld && input.heldDeletes > 0;
   return {
+    // The 3s exit clock starts once trash is done, not while it runs.
+    armFallback: !release,
     preventDefault: release,
     releaseHeld: release,
     unblockWindows: true,
   };
 };
+
+/** A second SIGTERM or SIGINT exits immediately. The first one quits. */
+export const nextSignalQuit = (signalsSeen: number): "exit" | "quit" =>
+  signalsSeen > 0 ? "exit" : "quit";
 
 export const quitFallbackDue = (elapsedMs: number): boolean =>
   elapsedMs >= QUIT_FALLBACK_MS;
