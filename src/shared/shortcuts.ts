@@ -93,15 +93,15 @@ export const SHORTCUT_META: {
   id: ShortcutId;
   label: string;
 }[] = [
-  { id: "focusNext", label: "Next slip" },
-  { id: "focusPrev", label: "Previous slip" },
+  { id: "focusNext", label: "Next jot" },
+  { id: "focusPrev", label: "Previous jot" },
   { id: "extendNext", label: "Extend down" },
   { id: "extendPrev", label: "Extend up" },
   { id: "open", label: "Open" },
   { id: "dismiss", label: "Close" },
   { id: "archive", label: "Archive" },
   { id: "delete", label: "Delete" },
-  { id: "compose", label: "New slip" },
+  { id: "compose", label: "New jot" },
   { id: "undo", label: "Undo" },
   { id: "cheatsheet", label: "Shortcuts" },
 ];
@@ -129,11 +129,11 @@ export const CHEATSHEET: { rows: CheatRow[]; title: string }[] = [
       { id: "archive", label: "Archive" },
       { id: "delete", label: "Delete" },
     ],
-    title: "Slip",
+    title: "Jot",
   },
   {
     rows: [
-      { id: "compose", label: "New slip" },
+      { id: "compose", label: "New jot" },
       { id: "undo", label: "Undo" },
       { alias: "Mod+Slash", id: "cheatsheet", label: "This list" },
     ],

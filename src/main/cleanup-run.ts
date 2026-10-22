@@ -28,6 +28,8 @@ import {
 import type { MeasuredUsage } from "../shared/gateway-api";
 import { findModel } from "../shared/gateway-models";
 import type { GatewayModel } from "../shared/gateway-models";
+import { interpretStoredKey } from "../shared/key-status";
+import type { KeyStatus } from "../shared/key-status";
 import { languageSpend } from "../shared/speech-cost";
 import type { SpeechStepCost } from "../shared/speech-cost";
 import {
@@ -43,7 +45,23 @@ import type {
 /** Same file as the old cleanup key, so an existing key still loads. */
 const keyFile = (): string => path.join(app.getPath("userData"), "cleanup-key");
 
-export const cleanupKeySet = (): boolean => existsSync(keyFile());
+const storedKey = (): { status: KeyStatus; value: string } => {
+  const file = keyFile();
+  if (!existsSync(file)) {
+    return { status: "absent", value: "" };
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    return { status: "reenter", value: "" };
+  }
+  return interpretStoredKey({
+    bytes: readFileSync(file),
+    decrypt: (bytes) => safeStorage.decryptString(bytes),
+  });
+};
+
+export const cleanupKeyStatus = (): KeyStatus => storedKey().status;
+
+export const cleanupKeySet = (): boolean => cleanupKeyStatus() === "saved";
 
 export const writeCleanupKey = (key: string): boolean => {
   const file = keyFile();
@@ -59,17 +77,7 @@ export const writeCleanupKey = (key: string): boolean => {
   return true;
 };
 
-export const readCleanupKey = (): string => {
-  const file = keyFile();
-  if (!existsSync(file) || !safeStorage.isEncryptionAvailable()) {
-    return "";
-  }
-  try {
-    return safeStorage.decryptString(readFileSync(file));
-  } catch {
-    return "";
-  }
-};
+export const readCleanupKey = (): string => storedKey().value;
 
 const helperField = (parsed: unknown, key: "error" | "text"): string | null => {
   if (parsed === null || typeof parsed !== "object" || !(key in parsed)) {

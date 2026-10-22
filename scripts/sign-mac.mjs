@@ -203,7 +203,7 @@ const main = async () => {
     return;
   }
   if (argument === undefined || !argument.endsWith(".app")) {
-    console.error("usage: sign-mac.mjs [--mode] Slip.app");
+    console.error("usage: sign-mac.mjs [--mode] Jot.app");
     process.exit(1);
   }
   if (mode === "adhoc") {

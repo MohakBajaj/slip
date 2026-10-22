@@ -12,9 +12,29 @@ export const TrayGlyph = ({ id }: { id: TrayIconId }) => (
     viewBox="0 0 32 32"
   >
     {id === "slip" ? (
-      <g transform="rotate(-10 16 16)">
-        <rect height="19" rx="1.6" width="14" x="9" y="6.5" />
-        <path d="M12.2 13.2h7.4M12.4 17.2h5.8" />
+      <g transform="scale(1.454545)">
+        <mask id="jot-tray-cut" maskUnits="userSpaceOnUse">
+          <rect fill="white" height="22" width="22" />
+          <g fill="black" transform="translate(15 12) rotate(-45)">
+            <rect height="6.5" width="1.2" x="-0.6" y="-6.5" />
+            <circle r="0.9" />
+          </g>
+        </mask>
+        <g mask="url(#jot-tray-cut)">
+          <path
+            d="M4 4H15V16L12 19H4ZM12 19V16H15"
+            fill="none"
+            stroke="currentColor"
+            strokeLinejoin="miter"
+            strokeWidth="2"
+          />
+          <path
+            d="M0-6L3-1L1.8 5.2Q1.8 5.7 1.3 5.7H-1.3Q-1.8 5.7-1.8 5.2L-3-1Z"
+            fill="currentColor"
+            stroke="none"
+            transform="translate(15 12) rotate(-45)"
+          />
+        </g>
       </g>
     ) : null}
     {id === "shift" ? (

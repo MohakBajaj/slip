@@ -14,6 +14,7 @@ import {
   sanitizeNoteCapture,
   sanitizeVoiceCapture,
 } from "./capture-bind";
+import { SUPPORT_DIR, VAULT_DIR } from "./product";
 import type { Shortcuts } from "./shortcuts";
 import { defaultShortcuts, sanitizeShortcuts } from "./shortcuts";
 import type { SlipSpeechCost } from "./speech-cost";
@@ -91,14 +92,16 @@ const homeDir = (): string | undefined => {
 
 export const defaultVaultPath = (): string => {
   const home = homeDir();
-  return home === undefined ? "~/Documents/Slip" : `${home}/Documents/Slip`;
+  return home === undefined
+    ? `~/Documents/${VAULT_DIR}`
+    : `${home}/Documents/${VAULT_DIR}`;
 };
 
 export const settingsFile = (): string => {
   const home = homeDir();
   return home === undefined
     ? ""
-    : `${home}/Library/Application Support/slip/settings.json`;
+    : `${home}/Library/Application Support/${SUPPORT_DIR}/settings.json`;
 };
 
 export const defaultSettings = (): Settings => {

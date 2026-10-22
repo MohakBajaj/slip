@@ -26,7 +26,7 @@ export const sectionMenuEntries = ({
   },
   ...(canMerge ? [{ id: "merge", label: "Merge Section" }] : []),
   { type: "separator" },
-  { id: "dissolve", label: "Remove Section (keeps slips)" },
+  { id: "dissolve", label: "Remove Section (keeps jots)" },
 ];
 
 export const handleSectionMenu = (

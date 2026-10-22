@@ -55,12 +55,14 @@ import {
 import type { DockSnapshot } from "../shared/dock-policy";
 import { listMarkdown, promptFor, titleOf } from "../shared/format";
 import { findModel } from "../shared/gateway-models";
+import { missingGrants } from "../shared/grants";
 import { attachmentType, imageExt } from "../shared/images";
 import type { ImagePayload, PreviewState } from "../shared/images";
 import { slipPatch, slipRecord } from "../shared/markdown-file";
 import type { MenuEntry } from "../shared/menu";
 import { isMergeCaption } from "../shared/merge";
 import { annotatePlan, voicePillWidth } from "../shared/paste-out";
+import { PRODUCT_NAME, PRODUCT_SITE } from "../shared/product";
 import {
   QUIT_FALLBACK_MS,
   QUIT_HARD_FALLBACK_MS,
@@ -113,6 +115,7 @@ import {
   appleCleanupStatus,
   cleanTranscript,
   cleanupKeySet,
+  cleanupKeyStatus,
   readCleanupKey,
   writeCleanupKey,
 } from "./cleanup-run";
@@ -128,6 +131,7 @@ import {
   inputMonitoringGranted,
   requestInputMonitoring,
 } from "./input-monitor";
+import { handoffLogin } from "./login-handoff";
 import { grabRegion, pasteOutText } from "./paste-out";
 import { bundledBin, SpeechAbortedError, transcribeVoice } from "./transcribe";
 import type { VoiceTranscript } from "./transcribe";
@@ -137,7 +141,15 @@ const ACCESS =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 const MIC =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
+const SCREEN =
+  "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+
+app.setName(PRODUCT_NAME);
+
 const SETTINGS_FILE = settingsFile();
+if (SETTINGS_FILE.length > 0) {
+  app.setPath("userData", path.dirname(SETTINGS_FILE));
+}
 
 const embedImage = (
   filePath: string
@@ -247,7 +259,6 @@ let currentSection = "";
 let persistFont = false;
 
 const loadSettings = (): Settings => {
-  mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
   if (!existsSync(SETTINGS_FILE)) {
     return defaultSettings();
   }
@@ -619,10 +630,10 @@ const trayTemplate = (): MenuItemConstructorOptions[] => {
         ]
       : []),
     { type: "separator" },
-    { click: () => showWindow(), label: "Open Slip" },
-    { click: () => composeSlip(), label: "New Slip" },
+    { click: () => showWindow(), label: `Open ${PRODUCT_NAME}` },
+    { click: () => composeSlip(), label: `New ${PRODUCT_NAME}` },
     { click: () => showNote(), label: "Quick Note" },
-    { click: () => showVoice(), label: "Voice Slip" },
+    { click: () => showVoice(), label: `Voice ${PRODUCT_NAME}` },
     { click: () => showDraw(), label: "Draw" },
     { click: () => showAnnotateOut(), label: "Annotate" },
     { click: () => toggleDictate(), label: "Dictate" },
@@ -647,7 +658,7 @@ const trayTemplate = (): MenuItemConstructorOptions[] => {
       enabled: canLogin,
       label: canLogin
         ? "Start at Login"
-        : "Start at Login — needs installed Slip",
+        : `Start at Login — needs installed ${PRODUCT_NAME}`,
       type: "checkbox",
     },
     ...(capture === "denied"
@@ -665,7 +676,7 @@ const trayTemplate = (): MenuItemConstructorOptions[] => {
       click: () => {
         app.quit();
       },
-      label: "Quit Slip",
+      label: `Quit ${PRODUCT_NAME}`,
     },
   ];
 };
@@ -682,7 +693,9 @@ const rebuildTray = (): void => {
   const drawChord = formatCapture(settings.drawCapture);
   const hint = `${chord} to capture — ${noteChord} for a note — ${voiceChord} to speak — ${drawChord} to draw`;
   tray.setToolTip(
-    open > 0 ? `Slip — ${open} open — ${hint}` : `Slip — ${hint}`
+    open > 0
+      ? `${PRODUCT_NAME} — ${open} open — ${hint}`
+      : `${PRODUCT_NAME} — ${hint}`
   );
 };
 
@@ -707,7 +720,7 @@ const createTray = (): void => {
   applyTrayIcon();
   rebuildTray();
   if (image.isEmpty()) {
-    tray.setTitle("Slip");
+    tray.setTitle(PRODUCT_NAME);
   }
 };
 
@@ -846,7 +859,10 @@ const writeCapture = (event: CaptureEvent, ctx: FrontContext): Slip | null => {
     url: ctx.url,
   });
   if (settings.notify && Notification.isSupported()) {
-    new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
+    new Notification({
+      body: titleOf(slip.content),
+      title: PRODUCT_NAME,
+    }).show();
   }
   send("slips-changed");
   rebuildTray();
@@ -926,7 +942,7 @@ const bootCapture = (): void => {
         releaseVoice();
       },
       sequence: settings.capture,
-      skip: [app.getName(), "Electron"],
+      skip: [app.getName(), "Electron", "Slip", PRODUCT_NAME],
       voiceSequence: settings.voiceCapture,
     });
   } catch {
@@ -964,7 +980,7 @@ const createWindow = (): void => {
     minHeight: Math.round(520 * zoom),
     minWidth: Math.round(340 * zoom),
     show: false,
-    title: "Slip",
+    title: PRODUCT_NAME,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
@@ -1428,7 +1444,7 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
     // Compact header fits at 797. 24px of slack for macOS fonts and traffic lights.
     minWidth: 821,
     show: false,
-    title: "Slip Draw",
+    title: `${PRODUCT_NAME} Draw`,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
@@ -1439,6 +1455,9 @@ const showDraw = (attach = false, target: DrawTarget | null = null): void => {
       webgl: false,
     },
     width,
+  });
+  drawWin.webContents.on("page-title-updated", (event) => {
+    event.preventDefault();
   });
   pinWorkspace(drawWin);
   drawWin.on("ready-to-show", () => {
@@ -1481,6 +1500,7 @@ const ownFront = (name: string): boolean =>
   name.length === 0 ||
   name === "Electron" ||
   name === "Slip" ||
+  name === PRODUCT_NAME ||
   name === app.getName();
 
 const placeNote = (target: BrowserWindow): void => {
@@ -1678,8 +1698,30 @@ const showNote = (): void => {
   setTimeout(openNote, 0);
 };
 
+const currentGrants = () => {
+  if (process.platform !== "darwin") {
+    return [];
+  }
+  return missingGrants({
+    accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+    inputMonitoring: inputMonitoringGranted(),
+    microphone: systemPreferences.getMediaAccessStatus("microphone"),
+    screen: systemPreferences.getMediaAccessStatus("screen"),
+  });
+};
+
 const boot = async (): Promise<void> => {
   await app.whenReady();
+  app.setAboutPanelOptions({
+    applicationName: PRODUCT_NAME,
+    applicationVersion: app.getVersion(),
+    copyright: PRODUCT_SITE,
+    website: PRODUCT_SITE,
+  });
+  if (process.platform === "darwin" && !inputMonitoringGranted()) {
+    requestInputMonitoring();
+  }
+  void handoffLogin();
   const onQuitSignal = (): void => {
     // The next SIGTERM or SIGINT is the default kill, even if this
     // thread is busy inside quit and cannot run another JS handler.
@@ -1961,7 +2003,7 @@ const boot = async (): Promise<void> => {
         if (settings.notify && Notification.isSupported()) {
           new Notification({
             body: titleOf(slip.content),
-            title: "Slip",
+            title: PRODUCT_NAME,
           }).show();
         }
         send("slips-changed");
@@ -2018,6 +2060,7 @@ const boot = async (): Promise<void> => {
     return writeCleanupKey(key);
   });
   ipcMain.handle("cleanupKeySet", () => cleanupKeySet());
+  ipcMain.handle("cleanupKeyStatus", () => cleanupKeyStatus());
   ipcMain.handle("appleCleanupStatus", () =>
     appleCleanupStatus(bundledBin("slip-cleanup"))
   );
@@ -2039,7 +2082,10 @@ const boot = async (): Promise<void> => {
         : null;
     if (slip) {
       if (settings.notify && Notification.isSupported()) {
-        new Notification({ body: titleOf(slip.content), title: "Slip" }).show();
+        new Notification({
+          body: titleOf(slip.content),
+          title: PRODUCT_NAME,
+        }).show();
       }
       send("slips-changed");
       rebuildTray();
@@ -2124,7 +2170,7 @@ const boot = async (): Promise<void> => {
         section: currentSection,
       });
       if (settings.notify && Notification.isSupported()) {
-        new Notification({ body: "Annotation", title: "Slip" }).show();
+        new Notification({ body: "Annotation", title: PRODUCT_NAME }).show();
       }
       send("slips-changed");
       rebuildTray();
@@ -2144,7 +2190,7 @@ const boot = async (): Promise<void> => {
       section: currentSection,
     });
     if (settings.notify && Notification.isSupported()) {
-      new Notification({ body: "Drawing", title: "Slip" }).show();
+      new Notification({ body: "Drawing", title: PRODUCT_NAME }).show();
     }
     send("slips-changed");
     rebuildTray();
@@ -2307,6 +2353,8 @@ const boot = async (): Promise<void> => {
   });
   ipcMain.handle("inputMonitoring", () => inputMonitoringGranted());
   ipcMain.handle("openMic", () => shell.openExternal(MIC));
+  ipcMain.handle("openScreen", () => shell.openExternal(SCREEN));
+  ipcMain.handle("grantStatus", () => currentGrants());
   ipcMain.handle("openVoice", () => {
     showVoice();
   });
@@ -2349,7 +2397,7 @@ const boot = async (): Promise<void> => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: "Slip",
+        label: PRODUCT_NAME,
         submenu: [
           { role: "about" },
           { type: "separator" },
@@ -2373,7 +2421,7 @@ const boot = async (): Promise<void> => {
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          { label: "Quit Slip", role: "quit" },
+          { label: `Quit ${PRODUCT_NAME}`, role: "quit" },
         ],
       },
       { role: "editMenu" },
@@ -2403,7 +2451,7 @@ const boot = async (): Promise<void> => {
           {
             accelerator: "Command+N",
             click: () => composeSlip(),
-            label: "New Slip",
+            label: `New ${PRODUCT_NAME}`,
           },
           {
             accelerator: "Command+F",
@@ -2425,7 +2473,7 @@ const boot = async (): Promise<void> => {
           },
           {
             click: () => showVoice(),
-            label: "Voice Slip",
+            label: `Voice ${PRODUCT_NAME}`,
           },
           {
             click: () => showDraw(),
@@ -2495,8 +2543,6 @@ const boot = async (): Promise<void> => {
     showWindow();
   });
 };
-
-app.setName("Slip");
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (gotSingleInstanceLock) {

@@ -969,13 +969,13 @@ export const DrawApp = () => {
   };
 
   const slipId = plate?.slipId ?? "";
-  let saveLabel = "Slip";
+  let saveLabel = "Jot";
   if (out) {
     saveLabel = "Inbox";
   } else if (attach || slipId.length > 0) {
     saveLabel = "Add";
   }
-  let heading = "Slip Draw";
+  let heading = "Jot Draw";
   if (flash.length > 0) {
     heading = flash;
   } else if (out || plate !== null) {

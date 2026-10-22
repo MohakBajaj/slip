@@ -14,7 +14,7 @@ export const titleOf = (content: string): string => {
 export const renderIndex = (slips: Slip[]): string => {
   const open = slips.filter((slip) => !slip.archived);
   const lines = [
-    "# Slip index",
+    "# Jot index",
     "",
     "Generated. Agents: prefer this list, then open the `.md` file.",
     "",
