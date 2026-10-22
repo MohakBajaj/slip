@@ -11,7 +11,7 @@
     "src/vault.ts",
     "src/skill-template.ts"
   ],
-  "exclude": ["src/**/*.test.ts"],
+  "exclude": ["src/**/*.test.ts", "site"],
   "compilerOptions": {
     "composite": false,
     "declaration": false,

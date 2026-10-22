@@ -28,6 +28,8 @@ export default defineConfig({
     ...(core.ignorePatterns ?? []),
     "**/release",
     "**/*.test.ts",
+    // site/ is its own package. The app check must not lint it.
+    "site/**",
   ],
   overrides: [
     {
