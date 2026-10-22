@@ -145,7 +145,7 @@ if (hasVideo) {
   const poster = join(publicDir, "intro-poster.jpg")
   if (!existsSync(poster) || statSync(poster).size === 0) {
     throw new Error(
-      "public/intro.mp4 is present but public/intro-poster.jpg is missing. Extract the frame at 25.5s."
+      "public/intro.mp4 is present but public/intro-poster.jpg is missing. Extract the frame at 38.8s."
     )
   }
 } else {

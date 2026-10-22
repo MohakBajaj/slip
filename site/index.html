@@ -140,7 +140,11 @@
           <div>
             <h2 id="shortcuts-title">shortcuts</h2>
             <p class="lead">a few shortcuts. short enough to remember.</p>
-            <p class="sub">hold fn to dictate. that's the one to remember.</p>
+            <ul class="keys">
+              <li><span class="key">shift shift</span> captures the selection into the inbox.</li>
+              <li><span class="key">hold fn</span> to dictate.</li>
+              <li><span class="key">⌃⌥A</span> to annotate anywhere.</li>
+            </ul>
           </div>
         </section>
 
@@ -191,11 +195,34 @@
       <p>made by Mohak Bajaj</p>
     </footer>
     <script>
+      var video = document.querySelector("#intro video")
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      var startPreview = function () {
+        if (!video || video.dataset.watched === "1") return
+        video.muted = true
+        var pending = video.play()
+        if (pending && pending.catch) pending.catch(function () {})
+      }
+      if (video && !reduce && "IntersectionObserver" in window) {
+        var seen = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) startPreview()
+          })
+        }, { threshold: 0.35 })
+        seen.observe(video)
+      } else if (video && !reduce) {
+        startPreview()
+      }
       var watch = document.getElementById("watch")
-      if (watch) {
+      if (watch && video) {
         watch.addEventListener("click", function () {
-          var video = document.querySelector("#intro video")
-          if (video && video.play) video.play().catch(function () {})
+          video.dataset.watched = "1"
+          video.controls = true
+          if (video.readyState >= 1) video.currentTime = 0
+          video.muted = false
+          video.volume = 1
+          var pending = video.play()
+          if (pending && pending.catch) pending.catch(function () {})
         })
       }
     </script>

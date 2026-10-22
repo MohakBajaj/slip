@@ -26,12 +26,12 @@ Edit `src/constants.ts`.
 
 ## Intro video
 
-`public/intro.mp4` plays muted and inline. `public/intro-poster.jpg` is the frame at 25.5 seconds.
+`public/intro.mp4` autoplays inline and muted when it scrolls into view. “watch the intro” restarts it with sound and controls. `public/intro-poster.jpg` is the frame at 38.8 seconds.
 
 If `intro.mp4` is missing, the build shows a still and does not request the file.
 
 To refresh the poster after replacing the video:
 
 ```sh
-ffmpeg -y -i public/intro.mp4 -ss 25.5 -frames:v 1 -update 1 public/intro-poster.jpg
+ffmpeg -y -i public/intro.mp4 -ss 38.8 -frames:v 1 -update 1 public/intro-poster.jpg
 ```
